@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Primary Meta Tags -->
+  <meta name="title" content="SyMuPe: Affective and Controllable Symbolic Music Performance - Ilya Borovik, Dmitrii Gavrilev, Vladimir Viro">
+  <meta name="description" content="We present SyMuPe, a novel framework for creating controllable models of symbolic music performance rendering, and PianoFlow, a state-of-the-art model that uses conditional flow matching to render and inpaint expressive piano performances.">
+  <meta name="keywords" content="expressive music performance, symbolic music, generative models, flow matching, emotions, affective computing">
+  <meta name="author" content="Ilya Borovik, Dmitrii Gavrilev, Vladimir Viro">
+  <meta name="robots" content="index, follow">
+  <meta name="language" content="English">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Skolkovo Institute of Science and Technology">
+  <meta property="og:title" content="SyMuPe: Affective and Controllable Symbolic Music Performance - Ilya Borovik, Dmitrii Gavrilev, Vladimir Viro">
+  <meta property="og:description" content="We present SyMuPe, a novel framework for creating controllable models of symbolic music performance rendering, and PianoFlow, a state-of-the-art model that uses conditional flow matching to render and inpaint expressive piano performances.">
+  <meta property="og:url" content="https://ilya16.github.io/SyMuPe">
+  <meta property="og:image" content="https://dl.acm.org/cms/asset/a4d0699b-ce38-4834-a7c1-569e3b21f0aa/3746027.3755871.key.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="SyMuPe: Affective and Controllable Symbolic Music Performance - Research Preview">
+  <meta property="article:published_time" content="2025-10-27T00:00:00.000Z">
+  <meta property="article:author" content="Ilya Borovik">
+  <meta property="article:section" content="Research">
+  <meta property="article:tag" content="symbolic music">
+  <meta property="article:tag" content="generative models">
+  <meta property="article:tag" content="flow matching">
+  <meta property="article:tag" content="emotions">
+  <meta property="article:tag" content="affective computing">
+
+  <!-- Academic/Research Specific -->
+  <meta name="citation_title" content="SyMuPe: Affective and Controllable Symbolic Music Performance">
+  <meta name="citation_author" content="Borovik, Ilya">
+  <meta name="citation_author" content="Gavrilev, Dmitrii">
+  <meta name="citation_author" content="Viro, Vladimir">
+  <meta name="citation_publication_date" content="2025-10-27">
+  <meta name="citation_conference_title" content="ACM Multimedia 2025">
+  <meta name="citation_pdf_url" content="https://dl.acm.org/doi/10.1145/3746027.3755871">
+
+  <!-- Additional SEO -->
+  <meta name="theme-color" content="#2563eb">
+  <meta name="msapplication-TileColor" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+  <!-- Preconnect for performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://ajax.googleapis.com">
+  <link rel="preconnect" href="https://documentcloud.adobe.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="preload" href="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/videos/control.mp4" as="video" type="video/mp4">
+
+  <title>SyMuPe: Affective and Controllable Symbolic Music Performance - Ilya Borovik, Dmitrii Gavrilev, Vladimir Viro | Academic Research</title>
+
+  <!-- Favicon and App Icons -->
+<!--  <link rel="icon" type="image/x-icon" href="static/images/survey.png">-->
+<!--  <link rel="apple-touch-icon" href="static/images/survey.png">-->
+
+  <!-- Critical CSS - Load synchronously -->
+  <link rel="stylesheet" href="static/css/bulma.min.css">
+  <link rel="stylesheet" href="static/css/index.css">
+  <link rel="stylesheet" href="static/css/style.css">
+
+  <!-- Non-critical CSS - Load asynchronously -->
+  <link rel="preload" href="static/css/bulma-carousel.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" href="static/css/bulma-slider.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" href="static/css/fontawesome.all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+
+  <!-- Fallback for browsers that don't support preload -->
+  <noscript>
+    <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
+    <link rel="stylesheet" href="static/css/bulma-slider.min.css">
+    <link rel="stylesheet" href="static/css/fontawesome.all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  </noscript>
+
+  <!-- Fonts - Optimized loading -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Defer non-critical JavaScript -->
+  <script defer src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="https://documentcloud.adobe.com/view-sdk/main.js"></script>
+  <script defer src="static/js/fontawesome.all.min.js"></script>
+  <script defer src="static/js/bulma-carousel.min.js"></script>
+  <script defer src="static/js/bulma-slider.min.js"></script>
+  <script defer src="static/js/index.js"></script>
+
+  <!-- Structured Data for Academic Papers -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ScholarlyArticle",
+    "headline": "SyMuPe: Affective and Controllable Symbolic Music Performance",
+    "description": "We present SyMuPe, a novel framework for creating controllable models of symbolic music performance rendering, and PianoFlow, a state-of-the-art model that uses conditional flow matching to render and inpaint expressive piano performances.",
+    "author": [
+      {
+        "@type": "Person",
+        "name": "Ilya Borovik",
+        "affiliation": {
+          "@type": "Organization",
+          "name": "Skolkovo Institute of Science and Technology"
+        }
+      },
+      {
+        "@type": "Person",
+        "name": "Dmitrii Gavrilev",
+        "affiliation": {
+          "@type": "Organization",
+          "name": "Skolkovo Institute of Science and Technology"
+        }
+      },
+      {
+        "@type": "Person",
+        "name": "Vladimir Viro",
+        "affiliation": {
+          "@type": "Organization",
+          "name": "Peachnote GmbH"
+        }
+      }
+    ],
+    "datePublished": "2025-10-27",
+    "publisher": {
+      "@type": "Organization",
+      "name": "ACM Multimedia 2025"
+    },
+    "url": "https://ilya16.github.io/SyMuPe",
+    "image": "https://dl.acm.org/cms/asset/a4d0699b-ce38-4834-a7c1-569e3b21f0aa/3746027.3755871.key.jpg",
+    "keywords": ["expressive music performance", "symbolic music", "generative models", "flow matching", "emotions", "affective computing"],
+    "abstract": "Emotions are fundamental to the creation and perception of music performances. However, achieving human-like expression and emotion through machine learning models for performance rendering remains a challenging task. In this work, we present SyMuPe, a novel framework for developing and training affective and controllable symbolic piano performance models. Our flagship model, PianoFlow, uses conditional flow matching trained to solve diverse multi-mask performance inpainting tasks. By design, it supports both unconditional generation and infilling of music performance features. For training, we use a curated, cleaned dataset of 3,000 hours of aligned musical scores and expressive MIDI performances. For text and emotion control, we integrate a piano performance emotion classifier and tune PianoFlow with the emotion-weighted Flan-T5 text embeddings provided as conditional inputs. Objective and subjective evaluations against transformer-based baselines and existing models show that PianoFlow not only outperforms other approaches, but also achieves performance quality comparable to human-recorded and transcribed MIDI samples. For emotion control, we present and analyze samples generated under different text conditioning scenarios. The developed model can be integrated into interactive applications, contributing to the creation of more accessible and engaging music performance systems.",
+    "citation": "@inproceedings{borovik2025symupe, title = {{SyMuPe: Affective and Controllable Symbolic Music Performance}}, author = {Borovik, Ilya and Gavrilev, Dmitrii and Viro, Vladimir}, year = {2025}, booktitle = {Proceedings of the 33rd ACM International Conference on Multimedia}, pages = {10699--10708}, doi = {10.1145/3746027.3755871}}",
+    "isAccessibleForFree": true,
+    "license": "https://creativecommons.org/licenses/by/4.0/",
+    "mainEntity": {
+      "@type": "WebPage",
+      "@id": "https://ilya16.github.io/SyMuPe"
+    },
+    "about": [
+      {
+        "@type": "Thing",
+        "name": "music information retrieval"
+      },
+      {
+        "@type": "Thing",
+        "name": "expressive performance rendering"
+      },
+      {
+        "@type": "Thing",
+        "name": "generative modeling"
+      },
+      {
+        "@type": "Thing",
+        "name": "affective computing"
+      }
+    ]
+  }
+  </script>
+</head>
+
+<body>
+  <!-- Scroll to Top Button -->
+  <button class="scroll-to-top" onclick="scrollToTop()" title="Scroll to top" aria-label="Scroll to top">
+    <i class="fas fa-chevron-up"></i>
+  </button>
+
+  <nav class="navbar is-fixed-top is-light" role="navigation" aria-label="main navigation">
+    <div class="container">
+      <div class="navbar-brand">
+        <a class="navbar-item has-text-weight-bold navbar-brand-link" href="#home">SyMuPe</a>
+        <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="symupeNavbar">
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </a>
+      </div>
+      <div id="symupeNavbar" class="navbar-menu">
+        <div class="navbar-end">
+          <a class="navbar-item" href="#abstract">Abstract</a>
+          <a class="navbar-item" href="#highlights">Highlights</a>
+          <a class="navbar-item" href="#samples-uncond">Unconditional</a>
+          <a class="navbar-item" href="#samples-cond">Text-Conditioned</a>
+          <a class="navbar-item" href="#emotion-classifier">Classifier</a>
+          <a class="navbar-item" href="#BibTeX">Citation</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="more-works-container">
+    <button class="more-works-btn" onclick="toggleMoreWorks()" title="View More Works from Our Lab">
+      <i class="fas fa-flask"></i>
+      More Works
+      <i class="fas fa-chevron-down dropdown-arrow"></i>
+    </button>
+    <div class="more-works-dropdown" id="moreWorksDropdown">
+      <div class="dropdown-header">
+        <h4>More Works</h4>
+        <button class="close-btn" onclick="toggleMoreWorks()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="works-list">
+        <a href="https://archives.ismir.net/ismir2023/paper/000069.pdf" class="work-item" target="_blank">
+          <div class="work-info">
+            <h5>ScorePerformer: Expressive Piano Performance Rendering With Fine-Grained Control</h5>
+<!--            <p>Brief description of the work and its main contribution.</p>-->
+            <span class="work-venue">ISMIR 2023</span>
+          </div>
+          <i class="fas fa-external-link-alt"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <section class="hero" id="home">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+            <h1 class="title is-1 publication-title">SyMuPe: Affective and Controllable Symbolic Music Performance</h1>
+
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+                <a href="https://scholar.google.com/citations?user=F9BpdRMAAAAJ&hl=ru" target="_blank">Ilya Borovik</a><sup>1</sup>,
+              </span>
+              <span class="author-block">
+                <a href="https://scholar.google.com/citations?hl=ru&user=K1Q_JjYAAAAJ" target="_blank">Dmitrii Gavrilev</a><sup>1</sup>,
+              </span>
+              <span class="author-block">
+                <a href="https://www.linkedin.com/in/vladimirviro" target="_blank">Vladimir Viro</a><sup>2</sup>
+              </span>
+            </div>
+
+            <div class="is-size-5 publication-authors">
+              <span class="author-block"><sup>1</sup>Skoltech,</span>
+              <span class="author-block"><sup>2</sup>Peachnote GmbH</span>
+              <br>
+              <span class="author-block">ACM Multimedia 2025</span>
+            </div>
+
+<!--            <div class="is-size-5">-->
+<!--              <b>ACM Multimedia 2025</b>-->
+<!--            </div>-->
+
+            <div class="column has-text-centered">
+              <div class="publication-links">
+<!--                <span class="link-block">-->
+<!--                  <a href="https://arxiv.org/pdf/<ARXIV PAPER ID>.pdf" target="_blank"  class="external-link button is-normal is-rounded is-dark">-->
+<!--                    <span class="icon">-->
+<!--                      <i class="fas fa-file-pdf"></i>-->
+<!--                    </span>-->
+<!--                    <span>Paper</span>-->
+<!--                  </a>-->
+<!--                </span>-->
+
+                <span class="link-block">
+                  <a href="https://github.com/ilya16/SyMuPe" target="_blank"
+                  class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="fab fa-github"></i>
+                    </span>
+                    <span>Code</span>
+                  </a>
+                </span>
+
+                <span class="link-block">
+                  <a href="https://dl.acm.org/doi/10.1145/3746027.3755871" target="_blank"
+                  class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="ai ai-acmdl"></i>
+                    </span>
+                    <span>ACM DL</span>
+                  </a>
+                </span>
+
+<!--                <span class="link-block">-->
+<!--                  <a href="https://arxiv.org/abs/<ARXIV PAPER ID>" target="_blank"-->
+<!--                  class="external-link button is-normal is-rounded is-dark">-->
+<!--                    <span class="icon">-->
+<!--                      <i class="ai ai-arxiv"></i>-->
+<!--                    </span>-->
+<!--                    <span>arXiv</span>-->
+<!--                  </a>-->
+<!--                </span>-->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Teaser video-->
+  <section class="hero teaser">
+    <div class="container is-max-widescreen">
+      <div class="hero-body">
+        <video poster="static/videos/control-frame.png" id="teaser-video" autoplay controls muted height="100%" preload="auto" style="border: 1px solid var(--border-color); border-radius: var(--border-radius-lg);">
+<!--          <source src="static/videos/control.mp4" type="video/mp4">-->
+          <source src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/videos/control.mp4" type="video/mp4">
+        </video>
+        <h2 class="subtitle has-text-centered">
+          <b>PianoFlow in Action:</b>
+          A demonstration of how different text prompts and emotional cues dynamically alter a piano performance, controlling its tempo, dynamics, and articulation.
+        </h2>
+      </div>
+    </div>
+  </section>
+  <!-- End teaser video -->
+
+  <!-- Paper abstract -->
+  <section class="section hero is-light" id="abstract">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Abstract</h2>
+          <div class="content has-text-justified">
+            <p>
+              Emotions are fundamental to the creation and perception of music performances. However, achieving
+              human-like expression and emotion through machine learning models for performance rendering remains a
+              challenging task. In this work, we present SyMuPe, a novel framework for developing and training affective
+              and controllable symbolic piano performance models. Our flagship model, PianoFlow, uses conditional flow
+              matching trained to solve diverse multi-mask performance inpainting tasks. By design, it supports both
+              unconditional generation and infilling of music performance features. For training, we use a curated,
+              cleaned dataset of 2,968 hours of aligned musical scores and expressive MIDI performances. For text and
+              emotion control, we integrate a piano performance emotion classifier and tune PianoFlow with the
+              emotion-weighted Flan-T5 text embeddings provided as conditional inputs. Objective and subjective
+              evaluations against transformer-based baselines and existing models show that PianoFlow not only
+              outperforms other approaches, but also achieves performance quality comparable to that of human-recorded
+              and transcribed MIDI samples. For emotion control, we present and analyze samples generated under
+              different text conditioning scenarios. The developed model can be integrated into interactive
+              applications, contributing to the creation of more accessible and engaging music performance systems.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- End paper abstract -->
+
+  <!-- Image carousel of key results -->
+  <section class="hero" id="highlights">
+    <div class="hero-body">
+      <div class="container is-max-widescreen">
+        <h2 class="title is-3 has-text-centered">Highlights</h2>
+        <div class="carousel results-carousel" id="results-carousel">
+          <div class="item">
+            <img alt="Architecture of the PianoFlow model" src="static/images/pianoflow.png" style="padding: 12px;"/>
+            <h2 class="subtitle has-text-centered">
+              <b>PianoFlow Architecture:</b>
+              Architecture of the PianoFlow model with the text- and emotion-based control inputs on the left
+              and score-performance inputs and generation logic on the right.
+            </h2>
+          </div>
+          <div class="item">
+            <img alt="Objective evaluation results" src="static/images/objective-eval.png" style="padding: 12px;"/>
+            <h2 class="subtitle has-text-centered">
+              <b>Objective Evaluation Results:</b>
+              Metrics computed for between the real data samples and performances rendered by different models.
+            </h2>
+          </div>
+          <div class="item">
+            <img alt="Side-by-side listening test results" src="static/images/survey.png" style="max-width: 900px; padding: 12px;"/>
+            <h2 class="subtitle has-text-centered">
+              <b>Listening Test Results:</b>
+              Aggregated win rates for the dataset and model samples evaluated during the side-by-side listening test.
+              The samples are presented <a href="#samples-uncond">below</a>.
+            </h2>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- End image carousel -->
+
+  <section class="section hero is-light" id="samples-uncond">
+    <!-- FIX: Use a wider container class -->
+    <div class="container is-max-widescreen">
+      <h2 class="title is-3 has-text-centered">1. Unconditional Piano Performance Rendering</h2>
+      <div class="content has-text-centered">
+        <p>MIDI samples were synthesized using <a href="https://www.modartt.com/pianoteq_overview" target="_blank">Pianoteq</a>.</p>
+      </div>
+
+      <details class="period-accordion" open>
+        <summary>Baroque Period<i class="fas fa-chevron-down"></i></summary>
+          <div class="accordion-content">
+              <!-- Card for Bach Fantasia -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Johann Sebastian Bach</div>
+                          <div class="work">Fantasia and Fugue in A Minor, BWV 944</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Fantasia_Fugue_A_Minor_BWV944/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Fantasia_Fugue_A_Minor_BWV944/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Fantasia_Fugue_A_Minor_BWV944/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Fantasia_Fugue_A_Minor_BWV944/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Fantasia_Fugue_A_Minor_BWV944/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Fantasia_Fugue_A_Minor_BWV944/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Fantasia_Fugue_A_Minor_BWV944/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+
+              <!-- Card for Bach Invention -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Johann Sebastian Bach</div>
+                          <div class="work">Invention No.11 in G minor, BWV782</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Invention_G_minor_BWV782/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Invention_G_minor_BWV782/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Invention_G_minor_BWV782/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Invention_G_minor_BWV782/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Invention_G_minor_BWV782/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Invention_G_minor_BWV782/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Bach_Invention_G_minor_BWV782/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+
+              <!-- Card for Handel Suite -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">George Frideric Handel</div>
+                          <div class="work">Suite No.7 in G Minor, VI. Passacaille</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Handel_Suite_G_Minor_Passacaille/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Handel_Suite_G_Minor_Passacaille/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Handel_Suite_G_Minor_Passacaille/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Handel_Suite_G_Minor_Passacaille/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Handel_Suite_G_Minor_Passacaille/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Handel_Suite_G_Minor_Passacaille/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Handel_Suite_G_Minor_Passacaille/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+          </div>
+      </details>
+
+      <details class="period-accordion">
+          <summary>Classical Period<i class="fas fa-chevron-down"></i></summary>
+          <div class="accordion-content">
+              <!-- Card for Beethoven Sonata No.25 -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Ludwig van Beethoven</div>
+                          <div class="work">Piano Sonata No.25 in G, Op.79 (Andante)</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_G_Op79_Andante/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_G_Op79_Andante/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_G_Op79_Andante/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_G_Op79_Andante/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_G_Op79_Andante/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_G_Op79_Andante/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_G_Op79_Andante/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+              <!-- Card for Beethoven Sonata No.30 -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Ludwig van Beethoven</div>
+                          <div class="work">Piano Sonata No.30 in E Major, Op.109 (III. Andante)</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_E_Op109_III/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_E_Op109_III/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_E_Op109_III/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_E_Op109_III/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_E_Op109_III/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_E_Op109_III/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Beethoven_Sonata_E_Op109_III/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+              <!-- Card for Mozart Sonata No.11 -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Wolfgang Amadeus Mozart</div>
+                          <div class="work">Piano Sonata No.11 in A Major, K.331 (Alla Turca)</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Mozart_Sonata_A_K331_Turca/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Mozart_Sonata_A_K331_Turca/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Mozart_Sonata_A_K331_Turca/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Mozart_Sonata_A_K331_Turca/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Mozart_Sonata_A_K331_Turca/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Mozart_Sonata_A_K331_Turca/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Mozart_Sonata_A_K331_Turca/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+          </div>
+      </details>
+
+      <details class="period-accordion">
+          <summary>Romantic Period<i class="fas fa-chevron-down"></i></summary>
+          <div class="accordion-content">
+              <!-- Card for Schubert Waltzes -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Franz Schubert</div>
+                          <div class="work">Valses sentimentales, D.779 (Waltz in A major)</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Schubert_Waltzes_D779_A_major/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Schubert_Waltzes_D779_A_major/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Schubert_Waltzes_D779_A_major/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Schubert_Waltzes_D779_A_major/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Schubert_Waltzes_D779_A_major/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Schubert_Waltzes_D779_A_major/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Schubert_Waltzes_D779_A_major/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+              <!-- Card for Chopin Ballade -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Frederic Chopin</div>
+                          <div class="work">Ballade No.1 in G Minor, Op.23</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Ballade_G_Minor_Op23/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Ballade_G_Minor_Op23/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Ballade_G_Minor_Op23/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Ballade_G_Minor_Op23/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Ballade_G_Minor_Op23/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Ballade_G_Minor_Op23/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Ballade_G_Minor_Op23/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+              <!-- Card for Chopin Nocturne -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Frederic Chopin</div>
+                          <div class="work">Nocturne No.1 in B‑flat Minor, Op.9 No.1</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Nocturne_Bb_minor_Op9_1/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Nocturne_Bb_minor_Op9_1/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Nocturne_Bb_minor_Op9_1/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Nocturne_Bb_minor_Op9_1/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Nocturne_Bb_minor_Op9_1/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Nocturne_Bb_minor_Op9_1/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Chopin_Nocturne_Bb_minor_Op9_1/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+              <!-- Card for Liszt Ballade -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Franz Liszt</div>
+                          <div class="work">Ballade No.2, S.171</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Ballade_2_S171/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Ballade_2_S171/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Ballade_2_S171/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Ballade_2_S171/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Ballade_2_S171/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Ballade_2_S171/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Ballade_2_S171/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+               <!-- Card for Liszt Rhapsody -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Franz Liszt</div>
+                          <div class="work">Hungarian Rhapsody No.6</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Hungarian_Rhapsody_6/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Hungarian_Rhapsody_6/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Hungarian_Rhapsody_6/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Hungarian_Rhapsody_6/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Hungarian_Rhapsody_6/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Hungarian_Rhapsody_6/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Liszt_Hungarian_Rhapsody_6/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+          </div>
+      </details>
+
+      <details class="period-accordion">
+          <summary>Impressionism / Early Modern<i class="fas fa-chevron-down"></i></summary>
+          <div class="accordion-content">
+              <!-- Card for Glinka Lark -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Mikhail Glinka</div>
+                          <div class="work">"The Lark" from A Farewell to Saint Petersburg</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Glinka_Farewell_Lark/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Glinka_Farewell_Lark/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Glinka_Farewell_Lark/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Glinka_Farewell_Lark/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Glinka_Farewell_Lark/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Glinka_Farewell_Lark/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Glinka_Farewell_Lark/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+              <!-- Card for Ravel Jeux -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Maurice Ravel</div>
+                          <div class="work">Jeux d'eau, M.30</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Ravel_Jeux_deau_M30/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Ravel_Jeux_deau_M30/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Ravel_Jeux_deau_M30/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Ravel_Jeux_deau_M30/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Ravel_Jeux_deau_M30/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Ravel_Jeux_deau_M30/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Ravel_Jeux_deau_M30/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+              <!-- Card for Satie Gymnopedies -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Erik Satie</div>
+                          <div class="work">3 Gymnopédies (I. Lent et douloureux)</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Satie_Gymnopedie_1/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Satie_Gymnopedie_1/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Satie_Gymnopedie_1/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Satie_Gymnopedie_1/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Satie_Gymnopedie_1/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Satie_Gymnopedie_1/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Satie_Gymnopedie_1/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+          </div>
+      </details>
+
+      <details class="period-accordion">
+          <summary>Late Romantic / Other Styles<i class="fas fa-chevron-down"></i></summary>
+          <div class="accordion-content">
+              <!-- Card for Prokofiev Toccata -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Sergei Prokofiev</div>
+                          <div class="work">Toccata, Op.11</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Prokofiev_Toccata_Op11/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Prokofiev_Toccata_Op11/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Prokofiev_Toccata_Op11/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Prokofiev_Toccata_Op11/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Prokofiev_Toccata_Op11/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Prokofiev_Toccata_Op11/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Prokofiev_Toccata_Op11/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+              <!-- Card for Grieg Sonata -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Edvard Grieg</div>
+                          <div class="work">Piano Sonata, Op.7 (Andante molto)</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Grieg_Lyric_Butterfly/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Grieg_Lyric_Butterfly/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Grieg_Lyric_Butterfly/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Grieg_Lyric_Butterfly/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Grieg_Lyric_Butterfly/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Grieg_Lyric_Butterfly/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Grieg_Lyric_Butterfly/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+               <!-- Card for Elgar Salut -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Edward Elgar</div>
+                          <div class="work">Salut d'amour, Op.12</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Elgar_Salut_Op12/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Elgar_Salut_Op12/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Elgar_Salut_Op12/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Elgar_Salut_Op12/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Elgar_Salut_Op12/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Elgar_Salut_Op12/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Elgar_Salut_Op12/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+              <!-- Card for Joplin Rag -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Scott Joplin</div>
+                          <div class="work">Maple Leaf Rag</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Joplin_Maple_Leaf/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Joplin_Maple_Leaf/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Joplin_Maple_Leaf/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Joplin_Maple_Leaf/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Joplin_Maple_Leaf/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Joplin_Maple_Leaf/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Joplin_Maple_Leaf/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+              <!-- Card for Balakirev Islamey -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Mily Balakirev</div>
+                          <div class="work">Islamey, Op.18</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Balakirev_Islamey_Op18/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Balakirev_Islamey_Op18/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Balakirev_Islamey_Op18/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Balakirev_Islamey_Op18/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Balakirev_Islamey_Op18/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Balakirev_Islamey_Op18/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Balakirev_Islamey_Op18/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+               <!-- Card for Rachmaninoff Sonata -->
+              <div class="composition-card">
+                  <div class="composition-header">
+                      <div class="composition-info">
+                          <div class="composer">Sergei Rachmaninoff</div>
+                          <div class="work">Piano Sonata No.2 in B‑flat Minor, Op.36 (Allegro molto)</div>
+                      </div>
+                      <div class="custom-player">
+                          <span class="model-name">Deadpan</span>
+                          <button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button>
+                          <div class="progress-bar"><div class="progress"></div></div>
+                          <span class="time-display">0:00 / 0:00</span>
+                          <audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Rachmaninoff_Sonata_Bb_Op36_III/dp_01.mp3" preload="none"></audio>
+                      </div>
+                  </div>
+                  <div class="audio-players-grid">
+                      <div class="custom-player"><span class="model-name">Dataset</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Rachmaninoff_Sonata_Bb_Op36_III/ds_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">PianoFlow</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Rachmaninoff_Sonata_Bb_Op36_III/pf_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">VirtuosoNet</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Rachmaninoff_Sonata_Bb_Op36_III/vn_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">DExter</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Rachmaninoff_Sonata_Bb_Op36_III/de_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">MLM</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Rachmaninoff_Sonata_Bb_Op36_III/mm_01.mp3" preload="none"></audio></div>
+                      <div class="custom-player"><span class="model-name">EncDec</span><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/survey/Rachmaninoff_Sonata_Bb_Op36_III/ed_01.mp3" preload="none"></audio></div>
+                  </div>
+              </div>
+          </div>
+      </details>
+
+    </div>
+  </section>
+
+  <section class="section hero" id="samples-cond">
+    <div class="container is-max-desktop">
+        <h2 class="title is-3 has-text-centered">2. Text-Conditioned Performance Rendering</h2>
+
+        <h4 class="title is-4 has-text-centered">Samples from Figures 3 and 4</h4>
+
+        <!-- Showcase for Figure 3 -->
+        <div class="showcase-card showcase-card-with-figure">
+            <div class="figure-image-container">
+                <img src="static/images/samples-emotions.png" alt="Figure 3 from the paper showing emotion-controlled inference results." style="padding: 12px;">
+            </div>
+            <div class="variations-container">
+                <div class="showcase-header">
+                    <div class="composer">Wolfgang Amadeus Mozart</div>
+                    <div class="work">Piano Sonata No.11, Mov. 3 “Alla Turca”</div>
+                </div>
+                <div class="variations-list">
+                    <div class="variation-item"><div class="variation-prompt">3a. Unconditional</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/fig3/uncond.mp3" preload="none"></audio></div></div>
+                    <div class="variation-item"><div class="variation-prompt">3b. "anger emotion"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/fig3/anger.mp3" preload="none"></audio></div></div>
+                    <div class="variation-item"><div class="variation-prompt">3c. "dreamy emotion"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/fig3/dreamy.mp3" preload="none"></audio></div></div>
+                    <div class="variation-item"><div class="variation-prompt">3d. "sad emotion"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/fig3/sad.mp3" preload="none"></audio></div></div>
+                    <div class="variation-item"><div class="variation-prompt">3e. "thunderstorms & lightning"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/fig3/thunderstorms_and_lightning.mp3" preload="none"></audio></div></div>
+                    <div class="variation-item"><div class="variation-prompt">3f. "angry and sad"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/fig3/sad_and_angry.mp3" preload="none"></audio></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Showcase for Figure 4 -->
+        <div class="showcase-card showcase-card-with-figure">
+            <div class="figure-image-container">
+                <!-- FIX: Limit image width -->
+                <img src="static/images/samples-inpaint.png" alt="Figure 4 from the paper showing performance inpainting results." style="max-width: 600px; width: 100%; display: block; margin: auto; padding: 12px;">
+            </div>
+            <div class="variations-container">
+                <div class="showcase-header">
+                    <div class="composer">Wolfgang Amadeus Mozart</div>
+                    <div class="work">Piano Sonata No.11 in A Major, K.331 (3rd Movement: Alla Turca)</div>
+                </div>
+                <div class="variations-list">
+                    <div class="variation-item"><div class="variation-prompt">4a. from "passionate" to "lento"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/fig4/passionately_to_lento.mp3" preload="none"></audio></div></div>
+                </div>
+                <div class="showcase-header">
+                    <div class="composer">Ludwig van Beethoven</div>
+                    <div class="work">Piano Sonata No.25 in G, Op.79 (Andante)</div>
+                </div>
+                <div class="variations-list">
+                    <div class="variation-item"><div class="variation-prompt">4b. Inpaint notes: pitch≤C4</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/fig4/inpaint.mp3" preload="none"></audio></div></div>
+                </div>
+            </div>
+        </div>
+
+        <h4 class="title is-4 has-text-centered" style="margin-top: 4rem;">Additional Samples</h4>
+
+        <!-- Showcase Card for Beethoven Sonata No. 22 -->
+        <div class="showcase-card">
+            <div class="showcase-header">
+                <div class="composer">Ludwig van Beethoven</div>
+                <div class="work">Piano Sonata No.22 in F Major, Op.54 (I. In tempo d'un minuetto)</div>
+            </div>
+            <div class="variations-list">
+                <div class="variation-item"><div class="variation-prompt">Dataset Sample</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Beethoven_Sonata22_Op54_I/dataset.mp3" preload="none"></audio></div></div>
+                <div class="variation-item"><div class="variation-prompt">Unconditional</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Beethoven_Sonata22_Op54_I/uncond.mp3" preload="none"></audio></div></div>
+                <div class="variation-item"><div class="variation-prompt">"comical"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Beethoven_Sonata22_Op54_I/comical.mp3" preload="none"></audio></div></div>
+                <div class="variation-item"><div class="variation-prompt">"depressed"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Beethoven_Sonata22_Op54_I/depressed.mp3" preload="none"></audio></div></div>
+                <div class="variation-item"><div class="variation-prompt">"fierce"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Beethoven_Sonata22_Op54_I/fierce.mp3" preload="none"></audio></div></div>
+                <div class="variation-item"><div class="variation-prompt">"rapidly"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Beethoven_Sonata22_Op54_I/rapidly.mp3" preload="none"></audio></div></div>
+                <div class="variation-item"><div class="variation-prompt">"capricious"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Beethoven_Sonata22_Op54_I/capricious.mp3" preload="none"></audio></div></div>
+            </div>
+        </div>
+
+        <!-- Showcase Card for Scott Joplin's Rag -->
+        <div class="showcase-card">
+            <div class="showcase-header">
+                <div class="composer">Scott Joplin</div>
+                <div class="work">Rose Leaf Rag</div>
+            </div>
+            <div class="variations-list">
+                <div class="variation-item"><div class="variation-prompt">Dataset Sample</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Joplin_Rose_Leaf/dataset.mp3" preload="none"></audio></div></div>
+                <div class="variation-item"><div class="variation-prompt">Unconditional</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Joplin_Rose_Leaf/uncond.mp3" preload="none"></audio></div></div>
+                <div class="variation-item"><div class="variation-prompt">"average and even"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Joplin_Rose_Leaf/average.mp3" preload="none"></audio></div></div>
+                <div class="variation-item"><div class="variation-prompt">"like a lullaby song"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Joplin_Rose_Leaf/lullaby.mp3" preload="none"></audio></div></div>
+                <div class="variation-item"><div class="variation-prompt">"a sprinter is running"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Joplin_Rose_Leaf/sprinter.mp3" preload="none"></audio></div></div>
+                <div class="variation-item"><div class="variation-prompt">"a romantic weekend"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Joplin_Rose_Leaf/romantic.mp3" preload="none"></audio></div></div>
+                <div class="variation-item"><div class="variation-prompt">"chaotic with abrupt changes"</div><div class="custom-player"><button class="play-pause-btn"><i class="fas fa-play"></i><i class="fas fa-pause"></i></button><div class="progress-bar"><div class="progress"></div></div><span class="time-display">0:00 / 0:00</span><audio src="https://raw.githubusercontent.com/ilya16/media-assets/main/symupe/samples/control/Joplin_Rose_Leaf/chaotic.mp3" preload="none"></audio></div></div>
+            </div>
+        </div>
+    </div>
+  </section>
+
+  <section class="section hero is-light" id="emotion-classifier">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column is-full has-text-centered">
+          <div class="content">
+            <h2 class="title is-3">3. Emotion Classifier Evaluation</h2>
+            <div class="column">
+              <figure>
+                <img alt="Emotion misclassification co-occurrence graph" src="static/images/emotion-graph.png" class="content-image-frame">
+                <p>
+                  <em><strong>Emotion classifier predictions.</strong></em>
+                  The predictions are represented in the form of a label co-occurrence graph.
+                  Node sizes show the number of total (light blue) and correct (orange) label assignments.
+                  Edge directions and colors illustrate the relative number of misclassifications
+                  (A → B means that A was misclassified as B).
+                </p>
+              </figure>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!--BibTex citation -->
+  <section class="section" id="BibTeX">
+    <div class="container is-max-desktop content">
+      <div class="bibtex-header">
+        <h2 class="title">BibTeX</h2>
+        <button class="copy-bibtex-btn" onclick="copyBibTeX()" title="Copy BibTeX to clipboard">
+          <i class="fas fa-copy"></i>
+          <span class="copy-text">Copy</span>
+        </button>
+      </div>
+      <pre id="bibtex-code"><code>@inproceedings{borovik2025symupe,
+  title = {{SyMuPe: Affective and Controllable Symbolic Music Performance}},
+  author = {Borovik, Ilya and Gavrilev, Dmitrii and Viro, Vladimir},
+  year = {2025},
+  booktitle = {Proceedings of the 33rd ACM International Conference on Multimedia},
+  pages = {10699--10708},
+  doi = {10.1145/3746027.3755871}
+}</code></pre>
+    </div>
+  </section>
+  <!--End BibTex citation -->
+
+  <footer class="footer">
+    <div class="container">
+      <div class="columns is-centered">
+        <div class="column is-8">
+          <div class="content has-text-centered">
+            <p>
+              This page was built using the
+              <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

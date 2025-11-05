@@ -1,0 +1,455 @@
+/*.publication-authors a {*/
+/*   color: hsl(204, 86%, 53%) !important;*/
+/*}*/
+
+.publication-authors a:hover {
+    text-decoration: underline;
+}
+
+.composition-title {
+    line-height: 1.4;
+}
+
+.composer {
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.work {
+    font-size: 0.95em;
+    color: #555;
+}
+
+.period-header {
+    font-weight: 600;
+    font-size: 1.1em;
+    letter-spacing: 0.5px;
+}
+
+.text-prompt {
+    font-style: italic;
+    color: #444;
+    line-height: 1.5;
+}
+
+/*.footer {*/
+/*  padding: 3rem 1.5rem 3rem;*/
+/*}*/
+
+/* ======================================================= */
+/* ====== DEFINITIVE ACCORDION & PLAYER STYLES  ====== */
+/* ======================================================= */
+
+#samples-uncond .container,
+#samples-cond .container {
+    width: 100%;
+    box-sizing: border-box; /* Ensures padding doesn't break the layout */
+}
+
+/* ---- Accordion Styles ---- */
+details.period-accordion {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    margin-bottom: 1rem;
+    transition: var(--transition);
+    overflow: hidden;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+details.period-accordion summary {
+    font-size: 1.5rem;
+    font-weight: 600;
+    padding: 1.5rem 2rem;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--background-secondary);
+}
+
+details.period-accordion summary:hover {
+    background-color: var(--background-accent);
+}
+
+details.period-accordion[open] summary .fa-chevron-down {
+    transform: rotate(180deg);
+}
+
+.accordion-content {
+    padding: 1.5rem;
+    background-color: var(--background-primary);
+}
+
+
+/* ---- Composition Card and Player Layout Styles ---- */
+.composition-card {
+    background-color: var(--background-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    border-left: 5px solid var(--primary-color);
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+}
+
+.composition-card:last-child {
+    margin-bottom: 0;
+}
+
+.composition-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-left-color: var(--accent-color); /* Optional: change border color on hover */
+}
+
+.composition-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.composition-header .composer {
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.composition-header .work {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    overflow-wrap: break-word;
+}
+
+.audio-players-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+/* ---- Custom Player Element Styles ---- */
+.custom-player {
+    display: flex;
+    align-items: center;
+    background-color: var(--background-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 0.75rem;
+    transition: var(--transition);
+}
+
+.custom-player audio {
+    display: none;
+}
+
+.custom-player .model-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    margin-right: 1.5rem;
+    width: 90px;
+    text-align: left;
+    flex-shrink: 0;
+}
+
+.play-pause-btn {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: var(--transition);
+    margin-right: 1.5rem;
+    cursor: pointer;
+}
+
+.play-pause-btn:hover {
+    background-color: var(--primary-hover); /* Changes color on hover */
+    transform: scale(1.1); /* Makes the button slightly larger */
+    box-shadow: var(--shadow-md); /* Adds a subtle shadow */
+}
+
+.play-pause-btn .fa-pause {
+    display: none;
+}
+
+.custom-player.is-playing .play-pause-btn .fa-play {
+    display: none;
+}
+
+.custom-player.is-playing .play-pause-btn .fa-pause {
+    display: block;
+}
+
+/*.custom-player.is-playing .play-pause-btn { background-color: var(--accent-color); }*/
+
+.progress-bar {
+    flex-grow: 1;
+    background-color: #e2e8f0;
+    height: 6px;
+    border-radius: 10px;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.progress {
+    width: 0%;
+    height: 100%;
+    background-color: var(--accent-color);
+    border-radius: 10px;
+}
+
+.time-display {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-left: 1.5rem;
+    flex-shrink: 0;
+    width: 90px;
+    text-align: right;
+}
+
+/* ---- Responsive Adjustments ---- */
+@media screen and (max-width: 900px) {
+    .composition-header {
+        grid-template-columns: 1fr;
+    }
+
+    .audio-players-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .custom-player {
+        flex-wrap: wrap;   /* CRITICAL: Allow items to wrap to the next line */
+        padding: 0.75rem 1rem;
+        row-gap: 0.75rem;  /* Add space between the model name and the controls below it */
+    }
+
+    details.period-accordion summary::-webkit-details-marker {
+        display: none;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .custom-player {
+        flex-wrap: wrap;
+        padding: 0.75rem 1rem;
+        row-gap: 0.75rem;
+    }
+
+    .custom-player .model-name {
+        flex-basis: 100%;
+        width: auto;
+    }
+
+    /* --- 4. Align the player controls on the second line --- */
+    .play-pause-btn {
+        margin-right: 1rem; /* Keep a small margin */
+        flex-shrink: 0;       /* Prevent the button from shrinking */
+    }
+
+    .time-display {
+        width: 80px;         /* CRITICAL: A fixed width ensures all players align perfectly */
+        text-align: right;   /* Align the text to the right for a cleaner look */
+        margin-left: 0.5rem; /* Keep a small margin */
+        flex-shrink: 0;      /* Prevent the time from shrinking */
+    }
+}
+
+.wide-container {
+    margin: 0 auto; /* This keeps the container centered */
+    padding: 0 2rem; /* This adds some padding on the sides so content doesn't touch the edge */
+    max-width: 3200px; /* THIS IS THE LINE TO EDIT! */
+}
+
+/* ======================================================= */
+/* ====== STYLES FOR TEXT-CONDITIONED SHOWCASE  ====== */
+/* ======================================================= */
+
+.showcase-card {
+    background-color: var(--background-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-md);
+    overflow: hidden; /* To keep the rounded corners clean */
+    border-left: 5px solid var(--primary-color); /* Use the accent color for variety */
+    transition: var(--transition);
+}
+
+.showcase-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-left-color: var(--accent-color); /* Optional: change border color on hover */
+}
+
+.showcase-header {
+    padding: 1.5rem 1.5rem 1rem 1.5rem;
+    background-color: var(--background-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.showcase-header .composer {
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.showcase-header .work {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.variations-list {
+    padding: 1rem;
+}
+
+.variation-item {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1rem;
+    border-radius: var(--border-radius);
+}
+
+/* Add a subtle zebra-striping for readability */
+.variation-item:nth-child(odd) {
+    background-color: var(--background-accent);
+}
+
+.variation-prompt {
+    flex-basis: 35%; /* Give the prompt a fixed portion of the space */
+    font-weight: 500;
+    font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    background-color: #fff;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+/* The custom player inside a variation takes the remaining space */
+.variation-item .custom-player {
+    flex-grow: 1;
+    background: none; /* Make it transparent to show the row color */
+}
+
+/* Responsive adjustments for the showcase card */
+@media screen and (max-width: 768px) {
+    .variation-item {
+        flex-direction: column; /* Stack prompt and player vertically */
+        align-items: stretch; /* Make them full-width */
+    }
+
+    .variation-prompt {
+        text-align: center;
+    }
+}
+
+/* ======================================================= */
+/* ====== STYLES FOR STICKY NAVIGATION BAR        ====== */
+/* ======================================================= */
+
+/* This is the magic part: It tells the browser to leave space
+   at the top when jumping to an anchor link, so the section
+   title isn't hidden behind the sticky navbar. */
+html {
+  scroll-padding-top: 52px; /* This should match the height of your navbar */
+  scroll-behavior: smooth; /* This makes the jump a smooth scroll! */
+}
+
+.navbar {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Adds a subtle shadow for depth */
+  background-color: rgba(255, 255, 255, 0.95) !important; /* Slight transparency */
+  backdrop-filter: blur(10px); /* Frosted glass effect for modern browsers */
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Style for the active link */
+.navbar-brand-link.is-active {
+  font-weight: 600;
+  color: var(--primary-color) !important;
+}
+
+.navbar-item.is-active {
+  font-weight: 600;
+  color: var(--primary-color) !important; /* Use your theme's primary color */
+  border-bottom: 3px solid var(--primary-color);
+}
+
+/*.more-works-container {*/
+/*  top: 76px; !* New value: 52px navbar height + 24px margin *!*/
+/*  transition: top 0.3s ease-in-out; !* Optional: smooth transition *!*/
+/*}*/
+
+#home .hero-body {
+  padding-top: calc(52px + 4rem); /* Navbar height + original padding */
+}
+
+.content-image-frame {
+  display: block; /* Ensures margin auto works */
+  margin: 1rem auto; /* Center the image with some vertical margin */
+
+  border: 1px solid var(--border-color);  /* Use theme's border color */
+  /*padding: 1rem;                          !* A bit more padding (16px) *!*/
+  border-radius: var(--border-radius);    /* Use theme's border radius (12px) */
+
+  box-shadow: var(--shadow-md); /* Optional: add a subtle shadow */
+
+  background-color: var(--background-secondary);
+}
+
+.content a {
+  color: var(--primary-color) !important; /* This is the key change */
+  font-weight: 500;
+  transition: var(--transition);
+}
+
+/* Optional: A nice hover effect */
+.content a:hover {
+  color: var(--primary-hover) !important; /* Also add !important here */
+  text-decoration: underline;
+}
+
+/* Reduce vertical spacing between the main title and the teaser video */
+#home .hero-body {
+  padding-bottom: 2rem; /* Default is 4rem */
+}
+
+.teaser .hero-body {
+  padding-top: 1rem; /* Default is 4rem, teaser has 2rem */
+}
+
+/* Carousel updates */
+
+/*.results-carousel {*/
+/*  padding-left: 50px;*/
+/*  padding-right: 50px;*/
+/*  !* The position: relative is often needed to correctly anchor absolute children *!*/
+/*  !*position: relative;*!*/
+/*}*/
+
+/*!* Left Button: Move it outside the left edge *!*/
+/*.results-carousel .slider-navigation-previous {*/
+/*  left: -24px; !* Half of the button's width (48px) to place it just outside *!*/
+/*}*/
+
+/*!* Right Button: Move it outside the right edge *!*/
+/*.results-carousel .slider-navigation-next {*/
+/*  right: -24px; !* Half of the button's width (48px) to place it just outside *!*/
+/*}*/
