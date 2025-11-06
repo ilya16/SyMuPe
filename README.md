@@ -9,6 +9,7 @@
 >
 > Authors: Ilya Borovik, Dmitrii Gavrilev, and Vladimir Viro
 >
+> [![arXiv](https://img.shields.io/badge/arXiv-2511.03425-b31b1b.svg?logo=arXiv)](https://arxiv.org/abs/2511.03425)
 > [![ACM DL](https://img.shields.io/badge/MM_'25-Proceedings-19552e?logo=acm&logoColor=white)](https://dl.acm.org/doi/10.1145/3746027.3755871)
 > [![Outstanding Paper Award](https://img.shields.io/badge/MM_'25-Outstanding_Paper-E6712D.svg)](https://acmmm2025.org/awards/)
 > [![Website](https://img.shields.io/badge/Demo-Samples-2563eb)](https://ilya16.github.io/SyMuPe)
