@@ -24,8 +24,6 @@ By design, the model supports both **unconditional generation** and **infilling*
 
 For more details, please refer to the [paper](https://dl.acm.org/doi/10.1145/3746027.3755871) and the [demo page](https://ilya16.github.io/SyMuPe) with samples.
 
-The source code will be released in November 2025.
-
 ## Citation
 
 ```bibtex

@@ -1,0 +1,11 @@
+numpy==1.26.4
+torch==2.3.1
+accelerate==1.7.0
+miditok==3.0.2
+symusic==0.5.6
+partitura==1.7.0
+parangonar==2.0.0
+omegaconf==2.3.0
+loguru==0.7.2
+tqdm>=4.63.0
+einops==0.8.0
