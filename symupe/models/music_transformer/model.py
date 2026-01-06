@@ -20,7 +20,6 @@ import torch
 import torch.nn as nn
 from omegaconf import DictConfig
 
-from modules.tuple_transformer.language_modeling import TupleTransformerLMOutput
 from symupe.data.collators import SequenceInputs, PerformanceInputs, Seq2SeqInputs
 from symupe.data.datasets import SequenceDataset, PerformanceDataset
 from symupe.data.tokenizers import OctupleM, SyMuPe
@@ -29,7 +28,7 @@ from symupe.modules.constructor import ModuleConfig
 from symupe.modules.tuple_transformer import (
     TupleTransformerConfig, TupleTransformer, TupleTransformerOutput,
     TupleTransformerWrappers,
-    TupleTransformerLMWrapper,
+    TupleTransformerLMWrapper, TupleTransformerLMOutput,
     TupleTransformerCFMOutput, TupleTransformerCFMWrapper, CFMIntermediates,
     TupleTransformerDFMWrapper, TupleTransformerDFMOutput, DFMIntermediates,
     TupleTransformerFMWrapper, TupleTransformerFMOutput, FMIntermediates

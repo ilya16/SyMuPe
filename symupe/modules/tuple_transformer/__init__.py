@@ -19,7 +19,7 @@ from .transformer import (
     TupleTransformerConfig, TupleTransformer
 )
 from .language_modeling import (
-    TupleTransformerLMWrapper,
+    TupleTransformerLMOutput, TupleTransformerLMWrapper,
     TupleTransformerARWrapper,
     TupleTransformerMLMWrapper,
     TupleTransformerMixedLMWrapper

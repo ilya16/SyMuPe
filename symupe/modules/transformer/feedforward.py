@@ -1,6 +1,7 @@
 """ Transformer FeedForward layer. """
 from dataclasses import dataclass
 
+import torch
 import torch.nn as nn
 
 from ..constructor import Constructor, ModuleConfig

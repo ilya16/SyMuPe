@@ -8,13 +8,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 from omegaconf import DictConfig
 
-from modules.tuple_transformer.transformer import EmbeddingMode
 from symupe.modules.transformer import TransformerConfig
 from symupe.modules.tuple_transformer import TupleTransformerEmbeddingsConfig
 from symupe.modules.tuple_transformer import (
     TupleTransformerOutput, TupleTransformerConfig, TupleTransformer,
     TupleTransformerHeadsConfig, TupleTransformerSplitValueHeadConfig
 )
+from symupe.modules.tuple_transformer.transformer import EmbeddingMode
 from symupe.utils import ExplicitEnum
 
 
