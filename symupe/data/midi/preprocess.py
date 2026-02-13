@@ -15,7 +15,7 @@ def preprocess_midi(
         cut_overlapped_notes: bool = False,
         clean_short_notes: bool = False,
         filter_extra_events: bool = False,
-        pitch_range: tuple[int, int] | None = (21, 109),
+        pitch_range: tuple[int, int] | None = (21, 108),
         min_tick_shift: int | None = None,
         min_tick_duration: int | None = None,
         min_time_shift: float | None = None,

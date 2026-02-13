@@ -308,12 +308,8 @@ class Optimizer:
         self.optimizer.zero_grad(set_to_none=set_to_none)
 
     def anneal_on_epoch_end(self, *args):
-        if self.lr_scheduler is not None:
-            if not self.is_step_lr_scheduler:
-                if isinstance(self.lr_scheduler.scheduler, LRSchedulersRegistry.get("plateau")):
-                    self.lr_scheduler.step(*args)
-                else:
-                    self.lr_scheduler.step()
+        if self.lr_scheduler is not None and not self.is_step_lr_scheduler:
+            self.lr_scheduler.step()
 
     def anneal_on_step_end(self, *args):
         if self.lr_scheduler is not None:

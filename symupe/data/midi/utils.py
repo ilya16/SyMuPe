@@ -48,36 +48,38 @@ def cut_overlapping_notes(
     prev_pitch_notes = {}
     for note in notes:
         prev_notes = prev_pitch_notes.get(note.pitch, None)
-        if prev_notes is not None:
-            prev_note = prev_notes[-1]
+        if prev_notes is None:
+            continue
 
-            if prev_note.time == note.time:  # `note` and `prev_note` start at the same time
-                if duplicate_max_duration:
-                    duration = max(prev_note.duration, note.duration)
-                else:
-                    duration = min(prev_note.duration, note.duration)
+        prev_note = prev_notes[-1]
 
-                note.duration = duration
+        if prev_note.time == note.time:  # `note` and `prev_note` start at the same time
+            if duplicate_max_duration:
+                duration = max(prev_note.duration, note.duration)
+            else:
+                duration = min(prev_note.duration, note.duration)
+
+            note.duration = duration
+            for _prev_note in prev_notes:
+                _prev_note.duration = duration
+            prev_pitch_notes[note.pitch].append(note)
+            continue
+
+        elif prev_note.end > note.time:  # `note` starts before `prev_note` ended
+            if min_shift is not None and note.time - prev_note.time < min_shift:  # previous note will be too short
+                note.duration = max(prev_note.end, note.end) - prev_note.time  # duplicate notes
+                note.time = prev_note.time
+
                 for _prev_note in prev_notes:
-                    _prev_note.duration = duration
+                    _prev_note.duration = note.duration
                 prev_pitch_notes[note.pitch].append(note)
                 continue
 
-            elif prev_note.end > note.time:  # `note` starts before `prev_note` ended
-                if min_shift is not None and note.time - prev_note.time < min_shift:  # previous note will be too short
-                    note.duration = max(prev_note.end, note.end) - prev_note.time  # duplicate notes
-                    note.time = prev_note.time
+            if prev_note.end > note.end:  # `note` is inside `prev_note`, do not cut total duration
+                note.duration = prev_note.end - note.time
 
-                    for _prev_note in prev_notes:
-                        _prev_note.duration = note.duration
-                    prev_pitch_notes[note.pitch].append(note)
-                    continue
-
-                if prev_note.end > note.end:  # `note` is inside `prev_note`, do not cut total duration
-                    note.duration = prev_note.end - note.time
-
-                for _prev_note in prev_notes:  # cut `prev_note` until `note` start
-                    _prev_note.duration = note.time - prev_note.start
+            for _prev_note in prev_notes:  # cut `prev_note` until `note` start
+                _prev_note.duration = note.time - prev_note.start
 
         prev_pitch_notes[note.pitch] = [note]
 
@@ -185,11 +187,11 @@ def remove_short_notes(
     return notes
 
 
-def filter_notes_by_pitch_range(notes: NoteTickList, pitch_range: tuple[int, int] = (21, 109)):
+def filter_notes_by_pitch_range(notes: NoteTickList, pitch_range: tuple[int, int] = (21, 108)):
     i = 0
     while i < len(notes):
         note = notes[i]
-        if note.pitch < pitch_range[0] or note.pitch >= pitch_range[1]:
+        if note.pitch < pitch_range[0] or note.pitch > pitch_range[1]:
             del notes[i]
             continue
         i += 1
@@ -445,8 +447,8 @@ def compute_global_sustain_control_boundaries(midi: Score):
     return start, end
 
 
-def clean_controls_in_interval(perf_midi: Score, start: float, end: float, eps: float = 1e-3):
-    for track in perf_midi.tracks:
+def clean_controls_in_interval(midi: Score, start: float, end: float, eps: float = 1e-3):
+    for track in midi.tracks:
         pedal_start, pedal_end = start, end
 
         sustain_ons, sustain_offs = extract_track_pedals(track)
@@ -480,7 +482,7 @@ def clean_controls_in_interval(perf_midi: Score, start: float, end: float, eps: 
                 lambda p: p.time < pedal_start or p.time > pedal_end, track.pedals
             ))
 
-    return perf_midi
+    return midi
 
 
 def fix_incorrect_durations(notes: NoteTickList, sort: bool = True):
@@ -490,10 +492,8 @@ def fix_incorrect_durations(notes: NoteTickList, sort: bool = True):
     prev_pitch_notes = {}
     update_notes = []
     for note in notes:
-        prev_notes = prev_pitch_notes.get(note.pitch, None)
-        if prev_notes is not None:
-            prev_note = prev_notes[0]
-
+        prev_note = prev_pitch_notes.get(note.pitch, None)
+        if prev_note is not None:
             if note.time == prev_note.time:  # `note` and `prev_note` start at the same time, leave only prev
                 note.velocity = 0
                 continue
@@ -501,10 +501,9 @@ def fix_incorrect_durations(notes: NoteTickList, sort: bool = True):
                 prev_note.velocity = 0
 
             elif note.time < prev_note.end:  # `note` starts before `prev_note` ended, update durations to cut notes
-                prev_pitch_notes[note.pitch] = [note]
                 update_notes.append((note, prev_note.end - note.time))
 
-        prev_pitch_notes[note.pitch] = [note]
+        prev_pitch_notes[note.pitch] = note
 
     for note, new_duration in update_notes:
         note.duration = new_duration
@@ -519,29 +518,3 @@ UNPERFORMED_TRACK_NAME = "Unperformed Notes"
 
 def create_unperformed_notes_track(program: int = 0):
     return Track(program=program, name=UNPERFORMED_TRACK_NAME, is_drum=False)
-
-
-def insert_silent_notes(
-        midi: Score,
-        markers: list[TextMeta] | None = None,
-        track_idx: int | None = None
-):
-    markers = markers or midi.markers
-
-    notes = NoteTickList()
-    for m in markers:
-        if m.text.startswith("NoteS"):
-            pitch, start, duration = map(int, m.text.split("_")[1:])
-            notes.append(Note(time=start, duration=duration, pitch=pitch, velocity=0))
-
-    if track_idx is None:
-        track = create_unperformed_notes_track()
-        track.notes = notes
-        midi.tracks.append(track)
-    else:
-        midi.tracks[track_idx].notes.extend(notes)
-
-    if midi.tracks[-1].name != UNPERFORMED_TRACK_NAME:
-        midi.tracks.append(create_unperformed_notes_track())
-
-    return midi

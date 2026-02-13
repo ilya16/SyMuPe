@@ -791,9 +791,7 @@ class LocalSequenceDataset(SequenceDataset):
         context_token_types = context_token_types or []
         load_tokens_fn = partial(
             load_token_sequence,
-            tokenizer=tokenizer,
-            add_tempo_tokens="Tempo" in token_types or "Tempo" in context_token_types,
-            add_special_tokens=not remove_special_tokens or "TimeDurationSustain" in token_types
+            tokenizer=tokenizer
         )
         seq_proc_funcs, seq_proc_funcs = [], []
         if zero_out_silent_durations:  # silent notes have non-zero duration

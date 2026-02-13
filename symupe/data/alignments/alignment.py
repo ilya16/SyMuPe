@@ -29,7 +29,8 @@ class AlignmentNote:
         return self.end - self.start
 
     def __eq__(self, other):
-        return self.pitch == other.pitch \
+        return other is not None \
+            and self.pitch == other.pitch \
             and math.fabs(self.start - other.start) < TIME_TOLERANCE \
             and (self.end is None or other.end is None or math.fabs(self.end - other.end) < TIME_TOLERANCE)
 

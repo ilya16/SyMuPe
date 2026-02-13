@@ -252,7 +252,8 @@ class SequenceClassifierConfig(ModuleConfig):
     num_classes: int
     backbone: DictConfig | TupleTransformerConfig | None
     backbone_checkpoint: str | None = None
-    transformer: DictConfig | TransformerConfig = TransformerConfig(_target_="default")
+    dim: int | None = None
+    transformer: DictConfig | TransformerConfig | None = TransformerConfig(_target_="default")
     classifier: LinearEmbeddingClassifierConfig = LinearEmbeddingClassifierConfig(hidden_dims=None)
     note_classifier: bool = False,
 
@@ -271,7 +272,8 @@ class SequenceClassifier(Model):
             num_classes: int,
             backbone: DictConfig | TupleTransformerConfig | None,
             backbone_checkpoint: str | None = None,
-            transformer: DictConfig | TransformerConfig = TransformerConfig(_target_="default"),
+            dim: int | None = None,
+            transformer: DictConfig | TransformerConfig | None = TransformerConfig(_target_="default"),
             classifier: LinearEmbeddingClassifierConfig = LinearEmbeddingClassifierConfig(hidden_dims=None),
             note_classifier: bool = False,
 
@@ -314,7 +316,7 @@ class SequenceClassifier(Model):
         self.context_with_memory = context_with_memory
         self.detach_inputs = float(detach_inputs)
 
-        self.dim = transformer.dim
+        self.dim = transformer.dim if transformer is not None else dim
 
         self.emb_norm = LayerNorm(self.backbone.dim) if emb_norm else nn.Identity()
         self.emb_dropout = nn.Dropout(p=emb_dropout)
@@ -326,7 +328,7 @@ class SequenceClassifier(Model):
         self.transformer = EncoderTransformer.init(
             transformer,
             memory_tokens=1 if aggregation == "token" else 0
-        )
+        ) if transformer is not None else None
 
         self.dropout = nn.Dropout(p=clf_dropout)
 
@@ -377,19 +379,25 @@ class SequenceClassifier(Model):
         embeddings = self.emb_dropout(embeddings)
         embeddings = self.project_emb(embeddings)
 
-        out = self.transformer(embeddings, mask=mask)
+        if self.transformer is not None:
+            out = self.transformer(embeddings, mask=mask)
 
-        if self.aggregation == "token":
-            embedding = out.memory_tokens[:, 0]
+            if self.aggregation == "token":
+                embedding = out.memory_tokens[:, 0]
+            else:
+                embeddings = out.out
+                if mask is None:
+                    embedding = embeddings.mean(dim=1)
+                else:
+                    embeddings = embeddings * mask[..., None]
+                    embedding = embeddings.sum(dim=1) / mask.sum(dim=1)[..., None]
         else:
-            embeddings = out.out
+            assert self.aggregation == "mean"
             if mask is None:
                 embedding = embeddings.mean(dim=1)
             else:
                 embeddings = embeddings * mask[..., None]
                 embedding = embeddings.sum(dim=1) / mask.sum(dim=1)[..., None]
-
-        # embedding = F.gelu(embedding)
 
         clf_out = self.classifier(self.dropout(embedding), labels=labels)
         loss = clf_out.loss

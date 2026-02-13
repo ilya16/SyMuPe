@@ -114,7 +114,7 @@ class AlignmentTool(Aligner):
             sec_per_quarter_note: float = 1.,  # 0.001,
             extra_note_region: float = 0.3,  # ∆ in the paper
             check_err_match: bool = False,
-            min_match_ratio: float = 0.8
+            min_recall: float = 0.8
     ):
         self.tool_path = tool_path
         self._check_and_build_programs()
@@ -126,7 +126,7 @@ class AlignmentTool(Aligner):
         self.sec_per_quarter_note = sec_per_quarter_note
         self.extra_note_region = extra_note_region
         self.check_err_match = check_err_match
-        self.min_match_ratio = min_match_ratio
+        self.min_recall = min_recall
 
     def _check_and_build_programs(self):
         # check all required computation programs
@@ -379,16 +379,14 @@ class AlignmentTool(Aligner):
 
             err_alignment = Alignment(path=err_corresp, filetype="corresp")
             score_interval = err_alignment.end_index - err_alignment.start_index + 1
-            # print("err_alignment", len(err_alignment), err_alignment.num_full_pairs, score_interval,
-            #       (err_alignment.start_index, err_alignment.end_index))
-            match_ratio = err_alignment.num_full_pairs / score_interval
+            recall = err_alignment.num_full_pairs / score_interval
 
-            if match_ratio < self.min_match_ratio:
+            if recall < self.min_recall:
                 _delete_temporary_files()
                 return (None, None), f"LowMatchRatio@compute_alignment: " \
                                      f"computation of {FileType.MATCH} halted ({match}), " \
                                      f"{FileType.ERR_CORRESP}'s match ratio: " \
-                                     f"{match_ratio:.3f} < {self.min_match_ratio:.3f}"
+                                     f"{recall:.3f} < {self.min_recall:.3f}"
 
         # realignment and match file
         if not match.exists() or force_recompute:

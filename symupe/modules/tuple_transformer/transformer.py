@@ -644,7 +644,7 @@ class TupleTransformer(nn.Module, Constructor):
             if attention_mask is not None:
                 attention_mask = F.pad(attention_mask, (mask_pad_len, 0, mask_pad_len, 0), value=True)
 
-        output_layer = output_layer or self.transformer_output_layer
+        output_layer = output_layer if output_layer is not None else self.transformer_output_layer
         return_embeddings = return_embeddings or (output_layer and output_layer < len(self.transformer.layers) - 1)
 
         output: TransformerOutput = self.transformer(

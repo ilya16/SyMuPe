@@ -20,8 +20,8 @@ import torch
 import torch.nn as nn
 from omegaconf import DictConfig
 
-from symupe.data.collators import SequenceInputs, PerformanceInputs, Seq2SeqInputs
-from symupe.data.datasets import SequenceDataset, PerformanceDataset
+from symupe.data.collators import SequenceInputs, Seq2SeqInputs
+from symupe.data.datasets import SequenceDataset
 from symupe.data.tokenizers import OctupleM, SyMuPe
 from symupe.modules.classes import LanguageModelingMode, ModelWrapper
 from symupe.modules.constructor import ModuleConfig
@@ -111,10 +111,10 @@ class _MusicTransformer(Model):
 
     def prepare_inputs(
             self,
-            inputs: dict | SequenceInputs | PerformanceInputs | Seq2SeqInputs,
+            inputs: dict | SequenceInputs | Seq2SeqInputs,
             ema_model: nn.Module | None = None
     ) -> dict[str, torch.Tensor]:
-        if isinstance(inputs, (SequenceInputs, PerformanceInputs, Seq2SeqInputs)):
+        if isinstance(inputs, (SequenceInputs, Seq2SeqInputs)):
             inputs = asdict(inputs)
 
         seq_key = "sequences"
@@ -173,9 +173,9 @@ class _MusicTransformer(Model):
     @staticmethod
     def inject_data_config(
             config: DictConfig | MusicTransformerConfig | None,
-            dataset: SequenceDataset | PerformanceDataset | None
+            dataset: SequenceDataset
     ) -> DictConfig | ModuleConfig | None:
-        assert isinstance(dataset, (SequenceDataset, PerformanceDataset))
+        assert isinstance(dataset, SequenceDataset)
 
         if isinstance(dataset, SequenceDataset):
             config["num_tokens"] = dataset.token_sizes
@@ -535,7 +535,7 @@ class CFMMusicTransformer(_MusicTransformer):
 
     def prepare_inputs(
             self,
-            inputs: dict | SequenceInputs | PerformanceInputs | Seq2SeqInputs,
+            inputs: dict | SequenceInputs | Seq2SeqInputs,
             ema_model: nn.Module | None = None
     ) -> dict[str, torch.Tensor]:
         inputs_dict = super().prepare_inputs(inputs=inputs, ema_model=ema_model)
@@ -679,7 +679,7 @@ class DFMMusicTransformer(_MusicTransformer):
 
     def prepare_inputs(
             self,
-            inputs: dict | SequenceInputs | PerformanceInputs | Seq2SeqInputs,
+            inputs: dict | SequenceInputs | Seq2SeqInputs,
             ema_model: nn.Module | None = None
     ) -> dict[str, torch.Tensor]:
         inputs_dict = super().prepare_inputs(inputs=inputs, ema_model=ema_model)
@@ -871,7 +871,7 @@ class FMMusicTransformer(_MusicTransformer):
 
     def prepare_inputs(
             self,
-            inputs: dict | SequenceInputs | PerformanceInputs | Seq2SeqInputs,
+            inputs: dict | SequenceInputs | Seq2SeqInputs,
             ema_model: nn.Module | None = None
     ) -> dict[str, torch.Tensor]:
         inputs_dict = super().prepare_inputs(inputs=inputs, ema_model=ema_model)

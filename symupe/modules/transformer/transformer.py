@@ -421,7 +421,7 @@ class Transformer(nn.Module, Constructor):
             if context is not None and self.context_projections is not None:
                 context = F.pad(context, (0, 0, num_mem, 0), value=0.)
 
-        output_layer = output_layer or -1
+        output_layer = output_layer if output_layer is not None else -1
         output_layer = len(self.layers) + output_layer if output_layer < 0 else output_layer
         assert 0 <= output_layer < len(self.layers), \
             f"Transformer has only {len(self.layers)}, while the passed `output_layer` asks for layer #{output_layer}"

@@ -203,11 +203,11 @@ class ParangonarAligner(Aligner):
                 paths[DataType.ALIGNMENT][FileType.ALIGN.value] = align_path
 
                 os.makedirs(os.path.dirname(align_path), exist_ok=True)
-                alignment.write(str(align_path))
 
-                alignment = Alignment(path=str(align_path))
-            else:
                 alignment.preprocess_pairs(sort=True, score_first=False, clean_duplicates=True)
+                alignment.write(str(align_path))
+                alignment.preprocess_pairs(sort=True, score_first=True, clean_duplicates=False)
+
         except Exception as e:
             msg = f"Error@process_alignment: post-processing of the alignment failed with ({repr(e)})"
             return None, paths, [msg]
