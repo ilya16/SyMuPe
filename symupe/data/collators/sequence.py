@@ -11,7 +11,7 @@ import torch
 from omegaconf import DictConfig
 
 from symupe.utils import ExplicitEnum, asdict
-from .common import SeqInputs, SeqSegments
+from .base import DataCollator, SeqInputs, SeqSegments
 from ..datasets import SequenceSample
 from ..tokenizers import TokSequence
 from ..tokenizers.constants import SPECIAL_TOKENS_VALUE
@@ -34,7 +34,7 @@ class SequenceInputs:
     random_sequences: SeqInputs | None = None
 
 
-class SequenceCollator:
+class SequenceCollator(DataCollator):
     def __init__(
             self,
             pad_token_id: int = 0,

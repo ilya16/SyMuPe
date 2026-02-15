@@ -11,7 +11,7 @@ from .score_performance import (
     ScorePerformanceDataset,
     LocalScorePerformanceDataset,
 )
-from .common import (
+from .base import (
     DATA_SPLITS,
     SequenceTask,
     TASK_TO_ENCODINGS,

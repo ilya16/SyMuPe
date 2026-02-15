@@ -8,7 +8,7 @@ import torch
 from tqdm.auto import tqdm
 
 from symupe.data.datasets import SequenceDataset, SequenceTask
-from symupe.data.datasets.common import TASK_SEQUENCE_SORTING, TASK_TO_ENCODINGS
+from symupe.data.datasets.base import TASK_SEQUENCE_SORTING, TASK_TO_ENCODINGS
 from symupe.data.tokenizers import (
     TokSequence, TokSequenceContext,
     SequenceType, EncodingType, SortingType, ENCODING_SORTING,

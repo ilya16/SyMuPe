@@ -10,7 +10,7 @@ import torch
 from omegaconf import DictConfig
 
 from symupe.utils import asdict
-from .common import SeqInputs, SeqSegments
+from .base import SeqInputs, SeqSegments
 from .sequence import (
     LMSequenceCollator,
     MaskLevel,

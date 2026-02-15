@@ -502,7 +502,7 @@ class TupleTransformerARWrapper(TupleTransformerLMWrapper):
             if eos_token_id is not None:  # eos only in `Bar`
                 is_eos_tokens = (out_tokens[..., -1, 0] == eos_token_id) | (out_tokens[..., -1, 0] == self.eos_token_id)
                 if is_eos_tokens.any(dim=-1):
-                    out_tokens[:, -1, 1:] = out_tokens[:, -1, 0]
+                    out_tokens[:, -1, 1:] = out_tokens[:, -1, :1]
                     pbar.close()
                     break
             elif max_bar is not None:

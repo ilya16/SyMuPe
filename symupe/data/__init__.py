@@ -1,4 +1,11 @@
+from torch.utils.data import Dataset
+
+from .datasets import (
+    LocalSequenceDataset,
+    LocalScorePerformanceDataset
+)
 from .collators import (
+    DataCollator,
     SequenceCollator,
     LMSequenceCollator,
     LMMultiSequenceCollator,
@@ -7,10 +14,12 @@ from .collators import (
     MixedLMScorePerformanceCollator,
     LMSeq2SeqCollator
 )
-from .datasets import (
-    LocalSequenceDataset,
-    LocalScorePerformanceDataset
-)
 
-DATASETS = {name: cls for name, cls in globals().items() if ".datasets." in str(cls)}
-COLLATORS = {name: cls for name, cls in globals().items() if ".collators." in str(cls)}
+DATASETS = {
+    name: cls for name, cls in locals().items()
+    if isinstance(cls, type) and issubclass(cls, Dataset) and cls is not Dataset
+}
+COLLATORS = {
+    name: cls for name, cls in locals().items()
+    if isinstance(cls, type) and issubclass(cls, DataCollator) and cls is not DataCollator
+}

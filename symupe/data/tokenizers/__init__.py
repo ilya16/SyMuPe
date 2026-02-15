@@ -40,7 +40,7 @@ class TokenizerType(ExplicitEnum):
 
 TOKENIZERS = {
     TokenizerType.OctupleM: OctupleM,
-    TokenizerType.SPMuple: SyMuPeLocal,
+    TokenizerType.SPMuple: SyMuPe,
     TokenizerType.SyMuPe: SyMuPe,
     TokenizerType.SyMuPeLocal: SyMuPeLocal,
     TokenizerType.SyMuPeOnset: SyMuPeOnset,

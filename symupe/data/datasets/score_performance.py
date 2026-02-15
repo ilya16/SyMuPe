@@ -16,7 +16,7 @@ from omegaconf import ListConfig, DictConfig
 from torch.utils.data import Dataset
 
 from symupe.utils import prob2bool, load_json, dump_json, tqdm_iterator
-from .common import NoteSegments, DATA_SPLITS, SequenceTask
+from .base import NoteSegments, DATA_SPLITS, SequenceTask
 from .token_sequence import load_and_process_token_sequence, TokenSequenceDataset, LocalTokenSequenceDataset
 from .utils import get_num_bars, compute_sample_positions, get_end_bar, load_token_sequence
 from ..helpers import (

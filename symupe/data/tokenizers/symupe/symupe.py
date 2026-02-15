@@ -83,7 +83,7 @@ class SyMuPe(SyMuPeBase):
         additional_params["max_notes_in_onset"] = additional_params.get("max_notes_in_onset", 12)
 
         # optional onset deviation performance tokens
-        additional_params["use_onset_tokens"] = additional_params.get("use_onset_tokens", True)
+        additional_params["use_onset_tokens"] = additional_params.get("use_onset_tokens", False)
 
         additional_params["rel_onset_dev"] = additional_params.get("rel_onset_dev", False)
         additional_params["num_onset_devs"] = additional_params.get("num_onset_devs", 129)

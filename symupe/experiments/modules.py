@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 
 from symupe.data import DATASETS, COLLATORS
 from symupe.data.tokenizers.constants import MASK_TOKEN
-from symupe.models import MODELS, EVALUATORS
+from symupe.models import AutoModel, AutoEvaluator
 from symupe.modules.constructor import ModuleConfig
 from symupe.utils.config import disable_nodes, Config
 from .trainer_config import TrainerConfig
@@ -163,8 +163,8 @@ def build_collator(config):
 
 
 def build_model(config, *, dataset: Dataset | None = None, **kwargs):
-    if config._name_ in MODELS:
-        model_cls = MODELS[config._name_]
+    model_cls = AutoModel.MODELS.get(config._name_)
+    if model_cls is not None:
         if dataset is not None:
             model_cls.inject_data_config(config, dataset)
         model = model_cls.init(config, **kwargs)
@@ -174,13 +174,13 @@ def build_model(config, *, dataset: Dataset | None = None, **kwargs):
         return model
     else:
         raise ValueError(
-            f"Invalid model type: {config._name_}. Supported types: {list(MODELS.keys())}"
+            f"Invalid model type: {config._name_}. Supported types: {list(AutoModel.MODELS.keys())}"
         )
 
 
 def build_evaluator(config, **kwargs):
-    if config is not None and config._name_ in EVALUATORS:
-        evaluator_cls = EVALUATORS[config._name_]
+    if config is not None and config._name_ in AutoEvaluator.EVALUATORS:
+        evaluator_cls = AutoEvaluator.EVALUATORS[config._name_]
         config = {key: value for key, value in config.items() if key[0] != "_"}
         config.update(**kwargs)
         return evaluator_cls(**config)

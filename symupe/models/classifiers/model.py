@@ -12,7 +12,7 @@ from omegaconf import MISSING, DictConfig, OmegaConf
 
 from symupe.data.collators import SequenceInputs
 from symupe.data.datasets import SequenceDataset
-from symupe.models.base import Model
+from symupe.models import Model, AutoModel
 from symupe.modules.constructor import Registry, ModuleConfig, VariableModuleConfig
 from symupe.modules.metrics import masked_batch_mean
 from symupe.modules.transformer import TransformerConfig, EncoderTransformer, LayerNorm
@@ -296,14 +296,13 @@ class SequenceClassifier(Model):
             self.backbone_config = backbone
 
         if backbone_checkpoint is not None:
-            from symupe.models import MODELS, MusicTransformer, Seq2SeqMusicTransformer
+            from symupe.models import MusicTransformer, Seq2SeqMusicTransformer
 
             checkpoint = torch.load(backbone_checkpoint, map_location="cpu", weights_only=True)
 
             self.backbone_config = OmegaConf.create(checkpoint["model"]["config"])
 
-            backbone_cls = MODELS[checkpoint["model"]["config"]["_name_"]]
-            backbone_model = backbone_cls.from_pretrained(checkpoint_path=backbone_checkpoint, strict=False)
+            backbone_model = AutoModel.from_checkpoint(checkpoint_path=backbone_checkpoint, strict=False)
 
             if isinstance(backbone_model, MusicTransformer):
                 self.backbone = backbone_model.unwrap_model().transformer

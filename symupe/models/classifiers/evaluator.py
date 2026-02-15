@@ -1,19 +1,21 @@
 """ Embedding Classifier evaluator. """
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 import torch
 import torch.nn.functional as F
 
+from symupe.models import Evaluator
 from symupe.modules.metrics import accuracy, accuracy_topk, Reduction, mean_reciprocal_rank
 
 
-class EmbeddingClassifierEvaluator:
+class EmbeddingClassifierEvaluator(Evaluator):
     def __init__(self, model, top_k: int | Sequence[int] = (3, 5), **kwargs):
-        self.model = model
+        super().__init__(model, **kwargs)
         self.top_k = top_k
 
     @torch.no_grad()
-    def __call__(self, inputs, outputs) -> dict[str, torch.Tensor]:
+    def __call__(self, inputs: dict, outputs: dataclass) -> dict[str, torch.Tensor]:
         labels = inputs["labels"]
 
         # standard top-1 prediction accuracy

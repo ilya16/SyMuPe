@@ -14,7 +14,7 @@ from torch.utils.data import Dataset
 
 from symupe.utils import prob2bool, load_json, dump_json, tqdm_iterator, find_closest
 from .classifiers import EmotionPredictionsDataset, LocalEmotionPredictionsDataset
-from .common import NoteSegments, SequenceTask, TASK_TO_ENCODINGS, DATA_SPLITS, TASK_SEQUENCE_SORTING
+from .base import NoteSegments, SequenceTask, TASK_TO_ENCODINGS, DATA_SPLITS, TASK_SEQUENCE_SORTING
 from .token_sequence import load_and_process_token_sequence, LocalTokenSequenceDataset, TokenSequenceDataset
 from .utils import compute_sample_positions, load_token_sequence
 from ..helpers import (
@@ -131,6 +131,8 @@ class SequenceDataset(Dataset):
         else:
             self.tokenizer = tokenizer
         self.encoding = self.tokenizer.__class__.__name__
+
+        self.tokenizer.config.pitch_range = (21, 108)
 
         self.token_types = token_types or list(self.tokenizer.sizes.keys())
         self.token_sizes = {key: self.tokenizer.sizes[key] for key in self.token_types}
@@ -406,6 +408,7 @@ class SequenceDataset(Dataset):
 
         if len(seq) == 0:
             rand_idx = np.random.randint(0, len(self))
+            print("no notes", idx, seq_idx, start, end, len(tok_seq), "rand_idx", rand_idx)
             return self.get(rand_idx)
 
         # slice score sequence
@@ -421,6 +424,8 @@ class SequenceDataset(Dataset):
 
             if len(score_seq) != len(seq):
                 rand_idx = np.random.randint(0, len(self))
+                print("diff score seq", idx, seq_idx, start, end,
+                      len(tok_seq), len(score_tok_seq), len(seq), len(score_seq), "rand_idx", rand_idx)
                 return self.get(rand_idx)
 
         # bars that might be used after the sequence encoding
@@ -436,6 +441,8 @@ class SequenceDataset(Dataset):
         pitches = pitches[pitches >= 0]
         if len(pitches) == 0 or len(source_seq) == 0 or len(target_seq) == 0:
             rand_idx = np.random.randint(0, len(self))
+            print("no notes", idx, seq_idx, start, end, len(tok_seq),
+                  "seq", len(seq), len(source_seq), len(target_seq), len(pitches), "rand_idx", rand_idx)
             return self.get(rand_idx)
 
         if len(source_seq) != len(seq):
@@ -773,6 +780,9 @@ class LocalSequenceDataset(SequenceDataset):
             metadata = metadata[self.split]
             if isinstance(metadata, dict):
                 metadata = list(metadata.keys()) + list(itertools.chain.from_iterable(metadata.values()))
+
+        # metadata = [x for x in metadata if "ATEPP" in x]
+        # metadata = [x for x in metadata if "GiantMIDI" in x]
 
         self.sequence_names = list(metadata)
 

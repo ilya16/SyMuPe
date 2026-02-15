@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from symupe.data.collators import ScorePerformanceCollator
 from symupe.data.datasets import ScorePerformanceSample
 from symupe.data.tokenizers import TokSequence, SyMuPe
-from symupe.models import MODELS, MusicTransformer, Seq2SeqMusicTransformer
+from symupe.models import AutoModel, MusicTransformer, Seq2SeqMusicTransformer
 
 
 class MLMClassifier(nn.Module):
@@ -175,7 +175,7 @@ class MLMClassifier(nn.Module):
         return out
 
     @classmethod
-    def from_pretrained(
+    def from_checkpoint(
             cls,
             checkpoint_path: str,
             strict: bool = True
@@ -199,7 +199,7 @@ class MLMClassifier(nn.Module):
             dropout=config["model"]["dropout"],
             is_mlm_frozen=False,
             labels=labels,
-            backbone=MODELS[checkpoint.get("backbone", "MusicTransformer")]
+            backbone=AutoModel.MODELS[checkpoint.get("backbone", "MusicTransformer")]
         )
 
         state_dict = checkpoint["state_dict"]

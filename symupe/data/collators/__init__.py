@@ -1,4 +1,7 @@
-from .common import SeqInputs
+from .base import (
+    DataCollator,
+    SeqInputs, SeqSegments
+)
 from .sequence import (
     SequenceInputs, SequenceCollator,
     LMSequenceInputs, LMSequenceCollator,

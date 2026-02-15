@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 from symupe.utils import asdict
-from .common import SeqInputs, SeqSegments
+from .base import SeqInputs, SeqSegments
 from .sequence import (
     SequenceCollator,
     LMSequenceCollator,

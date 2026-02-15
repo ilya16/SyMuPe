@@ -3,26 +3,32 @@ from __future__ import annotations
 
 import torch
 
-from symupe.modules.metrics import Reduction, accuracy, distance, weighted_distance
 from symupe.data.collators import LMSequenceInputs, LMScorePerformanceInputs
 from symupe.data.tokenizers import OctupleM
+from symupe.models import Evaluator
 from symupe.modules.classes import LanguageModelingMode
+from symupe.modules.metrics import Reduction, accuracy, distance, weighted_distance
 from symupe.modules.tuple_transformer import (
     TupleTransformerOutput, TupleTransformerCFMOutput, TupleTransformerFMOutput
 )
-from .model import MusicTransformerOutput, CFMMusicTransformerOutput, FMMusicTransformerOutput
+from .model import (
+    MusicTransformer, MusicTransformerOutput,
+    CFMMusicTransformer, CFMMusicTransformerOutput,
+    FMMusicTransformer, FMMusicTransformerOutput
+)
 
 
-class MusicTransformerEvaluator:
+class MusicTransformerEvaluator(Evaluator):
     def __init__(
             self,
-            model,
+            model: MusicTransformer,
             tokenizer: OctupleM,
             label_pad_token_id: int = -100,
             normalized_targets: bool = True,
             ignore_keys: list[str] | None = None
     ):
-        self.model = model
+        super().__init__(model)
+
         self.tokenizer = tokenizer
         self.label_pad_token_id = label_pad_token_id
         self.normalized_targets = normalized_targets
@@ -144,16 +150,17 @@ class MusicTransformerEvaluator:
         return metrics
 
 
-class CFMMusicTransformerEvaluator:
+class CFMMusicTransformerEvaluator(Evaluator):
     def __init__(
             self,
-            model,
+            model: CFMMusicTransformer,
             tokenizer: OctupleM,
             label_pad_token_id: int = -100,
             normalized_targets: bool = True,
             ignore_keys: list[str] | None = None
     ):
-        self.model = model
+        super().__init__(model)
+
         self.tokenizer = tokenizer
         self.label_pad_token_id = label_pad_token_id
         self.normalized_targets = normalized_targets
@@ -229,20 +236,20 @@ class CFMMusicTransformerEvaluator:
                 outputs.pred_pedals[..., 1], pedals[..., 1], mask=mask, reduction=Reduction.BATCH_MEAN
             )
 
-
         return metrics
 
 
-class FMMusicTransformerEvaluator:
+class FMMusicTransformerEvaluator(Evaluator):
     def __init__(
             self,
-            model,
+            model: FMMusicTransformer,
             tokenizer: OctupleM,
             label_pad_token_id: int = -100,
             normalized_targets: bool = True,
             ignore_keys: list[str] | None = None
     ):
-        self.model = model
+        super().__init__(model)
+
         self.tokenizer = tokenizer
         self.label_pad_token_id = label_pad_token_id
         self.normalized_targets = normalized_targets

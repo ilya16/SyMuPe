@@ -1,4 +1,5 @@
-from .base import Model
+from .auto import AutoModel, AutoEvaluator
+from .base import Model, Evaluator
 from .classifiers import (
     SequenceClassifier, SequenceClassifierEvaluator
 )
@@ -21,5 +22,10 @@ from .seq2seq import (
     Seq2SeqFMMusicTransformer, Seq2SeqFMMusicTransformerEvaluator
 )
 
-MODELS = {name: cls for name, cls in globals().items() if ".model." in str(cls)}
-EVALUATORS = {name: cls for name, cls in globals().items() if ".evaluator." in str(cls)}
+for _name, _cls in list(locals().items()):
+    if isinstance(_cls, type) and issubclass(_cls, Model) and _cls is not Model:
+        AutoModel.register(_cls)
+
+for _name, _cls in list(locals().items()):
+    if isinstance(_cls, type) and issubclass(_cls, Evaluator) and _cls is not Evaluator:
+        AutoEvaluator.register(_cls)
