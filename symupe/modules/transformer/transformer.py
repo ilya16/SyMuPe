@@ -234,8 +234,8 @@ class TransformerConfig(VariableModuleConfig):
     depth: int = 6
     causal: bool = False
 
-    attention: AttentionConfig | DictConfig | None = AttentionConfig()
-    feed_forward: FeedForwardConfig | DictConfig = FeedForwardConfig()
+    attention: AttentionConfig | DictConfig | None = field(default_factory=lambda: AttentionConfig())
+    feed_forward: FeedForwardConfig | DictConfig = field(default_factory=lambda: FeedForwardConfig())
     cross_attend: bool = False
     cross_attention: AttentionConfig | DictConfig | None = None
 

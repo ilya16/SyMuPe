@@ -253,8 +253,8 @@ class SequenceClassifierConfig(ModuleConfig):
     backbone: DictConfig | TupleTransformerConfig | None
     backbone_checkpoint: str | None = None
     dim: int | None = None
-    transformer: DictConfig | TransformerConfig | None = TransformerConfig(_target_="default")
-    classifier: LinearEmbeddingClassifierConfig = LinearEmbeddingClassifierConfig(hidden_dims=None)
+    transformer: DictConfig | TransformerConfig | None = field(default_factory=lambda: TransformerConfig(_target_="default"))
+    classifier: LinearEmbeddingClassifierConfig = field(default_factory=lambda: LinearEmbeddingClassifierConfig(hidden_dims=None))
     note_classifier: bool = False,
 
     aggregation: str = "token"
