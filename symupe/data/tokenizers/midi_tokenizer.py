@@ -1,11 +1,16 @@
 """Base tokenizer class, extending miditok.MusicTokenizer."""
 from __future__ import annotations
 
+import json
+import sys
+import warnings
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 import numpy as np
+from huggingface_hub import hf_hub_download
 from miditok import MusicTokenizer as _MusicTokenizer, Event
-from miditok.constants import TIME_SIGNATURE, MIDI_INSTRUMENTS
+from miditok.constants import TIME_SIGNATURE, MIDI_INSTRUMENTS, DEFAULT_TOKENIZER_FILE_NAME, CURRENT_MIDITOK_VERSION
 from miditok.utils import (
     is_track_empty, merge_same_program_tracks,
     remove_duplicated_notes,
@@ -503,3 +508,65 @@ class MusicTokenizer(_MusicTokenizer, ABC):
             return messages[np.lexsort((-messages[:, 3], messages[:, 2], messages[:, 0]))]
         else:
             return messages[np.lexsort((messages,))]
+
+    @classmethod
+    def _from_pretrained(
+            cls,
+            *,
+            model_id: str,
+            revision: str | None,
+            cache_dir: str | Path | None,
+            force_download: bool,
+            proxies: dict | None = None,
+            resume_download: bool = False,
+            local_files_only: bool,
+            token: str | bool | None,
+            **kwargs,
+    ) -> MusicTokenizer:
+        # Called by `ModelHubMixin.from_pretrained`
+        pretrained_path = Path(model_id)
+        if pretrained_path.is_file():
+            params_path = pretrained_path
+        else:
+            filename = kwargs.get("filename", DEFAULT_TOKENIZER_FILE_NAME)
+            if (pretrained_path / filename).is_file():
+                params_path = pretrained_path / filename
+            else:
+                hf_hub_kwargs = dict(
+                    repo_id=model_id,
+                    filename=filename,
+                    revision=revision,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    local_files_only=local_files_only,
+                    token=token,
+                    library_name="MidiTok",
+                    library_version=CURRENT_MIDITOK_VERSION,
+                )
+
+                import inspect
+                hf_download_params = inspect.signature(hf_hub_download).parameters
+                if "proxies" in hf_download_params:
+                    hf_hub_kwargs["proxies"] = proxies
+                if "resume_download" in hf_download_params:
+                    hf_hub_kwargs["resume_download"] = resume_download
+
+                params_path = hf_hub_download(**hf_hub_kwargs)
+
+        # Checking config file tokenization
+        with Path(params_path).open() as file:
+            tokenization = json.load(file)["tokenization"]
+        cls_name = cls.__name__
+        if cls_name not in ["MusicTokenizer", tokenization]:
+            warnings.warn(
+                ".from_pretrained called with an invalid class name. The current class"
+                f"is {cls_name} whereas the config file comes from a {tokenization} "
+                f"tokenizer. Returning an instance of {tokenization}.",
+                stacklevel=2,
+            )
+
+        if cls_name == tokenization:
+            return cls(params=params_path)
+
+        miditok_module = sys.modules[".".join(__name__.split(".")[:-1])]
+        return getattr(miditok_module, tokenization)(params=params_path)

@@ -1,5 +1,5 @@
 from .auto import AutoModel, AutoEvaluator
-from .base import Model, Evaluator
+from .base import Model, Evaluator, Generator
 from .classifiers import (
     SequenceClassifier, SequenceClassifierEvaluator
 )

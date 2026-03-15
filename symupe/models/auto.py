@@ -69,9 +69,11 @@ class AutoModel:
             config_path = hf_hub_download(repo_id=pretrained_path, filename=Model.CONFIG_NAME, **kwargs)
 
         config = load_json(config_path)
-        return cls._get_model_class(config.get("_name_")).from_pretrained(
+        model = cls._get_model_class(config.get("_name_")).from_pretrained(
             pretrained_path, strict=strict, device=device, **kwargs
         )
+        model.eval()
+        return model
 
     @classmethod
     def _get_model_class(cls, model_name: str | None) -> type[Model]:

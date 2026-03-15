@@ -16,6 +16,7 @@ from symupe.data.tokenizers import (
 )
 from symupe.data.tokenizers.constants import SOS_TOKEN, EOS_TOKEN, MASK_TOKEN, SPECIAL_TOKENS_VALUE
 from .model import Seq2SeqMusicTransformer
+from ..base import Generator
 
 
 @dataclass
@@ -38,12 +39,12 @@ class Seq2SeqData:
     reached_eos: bool = False
 
 
-class Seq2SeqMusicTransformerGenerator:
+class Seq2SeqMusicTransformerGenerator(Generator):
     def __init__(
             self,
             model: Seq2SeqMusicTransformer,
             tokenizer: SyMuPe,
-            dataset: SequenceDataset | None,
+            dataset: SequenceDataset | None = None,
             used_token_types: list[str] | None = None,
             mask_token_dims: dict[str, list[int]] | list[int] | None = None,
             used_context_token_types: list[str] | None = None,
@@ -51,18 +52,17 @@ class Seq2SeqMusicTransformerGenerator:
 
             device: str | torch.device | None = None
     ):
-        self.model = model
+        super().__init__(
+            model=model,
+            tokenizer=tokenizer,
+            dataset=dataset,
+            device=device
+        )
+
         self.context_dim = self.model.unwrapped_transformer.context_embedding_dim
-
-        self.tokenizer = tokenizer
-        self.dataset = dataset
-
-        assert isinstance(self.tokenizer, SyMuPe)
-        self.token_transformer = SyMuPeTransformer(tokenizer=self.tokenizer)
 
         self.data = Seq2SeqData()
 
-        self.device = device
         self.sos_token_id = self.tokenizer[0, SOS_TOKEN]
         self.eos_token_id = self.tokenizer[0, EOS_TOKEN]
         self.mask_token_id = self.tokenizer[0, MASK_TOKEN]

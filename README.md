@@ -13,7 +13,8 @@
 > [![ACM DL](https://img.shields.io/badge/MM_'25-Proceedings-19552e?logo=acm&logoColor=white)](https://dl.acm.org/doi/10.1145/3746027.3755871)
 > [![Outstanding Paper Award](https://img.shields.io/badge/MM_'25-Outstanding_Paper-E6712D.svg)](https://acmmm2025.org/awards/)
 > [![Website](https://img.shields.io/badge/Demo-Samples-2563eb)](https://ilya16.github.io/SyMuPe)
-> [![Dataset](https://img.shields.io/badge/HuggingFace-Dataset-yellow?logo=huggingface)](https://huggingface.co/datasets/ilya16/PERiScoPe)
+> [![Models](https://img.shields.io/badge/HuggingFace-Models-yellow?logo=huggingface)](https://huggingface.co/SyMuPe)
+> [![Dataset](https://img.shields.io/badge/HuggingFace-Dataset-yellow?logo=huggingface)](https://huggingface.co/datasets/SyMuPe/PERiScoPe)
 > [![License](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey)](LICENSE)
 
 ## Description
@@ -25,9 +26,62 @@ By design, the model supports both **unconditional generation** and **infilling*
 
 For more details, please refer to the [paper](https://arxiv.org/abs/2511.03425) and the [demo page](https://ilya16.github.io/SyMuPe) with samples.
 
+## Models in the SyMuPe Framework
+
+Score-only models described in the paper are available on the [Hugging Face Hub](https://huggingface.co/SyMuPe).
+
+| Model Repo | Type                       | Objective | Description                                 |
+|:---|:---------------------------|:---|:--------------------------------------------|
+| [**PianoFlow-base**](https://huggingface.co/SyMuPe/PianoFlow-base) | Encoder Transformer | CFM | Flagship model for high-fidelity rendering  |
+| [**EncDec-base**](https://huggingface.co/SyMuPe/EncDec-base) | Encoder-Decoder Transformer | CLM | Slower sequence-to-sequence baseline        |
+| [**MLM-base**](https://huggingface.co/SyMuPe/MLM-base) | Encoder Transformer | MLM | Fast single-step language modeling baseline |
+## Quick Start
+
+Render an expressive performance from a quantized MIDI score in just a few lines of code.
+
+```python
+import torch
+from symusic import Score
+
+from symupe.data.tokenizers import SyMuPe
+from symupe.inference import AutoGenerator, perform_score, save_performances
+from symupe.models import AutoModel
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Load the model and tokenizer directly from the Hub
+model_name = "SyMuPe/PianoFlow-base"
+# model_name = "SyMuPe/EncDec-base"
+# model_name = "SyMuPe/MLM-base"
+
+model = AutoModel.from_pretrained(model_name).to(device)
+tokenizer = SyMuPe.from_pretrained(model_name)
+
+# Prepare generator for the model
+generator = AutoGenerator.from_model(model, tokenizer, device=device)
+
+# Load score MIDI
+score_midi = Score("score.mid")
+
+# Perform score MIDI (tokenization is handled inside)
+gen_results = perform_score(
+    generator=generator,
+    score=score_midi,
+    use_score_context=True,
+    num_samples=8,
+    seed=23
+)
+# gen_results[i] is PerformanceRenderingResult(...) containing:
+# - score_midi, score_seq, gen_seq, perf_seq, perf_midi, perf_midi_sus
+
+# Save performed MIDI files in a single directory
+save_performances(gen_results, out_dir="samples")
+
+```
+
 ## Dataset
 
-The **PERiScoPe** dataset used to train the models is available on [HuggingFace](https://huggingface.co/datasets/ilya16/PERiScoPe). 
+The **PERiScoPe** (Piano Expression Refined Score and Performance MIDI) dataset used to train the models is available on [Hugging Face](https://huggingface.co/datasets/SyMuPe/PERiScoPe). 
 
 ## Citation
 

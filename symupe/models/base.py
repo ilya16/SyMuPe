@@ -14,9 +14,11 @@ from omegaconf import DictConfig, OmegaConf
 from safetensors.torch import load_model, save_model
 from torch.utils.data import Dataset
 
+from symupe import __version__
+from symupe.data.datasets import SequenceDataset
+from symupe.data.tokenizers import SyMuPe, SyMuPeTransformer
 from symupe.modules.constructor import Constructor, ModuleConfig
 from symupe.utils import load_json, dump_json
-from symupe import __version__
 
 
 class Model(nn.Module, Constructor):
@@ -348,4 +350,32 @@ class Evaluator(Constructor):
     @torch.no_grad()
     def __call__(self, inputs: object, outputs: object, **kwargs) -> dict[str, torch.Tensor]:
         """ Compute metrics from inputs and model outputs. """
+        ...
+
+
+class Generator(Constructor):
+    """ Base class for all model evaluators. """
+
+    def __init__(
+            self,
+            model: Model,
+            tokenizer: SyMuPe,
+            dataset: SequenceDataset | None = None,
+            device: str | torch.device | None = None,
+            **kwargs
+    ):
+        self.model = model
+        self.tokenizer = tokenizer
+        self.dataset = dataset
+        self.device = device
+
+        assert isinstance(self.tokenizer, SyMuPe)
+        self.token_transformer = SyMuPeTransformer(tokenizer=self.tokenizer)
+
+    @abstractmethod
+    def reset(self) -> None:
+        ...
+
+    @abstractmethod
+    def prepare_sequence(self, **kwargs):
         ...

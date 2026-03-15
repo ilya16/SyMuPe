@@ -503,13 +503,15 @@ class TupleTransformerARWrapper(TupleTransformerLMWrapper):
                 is_eos_tokens = (out_tokens[..., -1, 0] == eos_token_id) | (out_tokens[..., -1, 0] == self.eos_token_id)
                 if is_eos_tokens.any(dim=-1):
                     out_tokens[:, -1, 1:] = out_tokens[:, -1, :1]
-                    pbar.close()
+                    if not disable_tqdm:
+                        pbar.close()
                     break
             elif max_bar is not None:
                 is_max_bar_tokens = (out_tokens[..., -1, 0] > max_bar)
                 if is_max_bar_tokens.any(dim=-1):
                     out_tokens = out_tokens[:, :-1, :]
-                    pbar.close()
+                    if not disable_tqdm:
+                        pbar.close()
                     break
 
         if num_dims == 2:

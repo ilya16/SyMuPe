@@ -15,6 +15,7 @@ from symupe.data.tokenizers import TokSequence, TokSequenceContext, EncodingType
 from symupe.data.tokenizers.constants import SOS_TOKEN, EOS_TOKEN, MASK_TOKEN, SPECIAL_TOKENS_VALUE
 from symupe.modules.tuple_transformer.flow_matching import resample
 from .model import MusicTransformer, CFMMusicTransformer
+from ..base import Generator
 
 
 @dataclass
@@ -108,12 +109,12 @@ class SequenceData:
     tempos: np.ndarray | None = None
 
 
-class MusicTransformerGenerator:
+class MusicTransformerGenerator(Generator):
     def __init__(
             self,
             model: MusicTransformer | CFMMusicTransformer,
             tokenizer: SyMuPe,
-            dataset: SequenceDataset | None,
+            dataset: SequenceDataset | None = None,
             used_token_types: list[str] | None = None,
             mask_token_dims: dict[str, list[int]] | list[int] | None = None,
             used_context_token_types: list[str] | None = None,
@@ -121,18 +122,17 @@ class MusicTransformerGenerator:
 
             device: str | torch.device | None = None
     ):
-        self.model = model
+        super().__init__(
+            model=model,
+            tokenizer=tokenizer,
+            dataset=dataset,
+            device=device
+        )
+
         self.context_dim = self.model.unwrapped_transformer.context_embedding_dim
-
-        self.tokenizer = tokenizer
-        self.dataset = dataset
-
-        assert isinstance(self.tokenizer, SyMuPe)
-        self.token_transformer = SyMuPeTransformer(tokenizer=self.tokenizer)
 
         self.data = SequenceData()
 
-        self.device = device
         self.sos_token_id = self.tokenizer[0, SOS_TOKEN]
         self.eos_token_id = self.tokenizer[0, EOS_TOKEN]
         self.mask_token_id = self.tokenizer[0, MASK_TOKEN]
