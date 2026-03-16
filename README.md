@@ -12,10 +12,9 @@
 > [![arXiv](https://img.shields.io/badge/arXiv-2511.03425-b31b1b.svg?logo=arXiv)](https://arxiv.org/abs/2511.03425)
 > [![ACM DL](https://img.shields.io/badge/MM_'25-Proceedings-19552e?logo=acm&logoColor=white)](https://dl.acm.org/doi/10.1145/3746027.3755871)
 > [![Outstanding Paper Award](https://img.shields.io/badge/MM_'25-Outstanding_Paper-E6712D.svg)](https://acmmm2025.org/awards/)
-> [![Website](https://img.shields.io/badge/Demo-Samples-2563eb)](https://ilya16.github.io/SyMuPe)
+> [![Website](https://img.shields.io/badge/Website-Demo-2563eb)](https://ilya16.github.io/SyMuPe)
 > [![Models](https://img.shields.io/badge/HuggingFace-Models-yellow?logo=huggingface)](https://huggingface.co/SyMuPe)
 > [![Dataset](https://img.shields.io/badge/HuggingFace-Dataset-yellow?logo=huggingface)](https://huggingface.co/datasets/SyMuPe/PERiScoPe)
-> [![License](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey)](LICENSE)
 
 ## Description
 
@@ -26,6 +25,13 @@ By design, the model supports both **unconditional generation** and **infilling*
 
 For more details, please refer to the [paper](https://arxiv.org/abs/2511.03425) and the [demo page](https://ilya16.github.io/SyMuPe) with samples.
 
+## Install
+
+Install the `symupe` package using:
+```shell
+pip install symupe
+```
+
 ## Models in the SyMuPe Framework
 
 Score-only models described in the paper are available on the [Hugging Face Hub](https://huggingface.co/SyMuPe).
@@ -35,6 +41,7 @@ Score-only models described in the paper are available on the [Hugging Face Hub]
 | [**PianoFlow-base**](https://huggingface.co/SyMuPe/PianoFlow-base) | Encoder Transformer | CFM | Flagship model for high-fidelity rendering  |
 | [**EncDec-base**](https://huggingface.co/SyMuPe/EncDec-base) | Encoder-Decoder Transformer | CLM | Slower sequence-to-sequence baseline        |
 | [**MLM-base**](https://huggingface.co/SyMuPe/MLM-base) | Encoder Transformer | MLM | Fast single-step language modeling baseline |
+
 ## Quick Start
 
 Render an expressive performance from a quantized MIDI score in just a few lines of code.
@@ -98,5 +105,6 @@ The **PERiScoPe** (Piano Expression Refined Score and Performance MIDI) dataset 
 
 ## License
 
-The materials in this repository are licensed under the
-[Creative Commons Attribution–NonCommercial–ShareAlike 4.0 International License (CC BY-NC-SA 4.0)](LICENSE).
+- The **source code** in this repository is licensed under the [Apache License 2.0](LICENSE).
+- The **pre-trained model weights** and the **PERiScoPe dataset** are licensed under 
+  [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International](LICENSE-DATA).
