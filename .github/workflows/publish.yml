@@ -1,0 +1,49 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-test-publish:
+    name: Build, test install, and publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build package
+        run: python -m build
+
+      - name: Check package metadata
+        run: twine check dist/*
+
+      - name: Test install package
+        run: |
+          pip install --force-reinstall dist/*.whl
+          python - <<EOF
+          import symupe
+          print("symupe import OK")
+          from symupe.data.tokenizers import SyMuPe
+          print("tokenizer import OK")
+          from symupe.inference import AutoGenerator
+          print("inference engine import OK")
+          EOF
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
