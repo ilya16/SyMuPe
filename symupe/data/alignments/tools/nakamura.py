@@ -377,7 +377,7 @@ class AlignmentTool(Aligner):
             if not err_corresp.exists() or force_recompute:
                 subprocess.run([self.programs["MatchToCorresp"], err_match, score_spr, err_corresp])
 
-            err_alignment = Alignment(path=err_corresp, filetype="corresp")
+            err_alignment = Alignment.from_file(path=err_corresp)
             score_interval = err_alignment.end_index - err_alignment.start_index + 1
             recall = err_alignment.num_full_pairs / score_interval
 

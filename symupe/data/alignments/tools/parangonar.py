@@ -32,11 +32,13 @@ class DataType(ExplicitEnum):
 class FileType(ExplicitEnum):
     MIDI = "MIDI"
     ALIGN = "align"
+    ALIGN_COMPRESSED = "align_compressed"
 
 
 FILE_EXT = {
     FileType.MIDI: ".mid",
-    FileType.ALIGN: "_align.txt"
+    FileType.ALIGN: "_align.txt",
+    FileType.ALIGN_COMPRESSED: "_align.npz"
 }
 
 
@@ -67,10 +69,12 @@ class ParangonarAligner(Aligner):
     def __init__(
             self,
             midi_dir: str | Path | None = None,
-            alignments_dir: str | Path | None = None
+            alignments_dir: str | Path | None = None,
+            save_compressed: bool = False
     ):
         self.midi_dir = Path(midi_dir) if alignments_dir is not None else None
         self.alignments_dir = Path(alignments_dir) if alignments_dir is not None else None
+        self.save_compressed = save_compressed
 
         self.matcher = pa.DualDTWNoteMatcher()
         self.matcher.onset_matcher.dtw = DynamicTimeWarpingSingleLoop()
@@ -159,6 +163,7 @@ class ParangonarAligner(Aligner):
             perf_name, score_name = os.path.basename(perf_midi), os.path.basename(score_midi)
         score_short_name = os.path.basename(score_name)
 
+        perf_name = perf_name.replace("_processed", "")
         align_name = f"{perf_name}_{score_short_name}"
 
         # process and save alignment
@@ -195,18 +200,19 @@ class ParangonarAligner(Aligner):
 
                 pairs.append(AlignmentPair(score_note=score_note, perf_note=perf_note))
 
-            alignment = Alignment(path=None, pairs=pairs, score_name=score_name, perf_name=perf_name)
+            alignment = Alignment(pairs=pairs, score_name=score_name, perf_name=perf_name)
+            alignment.preprocess_pairs(sort=True, clean_duplicates=True)  # parangonar might output duplicates
 
             if save_alignment:
                 assert self.alignments_dir is not None
-                align_path = self.alignments_dir / (align_name + FILE_EXT[FileType.ALIGN])
+                align_path = self.alignments_dir / (
+                        align_name + FILE_EXT[FileType.ALIGN_COMPRESSED if self.save_compressed else FileType.ALIGN]
+                )
                 paths[DataType.ALIGNMENT][FileType.ALIGN.value] = align_path
 
                 os.makedirs(os.path.dirname(align_path), exist_ok=True)
 
-                alignment.preprocess_pairs(sort=True, score_first=False, clean_duplicates=True)
-                alignment.write(str(align_path))
-                alignment.preprocess_pairs(sort=True, score_first=True, clean_duplicates=False)
+                alignment.save(align_path)  # compression is detected from the path extension
 
         except Exception as e:
             msg = f"Error@process_alignment: post-processing of the alignment failed with ({repr(e)})"

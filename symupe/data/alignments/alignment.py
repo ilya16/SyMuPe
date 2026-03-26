@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 from symusic import Score
@@ -26,7 +27,7 @@ class AlignmentNote:
 
     @property
     def duration(self):
-        return self.end - self.start
+        return self.end - self.start if self.end is not None else None
 
     def __eq__(self, other):
         return other is not None \
@@ -45,6 +46,20 @@ class AlignmentNote:
             f"\t{round(self.start, TIME_PRECISION)}"
             f"\t{round(self.end or -1, TIME_PRECISION)}"
             f"\t{pitch2sitch(self.pitch)}"
+        )
+
+    def to_array(self):
+        return [self.idx, self.pitch, self.start, self.end if self.end is not None else -1.0]
+
+    @classmethod
+    def from_array(cls, row):
+        if row[0] == -1:
+            return None
+        return cls(
+            idx=int(row[0]),
+            pitch=int(row[1]),
+            start=float(row[2]),
+            end=float(row[3]) if row[3] != -1 else None
         )
 
 
@@ -71,112 +86,196 @@ class PositionPair:
 
 class AlignmentFileType(ExplicitEnum):
     ALIGN = "align"
+    COMPRESSED = "compressed"
     CORRESP = "corresp"
 
 
+class AlignmentFormat(ExplicitEnum):
+    ALIGN = ".txt"
+    COMPRESSED = ".npz"
+    CORRESP = "_corresp.txt"
+
+
 class Alignment:
-    _tpmult = 100000
+    _pitch_time_multiplier = 100000
 
     def __init__(
             self,
-            path: str | None,
-            pairs: list[AlignmentPair] | None = None,
-            score_name: str | None = None,
-            perf_name: str | None = None,
-            score_first: bool = True,
-            clean_duplicates: bool = True,
-            clean_mismatched_pitches: bool = True,
-            score_index_range: tuple[int, int] | None = None,
-            filetype: str = "align"
+            pairs: list[AlignmentPair],
+            score_name: str = None,
+            perf_name: str = None
     ):
-        assert path is not None or pairs is not None
+        assert isinstance(pairs, list)
+        self.pairs = pairs
+        self.score_name = score_name
+        self.perf_name = perf_name
 
-        if pairs is None:
-            (self.score_name, self.perf_name), self.pairs = self.load(
-                filepath=path,
-                clean_duplicates=clean_duplicates,
-                clean_mismatched_pitches=clean_mismatched_pitches,
-                filetype=filetype
-            )
+        self._score_data = None
+        self._perf_data = None
+
+    # properties
+
+    def __getitem__(self, idx: int):
+        return self.pairs[idx] if idx < len(self) else None
+
+    def __len__(self):
+        return len(self.pairs)
+
+    @property
+    def num_full_pairs(self) -> int:
+        return sum(map(lambda p: int(p.score_note is not None and p.perf_note is not None), self.pairs))
+
+    def clear_cache(self):
+        self._score_data = None
+        self._perf_data = None
+
+    @property
+    def score_note_array(self):
+        if self._score_data is None:
+            self._score_data = np.array([p.score_note.to_array() if p.score_note else [-1, -1, -1, -1] for p in self.pairs])
+        return self._score_data
+
+    @property
+    def perf_note_array(self):
+        if self._perf_data is None:
+            self._perf_data = np.array([p.perf_note.to_array() if p.perf_note else [-1, -1, -1, -1] for p in self.pairs])
+        return self._perf_data
+
+    def _get_pitch_time_array(self, pitches: np.ndarray, times: np.ndarray, precision: int = 4):
+        return self._pitch_time_multiplier * pitches + np.round(times, precision)
+
+    @property
+    def score_pitch_time_array(self):
+        score_data = self.score_note_array
+        return self._get_pitch_time_array(pitches=score_data[:, 1], times=score_data[:, 2])
+
+    @property
+    def perf_pitch_time_array(self):
+        perf_data = self.perf_note_array
+        return self._get_pitch_time_array(pitches=perf_data[:, 1], times=perf_data[:, 2])
+
+    # loading/saving methods
+
+    @classmethod
+    def from_file(cls, path: str | Path):
+        path = Path(path)
+        if path.suffix == AlignmentFormat.COMPRESSED:
+            return cls._load_compressed(path)
+        elif path.name.endswith(AlignmentFormat.CORRESP.value):
+            return cls._load_text(path, filetype=AlignmentFileType.CORRESP)
         else:
-            (self.score_name, self.perf_name), self.pairs = (score_name, perf_name), pairs
+            return cls._load_text(path, filetype=AlignmentFileType.ALIGN)
 
-        self.preprocess_pairs(score_first=score_first, clean_duplicates=False)
+    @classmethod
+    def _load_text(cls, path: str | Path, filetype: str | AlignmentFileType = AlignmentFileType.ALIGN):
+        is_align = filetype == AlignmentFileType.ALIGN
 
-        self.score_index_range = score_index_range
-
-    @staticmethod
-    def load(
-            filepath: str,
-            clean_duplicates: bool = True,
-            clean_mismatched_pitches: bool = True,
-            filetype: str = "align"
-    ):
-        with open(filepath, "r") as f:
-            # load score/performance name metadata
-            if filetype == AlignmentFileType.ALIGN:
-                meta = f.readline().strip().split("\t")
-                if len(meta) == 2:  # backward compatibility
-                    meta = ["P-S"] + meta
-                score_first = meta[0] == "S-P"
-                score_name, perf_name = (meta[1], meta[2]) if score_first else (meta[2], meta[1])
+        with open(path, "r") as f:
+            if is_align:
+                header = f.readline().strip().split("\t")
+                if len(header) == 2: header = ["P-S"] + header
+                score_first = header[0] == "S-P"
+                score_name, perf_name = (header[1], header[2]) if score_first else (header[2], header[1])
             else:  # no name meta
-                score_first = False
-                score_name, perf_name = None, None
-
-            _perf_ids, _score_ids = set(), set()
+                score_first, score_name, perf_name = False, None, None
 
             alignment = []
             for line in f:
                 items = line.strip().split("\t")
+                if filetype == AlignmentFileType.CORRESP and (line.startswith("//") or len(items) != 10):
+                    continue
 
-                if filetype == AlignmentFileType.CORRESP:
-                    if line.startswith("//") or len(items) != 10:
-                        continue
+                def parse_note(note_data):
+                    if (is_align and note_data[3] == "*") or (not is_align and note_data[0] == "*"):
+                        return None
 
-                if filetype == AlignmentFileType.ALIGN:
-                    note_1, note_2 = map(
-                        lambda ni: AlignmentNote(
-                            idx=int(ni[0]),
-                            start=float(ni[1]),
-                            end=float(ni[2]) if ni[2] != -1 else None,
-                            pitch=sitch2pitch(ni[3])
-                        ) if ni[3] != "*" else None,
-                        (items[:4], items[4:8])
+                    return AlignmentNote(
+                        idx=int(note_data[0]),
+                        start=float(note_data[1]),
+                        end=float(note_data[2]) if is_align and note_data[2] != "-1" else None,
+                        pitch=sitch2pitch(note_data[3]) if is_align else int(note_data[3])
                     )
-                elif filetype == AlignmentFileType.CORRESP:
-                    note_1, note_2 = map(
-                        lambda ni: AlignmentNote(
-                            idx=int(ni[0]),
-                            start=float(ni[1]),
-                            pitch=int(ni[3])
-                        ) if ni[0] != "*" else None,
-                        (items[:5], items[5:10])
-                    )
+
+                note_1 = parse_note(items[:4] if is_align else items[:5])
+                note_2 = parse_note(items[4:8] if is_align else items[5:10])
 
                 s_note, p_note = (note_1, note_2) if score_first else (note_2, note_1)
-
-                if clean_duplicates:
-                    if (p_note and p_note.idx in _perf_ids) or (s_note and s_note.idx in _score_ids):
-                        continue  # duplicate
-
-                    if p_note:
-                        _perf_ids.add(p_note.idx)
-
-                    if s_note:
-                        _score_ids.add(s_note.idx)
-
-                if clean_mismatched_pitches and s_note and p_note and s_note.pitch != p_note.pitch:
-                    p_note = None
-
                 alignment.append(AlignmentPair(s_note, p_note))
 
-            del _perf_ids, _score_ids
+        return cls(alignment, score_name, perf_name)
 
-        return (score_name, perf_name), alignment
+    @classmethod
+    def _load_compressed(cls, path: str | Path):
+        with np.load(path) as data:
+            score_idx, score_pitch, score_times = data["score_idx"], data["score_pitch"], data["score_times"]
+            perf_idx, perf_pitch, perf_times = data["perf_idx"], data["perf_pitch"], data["perf_times"]
 
-    @staticmethod
-    def from_midis(
+            pairs = []
+            for i in range(len(score_idx)):
+                s_note = AlignmentNote(
+                    idx=int(score_idx[i]),
+                    pitch=int(score_pitch[i]),
+                    start=float(score_times[i][0]),
+                    end=float(score_times[i][1]) if score_times[i][1] != -1 else None
+                ) if score_idx[i] != -1 else None
+
+                p_note = AlignmentNote(
+                    idx=int(perf_idx[i]),
+                    pitch=int(perf_pitch[i]),
+                    start=float(perf_times[i][0]),
+                    end=float(perf_times[i][1]) if perf_times[i][1] != -1 else None
+                ) if perf_idx[i] != -1 else None
+
+                pairs.append(AlignmentPair(s_note, p_note))
+
+            return cls(
+                pairs=pairs,
+                score_name=str(data["score_name"]),
+                perf_name=str(data["perf_name"])
+            )
+
+    def save(self, path: str | Path, **kwargs):
+        path = Path(path)
+        if path.suffix == ".npz":
+            self._save_compressed(path)
+        else:
+            self._save_text(path, **kwargs)
+
+    def _save_text(self, path: Path, score_first: bool = True):
+        _empty = "-1\t-1\t-1\t*"
+        self.preprocess_pairs(sort=True, score_first=score_first, clean_duplicates=False)
+
+        with open(path, "w") as f:
+            if score_first:
+                header = f"S-P\t{self.score_name}\t{self.perf_name}\n"
+            else:
+                header = f"P-S\t{self.perf_name}\t{self.score_name}\n"
+            f.write(header)
+
+            for pair in self.pairs:
+                s_str = pair.score_note.to_print_str() if pair.score_note else _empty
+                p_str = pair.perf_note.to_print_str() if pair.perf_note else _empty
+                f.write(f"{s_str}\t{p_str}\n" if score_first else f"{p_str}\t{s_str}\n")
+
+    def _save_compressed(self, path: Path):
+        score_data = np.array([p.score_note.to_array() if p.score_note else [-1, -1, -1, -1] for p in self.pairs])
+        perf_data = np.array([p.perf_note.to_array() if p.perf_note else [-1, -1, -1, -1] for p in self.pairs])
+
+        np.savez_compressed(
+            path,
+            score_name=str(self.score_name),
+            score_idx=score_data[:, 0].astype(np.int32),
+            score_pitch=score_data[:, 1].astype(np.int8),
+            score_times=score_data[:, 2:].astype(np.float64),
+            perf_name=str(self.perf_name),
+            perf_idx=perf_data[:, 0].astype(np.int32),
+            perf_pitch=perf_data[:, 1].astype(np.int8),
+            perf_times=perf_data[:, 2:].astype(np.float64),
+        )
+
+    @classmethod
+    def from_midi(
+            cls,
             score_midi: Score,
             perf_midi: Score,
             alignment: np.ndarray | None = None
@@ -207,55 +306,59 @@ class Alignment:
         for score_idx, perf_idx in enumerate(alignment):
             pairs.append(AlignmentPair(score_notes[score_idx], perf_notes[perf_idx]))
 
-        return Alignment(path=None, pairs=pairs)
+        return Alignment(pairs=pairs)
 
-    def write(
+    # processing methods
+
+    def preprocess_pairs(
             self,
-            filepath: str,
-            score_first: bool = False
+            sort: bool = True,
+            score_first: bool = True,
+            clean_duplicates: bool = False,
+            clean_mismatched_pitches: bool = False,
+            clear_cache: bool = True
     ):
-        _empty = "-1\t-1\t-1\t*"
-        self.preprocess_pairs(sort=True, score_first=score_first, clean_duplicates=False)
-
-        with open(filepath, "w") as f:
-            if score_first:
-                meta = f"S-P\t{self.score_name}\t{self.perf_name}\n"
-            else:
-                meta = f"P-S\t{self.perf_name}\t{self.score_name}\n"
-            f.write(meta)
-
-            for pair in self.pairs:
-                s_note, p_note = pair.score_note, pair.perf_note
-                s_str = s_note.to_print_str() if s_note is not None else _empty
-                p_str = p_note.to_print_str() if p_note is not None else _empty
-                f.write(f"{s_str}\t{p_str}\n" if score_first else f"{p_str}\t{s_str}\n")
-
-    def preprocess_pairs(self, sort: bool = True, score_first: bool = True, clean_duplicates: bool = True):
         if clean_duplicates:
-            self.pairs = list(set(self.pairs))
+            self.clean_duplicates()
+
+        if clean_mismatched_pitches:
+            self.clean_mismatched_pitches()
 
         if sort:
-            if score_first:
-                self.pairs.sort(key=lambda p: (
-                    (p.score_note.start, p.score_note.pitch) if p.score_note else INVALID_TIME_PITCH_TUPLE,
-                    (p.perf_note.start, p.perf_note.pitch) if p.perf_note else INVALID_TIME_PITCH_TUPLE
-                ))
-            else:
-                self.pairs.sort(key=lambda p: (
-                    (p.perf_note.start, p.perf_note.pitch) if p.perf_note else INVALID_TIME_PITCH_TUPLE,
-                    (p.score_note.start, p.score_note.pitch) if p.score_note else INVALID_TIME_PITCH_TUPLE
-                ))
+            self.sort(score_first=score_first)
 
-        self._score_data = self._get_pitch_time_data(
-            pitches=np.array(list(map(lambda x: x.score_note.pitch if x.score_note else -1, self.pairs))),
-            times=np.array(list(map(lambda x: x.score_note.start if x.score_note else -1, self.pairs)))
-        )
-        self._perf_data = self._get_pitch_time_data(
-            pitches=np.array(list(map(lambda x: x.perf_note.pitch if x.perf_note else -1, self.pairs))),
-            times=np.array(list(map(lambda x: x.perf_note.start if x.perf_note else -1, self.pairs)))
-        )
+        if clear_cache:
+            self.clear_cache()
 
         return self
+
+    def sort(self, score_first: bool = True):
+        if score_first:
+            self.pairs.sort(key=lambda p: (
+                (p.score_note.start, p.score_note.pitch) if p.score_note else INVALID_TIME_PITCH_TUPLE,
+                (p.perf_note.start, p.perf_note.pitch) if p.perf_note else INVALID_TIME_PITCH_TUPLE
+            ))
+        else:
+            self.pairs.sort(key=lambda p: (
+                (p.perf_note.start, p.perf_note.pitch) if p.perf_note else INVALID_TIME_PITCH_TUPLE,
+                (p.score_note.start, p.score_note.pitch) if p.score_note else INVALID_TIME_PITCH_TUPLE
+            ))
+
+        self.clear_cache()
+
+    def clean_duplicates(self):
+        self.pairs = list(set(self.pairs))
+        self.clear_cache()
+
+    def clean_mismatched_pitches(self):
+        for pair in self.pairs:
+            if (pair.score_note is not None
+                    and pair.perf_note is not None
+                    and pair.score_note.pitch != pair.perf_note.pitch):
+                pair.perf_note = None
+        self.clear_cache()
+
+    # utility methods used during the alignment cleaning
 
     def compare_notes_with_midi(
             self,
@@ -303,7 +406,7 @@ class Alignment:
             if fill_note_attributes:
                 _fill_attributes(perf_midi, pair_to_note, is_score_midi=False)
 
-        self.preprocess_pairs(sort=False, clean_duplicates=False)
+        self.clear_cache()
 
         return self
 
@@ -348,20 +451,6 @@ class Alignment:
 
         return None
 
-    def _get_pitch_time_data(self, pitches: np.ndarray, times: np.ndarray, precision: int = 4):
-        return self._tpmult * pitches + np.round(times, precision)
-
-    def _get_midi_data(self, midi: Score):
-        note_soa = midi.tracks[0].notes.numpy()
-        midi_pitches = note_soa["pitch"]
-        midi_times = note_soa["time"]
-
-        if isinstance(midi.ttype, Tick):
-            time_mapper = MIDITimeMapper(midi)
-            midi_times = time_mapper.t2s(midi_times)
-
-        return self._get_pitch_time_data(midi_pitches, midi_times)
-
     def match_with_midi(
             self,
             midi: Score,
@@ -369,8 +458,19 @@ class Alignment:
             fix_non_unique: bool = True,
             return_midi_data: bool = False
     ) -> tuple[np.ndarray, np.ndarray] | tuple[tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]]:
-        midi_data = self._get_midi_data(midi)
-        pair_data = self._score_data if is_score_midi else self._perf_data
+        def _get_midi_data():
+            note_soa = midi.tracks[0].notes.numpy()
+            midi_pitches = note_soa["pitch"]
+            midi_times = note_soa["time"]
+
+            if isinstance(midi.ttype, Tick):
+                time_mapper = MIDITimeMapper(midi)
+                midi_times = time_mapper.t2s(midi_times)
+
+            return self._get_pitch_time_array(midi_pitches, midi_times)
+
+        midi_data = _get_midi_data()
+        pair_data = self.score_pitch_time_array if is_score_midi else self.perf_pitch_time_array
 
         indices = np.argsort(midi_data)
         if len(midi_data) == 0:
@@ -393,8 +493,11 @@ class Alignment:
                 repeat_pair_ids = np.where(pair_to_note == idx)[0]
                 for rep_idx in repeat_pair_ids[1:]:
                     for i, un_idx in enumerate(unused_ids):
-                        pair_pitch, pair_time = pair_data[rep_idx] // self._tpmult, pair_data[rep_idx] % self._tpmult
-                        midi_pitch, midi_time = midi_data[un_idx] // self._tpmult, midi_data[un_idx] % self._tpmult
+                        pair_pitch = pair_data[rep_idx] // self._pitch_time_multiplier
+                        pair_time = pair_data[rep_idx] % self._pitch_time_multiplier
+                        midi_pitch = midi_data[un_idx] // self._pitch_time_multiplier
+                        midi_time = midi_data[un_idx] % self._pitch_time_multiplier
+
                         if abs(pair_time - midi_time) < 1 and pair_pitch == midi_pitch:
                             pair_to_note[rep_idx] = un_idx
                             unused_ids = np.delete(unused_ids, i)
@@ -409,7 +512,7 @@ class Alignment:
         if return_midi_data:
             return (pair_to_note, note_to_pair), (pair_data, midi_data)
         else:
-            return (pair_to_note, note_to_pair)
+            return pair_to_note, note_to_pair
 
     def build_position_pairs(self, score_midi: Score):
         pair_to_score, _ = self.match_with_midi(score_midi)
@@ -473,7 +576,7 @@ class Alignment:
         if no_perf_note:
             self.pairs = list(filter(lambda p: p.perf_note is not None, self.pairs))
 
-        self.preprocess_pairs(sort=False, clean_duplicates=False)
+        self.clear_cache()
 
         return self
 
@@ -507,7 +610,7 @@ class Alignment:
                 )
                 self.pairs.append(AlignmentPair(s_note, perf_note=None))
 
-            self.preprocess_pairs(clean_duplicates=False)
+            self.preprocess_pairs(sort=True, clean_duplicates=False)
 
         return self
 
@@ -542,52 +645,22 @@ class Alignment:
                     note.start += time_shift
                     note.end += time_shift
 
-        self.preprocess_pairs(sort=False, clean_duplicates=False)
+        self.clear_cache()
+
         return np.array(ids)
-
-    def join_with(self, other):
-        _score_notes = set(map(lambda p: p.score_note, self.pairs))
-        _perf_notes = set(map(lambda p: p.perf_note, self.pairs))
-
-        new_pairs = False
-        for pair in other.pairs:
-            if pair.score_note not in _score_notes and pair.perf_note not in _perf_notes:
-                self.pairs.append(pair)
-                new_pairs = True
-
-        if new_pairs:
-            self.preprocess_pairs()
-
-        return self
-
-    def __getitem__(self, idx: int):
-        return self.pairs[idx] if idx < len(self) else None
-
-    def __len__(self):
-        return len(self.pairs)
-
-    @property
-    def num_full_pairs(self) -> int:
-        return sum(map(lambda p: int(p.score_note is not None and p.perf_note is not None), self.pairs))
 
     @property
     def start_index(self):
-        if self.score_index_range is None:
-            start_idx = 1e10
-            for pair in self.pairs:
-                if pair.score_note is not None and pair.perf_note is not None:
-                    start_idx = min(start_idx, pair.score_note.idx)
-        else:
-            start_idx = self.score_index_range[0]
+        start_idx = 1e10
+        for pair in self.pairs:
+            if pair.score_note is not None and pair.perf_note is not None:
+                start_idx = min(start_idx, pair.score_note.idx)
         return start_idx
 
     @property
     def end_index(self):
-        if self.score_index_range is None:
-            end_idx = 0
-            for pair in self.pairs:
-                if pair.score_note is not None and pair.perf_note is not None:
-                    end_idx = max(end_idx, pair.score_note.idx)
-        else:
-            end_idx = self.score_index_range[1]
+        end_idx = 0
+        for pair in self.pairs:
+            if pair.score_note is not None and pair.perf_note is not None:
+                end_idx = max(end_idx, pair.score_note.idx)
         return end_idx
