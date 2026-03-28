@@ -185,7 +185,8 @@ class Alignment:
         with open(path, "r") as f:
             if is_align:
                 header = f.readline().strip().split("\t")
-                if len(header) == 2: header = ["P-S"] + header
+                if len(header) == 2:
+                    header = ["P-S"] + header
                 score_first = header[0] == "S-P"
                 score_name, perf_name = (header[1], header[2]) if score_first else (header[2], header[1])
             else:  # no name meta

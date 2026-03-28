@@ -430,7 +430,7 @@ def unique_alignments(xs, ys, threshold=None):
     used_x = set()
     tuples = list()
     for x in xs:
-        if not x in used_x:
+        if x not in used_x:
             current_x_mask = xs[p[:, 0]] == x
             if current_x_mask.sum() > 1:
                 current_ids = p[current_x_mask, :]

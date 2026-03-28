@@ -17,13 +17,10 @@ from torch.utils.data import Dataset
 
 from symupe.utils import prob2bool, load_json, dump_json, tqdm_iterator
 from .base import NoteSegments, DATA_SPLITS, SequenceTask
+from .indexers import TokenSequenceBarIndexer
+from .processors import TupleTokenSequenceProcessor, TokenSequenceAugmentations
 from .token_sequence import load_and_process_token_sequence, TokenSequenceDataset, LocalTokenSequenceDataset
 from .utils import get_num_bars, compute_sample_positions, get_end_bar, load_token_sequence
-from ..helpers import (
-    TupleTokenSequenceProcessor,
-    TokenSequenceBarIndexer,
-    TokenSequenceAugmentations
-)
 from ..tokenizers import TOKENIZERS, SyMuPe, TokSequence, EncodingType
 
 
@@ -544,7 +541,7 @@ class ScorePerformanceDataset(Dataset):
             if score_start == 0:
                 score_seq = self.tokenizer.add_sos_token(score_seq)
                 perf_seq = self.tokenizer.add_sos_token(perf_seq)
-                noisy_perf_seq = self.tokenizer.add_sos_token(noisy_perf_seq) if exists(noisy_perf_seq) else None
+                noisy_perf_seq = self.tokenizer.add_sos_token(noisy_perf_seq) if noisy_perf_seq is not None else None
                 bars, beats, onsets = map(
                     lambda s: np.concatenate([[s[0] if len(s) else self.tokenizer.zero_token], s]),
                     (bars, beats, onsets)
@@ -552,7 +549,7 @@ class ScorePerformanceDataset(Dataset):
             if score_end == score_total_notes:
                 score_seq = self.tokenizer.add_eos_token(score_seq)
                 perf_seq = self.tokenizer.add_eos_token(perf_seq)
-                noisy_perf_seq = self.tokenizer.add_eos_token(noisy_perf_seq) if exists(noisy_perf_seq) else None
+                noisy_perf_seq = self.tokenizer.add_eos_token(noisy_perf_seq) if noisy_perf_seq is not None else None
                 bars, beats, onsets = map(
                     lambda s: np.concatenate([s, [s[-1] if len(s) else self.tokenizer.zero_token]]),
                     (bars, beats, onsets)

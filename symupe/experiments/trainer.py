@@ -110,7 +110,7 @@ class Trainer:
         self.build_optimizer()
 
         self.accelerator.wait_for_everyone()
-        logger.info(f"Built Trainer!")
+        logger.info("Built Trainer!")
 
     def _setup_directories(self):
         # output results directory
@@ -192,7 +192,7 @@ class Trainer:
 
         if not self.callback_handler.has_callback(TrackerCallback):
             self.add_callback(TrackerCallback(accelerator=self.accelerator))
-            logger.info(f"Built TrackerCallback")
+            logger.info("Built TrackerCallback")
 
     def _setup_model(self):
         # prepare model
@@ -257,7 +257,7 @@ class Trainer:
                 model=self.model,
                 num_train_steps=num_train_steps
             )
-            logger.info(f"Built Optimizer")
+            logger.info("Built Optimizer")
 
         self.grad_accum_steps = self.optimizer.grad_accum_steps if self.optimizer is not None else 1
 
@@ -300,11 +300,9 @@ class Trainer:
             max_steps = config.max_steps
             num_train_epochs = config.max_steps // num_update_steps_per_epoch \
                                + int(config.max_steps % num_update_steps_per_epoch > 0)
-            num_train_samples = max_steps * total_train_batch_size  # note: last batch might be incomplete
         else:
             max_steps = math.ceil(config.epochs * num_update_steps_per_epoch)
             num_train_epochs = math.ceil(config.epochs)
-            num_train_samples = len(self.train_dataloader.dataset) * config.epochs
 
         num_examples = len(self.train_dataloader.dataset)
 
@@ -350,7 +348,7 @@ class Trainer:
         else:
             return
 
-        logger.info(f"*** Running evaluation ***")
+        logger.info("*** Running evaluation ***")
 
         metrics = self.run_epoch(eval_dataloader, is_train=False)
 
@@ -497,7 +495,7 @@ class Trainer:
                 trainer_state_path = os.path.join(self.config.output_dir, TRAINER_STATE_NAME)
                 if "experiment" in checkpoint_dict and "state" in checkpoint_dict["experiment"]:
                     self.state = TrainerState.from_json_string(checkpoint_dict["experiment"]["state"])
-                    logger.info(f"Loaded trainer state from the checkpoint.")
+                    logger.info("Loaded trainer state from the checkpoint.")
                 elif os.path.exists(trainer_state_path):
                     self.state = self.state.load_from_json(trainer_state_path)
                     logger.info(f"Loaded trainer state from `{trainer_state_path}`.")

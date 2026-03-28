@@ -460,13 +460,13 @@ class LocalAttention(Attention):
 
         # pack and pad
 
-        q, packed_shape = rearrange(q, "b h n d -> (b h) n d"), q.shape[:2]
+        q = rearrange(q, "b h n d -> (b h) n d")
         needed_pad, q = pad_to_multiple(q, window_size, dim=-2)
         _, k = pad_to_multiple(rearrange(k, "b h n d -> (b h) n d"), window_size, dim=-2)
         _, v = pad_to_multiple(rearrange(v, "b h n d -> (b h) n d"), window_size, dim=-2)
 
         bh, n, head_dim = q.shape
-        device, dtype = q.device, q.dtype
+        device = q.device
         windows = n // window_size
 
         seq = torch.arange(n, device=device)

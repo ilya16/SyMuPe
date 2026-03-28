@@ -15,15 +15,15 @@ class GradientReversalFunction(torch.autograd.Function):
     """Revert gradient without any further input modification."""
 
     @staticmethod
-    def forward(ctx, x, l, c):
-        ctx.l = l
-        ctx.c = c
+    def forward(ctx, x, scale: float = 1., clip_value: float = 1.):
+        ctx.scale = scale
+        ctx.clip_value = clip_value
         return x.view_as(x)
 
     @staticmethod
     def backward(ctx, grad_output):
-        grad_output = grad_output.clamp(-ctx.c, ctx.c)
-        return ctx.l * grad_output.neg(), None, None
+        grad_output = grad_output.clamp(-ctx.clip_value, ctx.clip_value)
+        return ctx.scale * grad_output.neg(), None, None
 
 
 @dataclass

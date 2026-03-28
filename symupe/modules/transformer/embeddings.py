@@ -494,7 +494,7 @@ class ALiBiPositionalBias(nn.Module):
             assert q is not None and k is not None
             q = q[:, :self.contextual_heads]
             k = k[:, None] if k.ndim == 3 else k[:, :self.contextual_heads]
-            dots = einsum(f"b h i d, b h j d -> b h i j", q, k) * (q.shape[-1] ** -0.5)
+            dots = einsum("b h i d, b h j d -> b h i j", q, k) * (q.shape[-1] ** -0.5)
             c_bias = -dots.sigmoid()
             c_pos = c_bias.triu(diagonal=offset + 1).cumsum(dim=-1) \
                 + c_bias.tril(diagonal=offset - 1).flip(-1).cumsum(dim=-1).flip(-1)
@@ -655,8 +655,8 @@ class RotaryEmbedding(nn.Module):
             pos_emb: tuple[torch.Tensor, torch.Tensor] | None = None
     ) -> torch.Tensor:
         pos_emb, scale = self.get_pos_emb(x, seq_len=seq_len) if pos_emb is None else pos_emb
-        l = pos_emb.shape[-1]
-        xl, xr = x[..., :l], x[..., l:]
+        left = pos_emb.shape[-1]
+        xl, xr = x[..., :left], x[..., left:]
         with torch.autocast("cuda", enabled=False):
             xl = self.apply_rotary_pos_emb(xl, pos_emb, scale=scale)
         return torch.cat((xl, xr), dim=-1)

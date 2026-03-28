@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..tokenizers import TokSequence
+from symupe.data.tokenizers import TokSequence
 
 
 class TokenSequenceIndexer:

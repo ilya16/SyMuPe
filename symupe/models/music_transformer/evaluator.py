@@ -67,7 +67,7 @@ class MusicTransformerEvaluator(Evaluator):
         pred_tokens, pred_values = None, None
         if outputs.logits is not None:
             pred_tokens = torch.cat(list(
-                map(lambda l: torch.argmax(l, dim=-1, keepdim=True), outputs.logits.values())
+                map(lambda logits: torch.argmax(logits, dim=-1, keepdim=True), outputs.logits.values())
             ), dim=-1)
 
             pred_values = self.tokenizer.decode_values(pred_tokens, token_type=token_keys)

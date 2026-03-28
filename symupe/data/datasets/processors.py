@@ -5,8 +5,7 @@ from functools import partial
 
 import numpy as np
 
-from ..tokenizers import TokSequence, OctupleM, SyMuPe, SequenceType, EncodingType
-from ..tokenizers.constants import MASK_TOKEN, SPECIAL_TOKENS_VALUE
+from ..tokenizers import TokSequence, OctupleM, SyMuPe
 
 
 def sample_integer_shift(low: int = -6, high: int = 6):

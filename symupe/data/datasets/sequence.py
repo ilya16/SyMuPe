@@ -13,14 +13,11 @@ import numpy as np
 from torch.utils.data import Dataset
 
 from symupe.utils import prob2bool, load_json, dump_json, tqdm_iterator, find_closest
-from .classifiers import EmotionPredictionsDataset, LocalEmotionPredictionsDataset
 from .base import NoteSegments, SequenceTask, TASK_TO_ENCODINGS, DATA_SPLITS, TASK_SEQUENCE_SORTING
+from .classifiers import EmotionPredictionsDataset, LocalEmotionPredictionsDataset
+from .processors import TupleTokenSequenceProcessor, TokenSequenceAugmentations
 from .token_sequence import load_and_process_token_sequence, LocalTokenSequenceDataset, TokenSequenceDataset
 from .utils import compute_sample_positions, load_token_sequence
-from ..helpers import (
-    TupleTokenSequenceProcessor,
-    TokenSequenceAugmentations
-)
 from ..tokenizers import (
     TokSequence, SequenceType, EncodingType, SortingType, ENCODING_SORTING,
     TOKENIZERS, SyMuPe, SyMuPeTransformer
@@ -430,7 +427,10 @@ class SequenceDataset(Dataset):
 
         # bars that might be used after the sequence encoding
         bars_init = None
-        if self.emotion_dataset is not None and seq_type in (SequenceType.PERFORMANCE, SequenceType.PERFORMANCE_SUSTAIN):
+        if (
+                self.emotion_dataset is not None
+                and seq_type in (SequenceType.PERFORMANCE, SequenceType.PERFORMANCE_SUSTAIN)
+        ):
             bars_init, _, _ = self.tokenizer.compute_bar_beat_onset_indices(seq)
 
         # transform sequence encodings
@@ -449,9 +449,15 @@ class SequenceDataset(Dataset):
             bars_init = None
 
         def sort_sequence(tok_sequence, encoding_type):
-            if task_type in TASK_SEQUENCE_SORTING[SortingType.SCORE] or encoding_type in ENCODING_SORTING[SortingType.SCORE]:
+            if (
+                    task_type in TASK_SEQUENCE_SORTING[SortingType.SCORE]
+                    or encoding_type in ENCODING_SORTING[SortingType.SCORE]
+            ):
                 sort_by_time = False
-            elif task_type in TASK_SEQUENCE_SORTING[SortingType.TIME] or encoding_type in ENCODING_SORTING[SortingType.TIME]:
+            elif (
+                    task_type in TASK_SEQUENCE_SORTING[SortingType.TIME]
+                    or encoding_type in ENCODING_SORTING[SortingType.TIME]
+            ):
                 sort_by_time = True
             elif self.sample and self.sample_sort:
                 sort_by_time = prob2bool(self.sort_by_time)

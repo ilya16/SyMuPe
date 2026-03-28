@@ -191,7 +191,7 @@ class Attend(nn.Module):
                 q, k, v, mask=mask, attn_bias=attn_bias, offset=offset
             )
 
-        n, device = q.shape[-2], q.device
+        device = q.device
         scale = self.scale if self.scale is not None else q.shape[-1] ** -0.5
 
         kv_einsum_eq = "b j d" if k.ndim == 3 else "b h j d"

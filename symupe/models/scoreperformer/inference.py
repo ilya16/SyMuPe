@@ -8,8 +8,7 @@ import numpy as np
 import torch
 
 from symupe.data.collators import MixedLMScorePerformanceCollator
-from symupe.data.datasets import ScorePerformanceDataset, ScorePerformanceSampleMeta
-from symupe.data.helpers import TokenSequenceAugmentations
+from symupe.data.datasets import ScorePerformanceDataset, ScorePerformanceSampleMeta, TokenSequenceAugmentations
 from symupe.data.tokenizers import TokSequence, TokSequenceContext, SyMuPeLocal
 from symupe.data.tokenizers.constants import SOS_TOKEN, EOS_TOKEN
 from symupe.modules.transformer import AttentionIntermediates, TransformerLayerIntermediates, TransformerIntermediates
@@ -182,7 +181,7 @@ class ScorePerformerGenerator:
 
             # cut input sequence if exceeds `max_seq_len`
             if input_len >= max_seq_len:
-                next_bar_idx = torch.where(torch.diff(input_tokens[first_note_idx:last_note_idx, 0]))[0]
+                next_bar_idx = torch.where(torch.diff(input_seq.ids[first_note_idx:last_note_idx, 0]))[0]
                 shift = 1
                 if len(next_bar_idx) > 0:
                     fits_context = torch.where(input_len - (next_bar_idx + first_note_idx) < max_seq_len)[0]

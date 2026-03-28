@@ -212,7 +212,7 @@ class Seq2SeqMusicTransformerGenerator(Generator):
         current_note_idx = gen_tokens.shape[1]
 
         has_condition = self.data.cond_embeddings is not None
-        cond_embeddings = self.data.cond_embeddings.clone().detach() if has_condition else None
+        # cond_embeddings = self.data.cond_embeddings.clone().detach() if has_condition else None
 
         has_condition_seq = self.data.cond_seq is not None
         cond_seq = replace(self.data.cond_seq) if has_condition_seq else None

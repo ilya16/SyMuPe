@@ -485,7 +485,7 @@ class ProgressCallback(TrainerCallback):
 
                 if control.is_train:
                     lr = kwargs.get("lr", None)
-                    desc += f"" if lr is None else f", lr: {lr:.3g}"
+                    desc += "" if lr is None else f", lr: {lr:.3g}"
 
                     grad_norm = kwargs.get("grad_norm", None)
                     desc += f", gn: {grad_norm}" if grad_norm is None else f", gn: {grad_norm:.3f}"

@@ -117,7 +117,7 @@ def split_metadata(
         seed: int | None = None
 ):
     data = {split: dict() for split in splits}
-    split_keys, split_probs = np.array(list(splits.keys())), np.array(list(splits.values()))
+    split_probs = np.array(list(splits.values()))
     cum_probs = np.concatenate([[0.], np.cumsum(split_probs)])
 
     if seed is not None:
