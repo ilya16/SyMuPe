@@ -49,6 +49,7 @@ def cut_overlapping_notes(
     for note in notes:
         prev_notes = prev_pitch_notes.get(note.pitch, None)
         if prev_notes is None:
+            prev_pitch_notes[note.pitch] = [note]
             continue
 
         prev_note = prev_notes[-1]
