@@ -34,13 +34,10 @@ CONSTANT_TEMPO_KEYS = [
     ("vivace", "vivo", "vivacissimamente"),  # lively
     "presto",  # very quick / fast
     "prestissimo",  # very quick indeed, as fast as possible / very fast
-
     # compound
     "allegro moderato",  # moderately quick
-
     # expression
     "mosso",  # with motion or animation
-
     # greater precision / expresion
     "agitato",  # agitated
     "appassionato",  # passionate /impassioned
@@ -65,7 +62,13 @@ CONSTANT_TEMPO_KEYS = [
     "grazioso",  # graceful / gracefully, smoothly, elegantly.
     "impetuoso",  # impetuous  (-)
     "langsamer",  # broad tempo / very slow
-    ("leggiero", "legg", "leggerissimo", "leggermente", "leggerezza"),  # light or graceful, delicate and brisk style
+    (
+        "leggiero",
+        "legg",
+        "leggerissimo",
+        "leggermente",
+        "leggerezza",
+    ),  # light or graceful, delicate and brisk style
     ("lusingando", "lusinghiero"),  # coaxingly, flatteringly, caressingly  (-)
     "maestoso",  # majestic  (-)
     "marcato",  # marked (emphatic manner) / with accentuation, execute every note as if it were to be accented
@@ -90,19 +93,22 @@ CONSTANT_TEMPO_KEYS = [
     "teneramente",  # tenderly  (-)
     ("tenuto", "tenute", "ten", "ten."),  # held or sustained
     ("tranquillo", "tranquilo", "tranquilamente"),  # tranquil / calm, peaceful  (-)
-
     # other
     "menuetto",  # a minuet
-    "recitativo"  # recitative (lyrics not to be sung but to be recited, imitating the natural inflections of speech)
+    "recitativo",  # recitative (lyrics not to be sung but to be recited, imitating the natural inflections of speech)
 ]
 
 INCREASE_TEMPO_KEYS = [
     ("accelerando", "acc", "accel", "acc.", "accel."),  # getting (gradually) faster
-    ("stringendo", "string", "string."),  # getting (gradually) faster / pressing onwards, hurrying the speed
+    (
+        "stringendo",
+        "string",
+        "string.",
+    ),  # getting (gradually) faster / pressing onwards, hurrying the speed
     ("più mosso", "piu mosso"),  # quicker at once / getting faster (literally “more moved”)
     "animato",  # animated, lively (faster)
     "stretto",  # getting faster (and often louder as well) / pressing onwards, hurrying the speed
-    "slargando"  # becoming (more largo)  (-)
+    "slargando",  # becoming (more largo)  (-)
 ]
 
 DECREASE_TEMPO_KEYS = [
@@ -112,22 +118,25 @@ DECREASE_TEMPO_KEYS = [
     "smorzando",  # dying away, getting slower and softer
     "calando",  # softer and slower
     "meno mosso",  # slower at once / getting slower
-
     "mancando",  # failing or waning tone / dying away  (-)
     "perdendosi",  # losing itself by getting softer and slower
-    "slentando"  # becoming slower (more lento)
+    "slentando",  # becoming slower (more lento)
 ]
 
 RESET_TEMPO_KEYS = [
-    ("tempo primo", "tempo i", "tempo uno"),  # at the same speed as at first / resume the original speed
-    ("a tempo", "in tempo")  # in time
+    (
+        "tempo primo",
+        "tempo i",
+        "tempo uno",
+    ),  # at the same speed as at first / resume the original speed
+    ("a tempo", "in tempo"),  # in time
 ]
 
 TEMPO_DIRECTIONS_MAPS = {
     TempoClasses.CONSTANT: CONSTANT_TEMPO_KEYS,
     TempoClasses.INCREASE: INCREASE_TEMPO_KEYS,
     TempoClasses.DECREASE: DECREASE_TEMPO_KEYS,
-    TempoClasses.RESET: RESET_TEMPO_KEYS
+    TempoClasses.RESET: RESET_TEMPO_KEYS,
 }
 TEMPO_DIRECTIONS_MAPS[TempoClasses.ALL] = sum(TEMPO_DIRECTIONS_MAPS.values(), [])
 

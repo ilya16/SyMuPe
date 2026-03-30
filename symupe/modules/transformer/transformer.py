@@ -1,4 +1,5 @@
-""" Transformer Attention Layers with data caching support for inference. """
+"""Transformer Attention Layers with data caching support for inference."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -23,7 +24,9 @@ class TransformerLayerIntermediates:
     cross_attention: AttentionIntermediates | None = None
     output: torch.Tensor | None = None
 
-    def add_past_cache(self, past_cache: TransformerLayerIntermediates | None) -> TransformerLayerIntermediates:
+    def add_past_cache(
+        self, past_cache: TransformerLayerIntermediates | None
+    ) -> TransformerLayerIntermediates:
         if past_cache is None:
             return self
 
@@ -47,9 +50,13 @@ class TransformerLayerOutput:
 class TransformerLayerConfig(ModuleConfig):
     dim: int = 384
     causal: bool = False
-    attention: AttentionConfig | DictConfig | None = field(default_factory=lambda: AttentionConfig())
+    attention: AttentionConfig | DictConfig | None = field(
+        default_factory=lambda: AttentionConfig()
+    )
     cross_attention: AttentionConfig | DictConfig | None = None
-    feed_forward: FeedForwardConfig | DictConfig = field(default_factory=lambda: FeedForwardConfig())
+    feed_forward: FeedForwardConfig | DictConfig = field(
+        default_factory=lambda: FeedForwardConfig()
+    )
     pre_norm: bool = True
     rms_norm: bool = False
     adaptive_norm: bool = False
@@ -60,18 +67,18 @@ class TransformerLayerConfig(ModuleConfig):
 
 class TransformerLayer(nn.Module, Constructor):
     def __init__(
-            self,
-            dim: int = 384,
-            causal: bool = False,
-            attention: AttentionConfig | DictConfig | None = AttentionConfig(),
-            cross_attention: AttentionConfig | DictConfig | None = None,
-            feed_forward: FeedForwardConfig | DictConfig = FeedForwardConfig(),
-            pre_norm: bool = True,
-            rms_norm: bool = False,
-            adaptive_norm: bool = False,
-            condition_dim: int | None = None,
-            context_as_input_prefix: bool = False,
-            context_as_attention_prefix: bool = False
+        self,
+        dim: int = 384,
+        causal: bool = False,
+        attention: AttentionConfig | DictConfig | None = AttentionConfig(),
+        cross_attention: AttentionConfig | DictConfig | None = None,
+        feed_forward: FeedForwardConfig | DictConfig = FeedForwardConfig(),
+        pre_norm: bool = True,
+        rms_norm: bool = False,
+        adaptive_norm: bool = False,
+        condition_dim: int | None = None,
+        context_as_input_prefix: bool = False,
+        context_as_attention_prefix: bool = False,
     ):
         super().__init__()
 
@@ -96,7 +103,7 @@ class TransformerLayer(nn.Module, Constructor):
                 dim=dim,
                 causal=causal,
                 context_as_input_prefix=context_as_input_prefix,
-                context_as_attention_prefix=context_as_attention_prefix
+                context_as_attention_prefix=context_as_attention_prefix,
             )
 
         self.cross_attention, self.cross_attention_norm = None, None
@@ -108,21 +115,22 @@ class TransformerLayer(nn.Module, Constructor):
         self.feed_forward = FeedForward.init(feed_forward, dim=dim)
 
     def forward(
-            self,
-            x: torch.Tensor,
-            mask: torch.Tensor | None = None,
-            context: torch.Tensor | None = None,
-            context_mask: torch.Tensor | None = None,
-            input_prefix_len: int = 0,
-            attention_mask: torch.Tensor | None = None,
-            causal: torch.Tensor | None = None,
-            adaptive_condition: torch.Tensor | None = None,
-            memory: list[torch.Tensor] | None = None,
-            cache: TransformerLayerIntermediates | None = None,
-            shared_cache: AttentionSharedIntermediates | None = None
+        self,
+        x: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        context: torch.Tensor | None = None,
+        context_mask: torch.Tensor | None = None,
+        input_prefix_len: int = 0,
+        attention_mask: torch.Tensor | None = None,
+        causal: torch.Tensor | None = None,
+        adaptive_condition: torch.Tensor | None = None,
+        memory: list[torch.Tensor] | None = None,
+        cache: TransformerLayerIntermediates | None = None,
+        shared_cache: AttentionSharedIntermediates | None = None,
     ) -> TransformerLayerOutput:
-        assert not self.adaptive_norm or adaptive_condition is not None, \
+        assert not self.adaptive_norm or adaptive_condition is not None, (
             "`adaptive_condition` should be provided for AdaptiveLayerNorm"
+        )
 
         norm_kwargs = dict(condition=adaptive_condition) if self.adaptive_norm else dict()
 
@@ -145,7 +153,7 @@ class TransformerLayer(nn.Module, Constructor):
                 causal=causal,
                 memory=memory,
                 cache=cache.attention if cache is not None else None,
-                shared_cache=shared_cache
+                shared_cache=shared_cache,
             )
             x = x + residual  # residual connection
 
@@ -165,7 +173,7 @@ class TransformerLayer(nn.Module, Constructor):
                 mask=mask,
                 context=context,
                 context_mask=context_mask,
-                cache=cache.cross_attention if cache is not None else None
+                cache=cache.cross_attention if cache is not None else None,
             )
             x = x + residual  # residual connection
 
@@ -189,13 +197,11 @@ class TransformerLayer(nn.Module, Constructor):
         intermediates = TransformerLayerIntermediates(
             attention=attn_cache,
             cross_attention=cross_attn_cache,
-            output=torch.cat([cache.output, x], dim=1) if cache is not None else x
+            output=torch.cat([cache.output, x], dim=1) if cache is not None else x,
         )
 
         return TransformerLayerOutput(
-            out=x,
-            intermediates=intermediates,
-            shared_intermediates=attn_shared_cache
+            out=x, intermediates=intermediates, shared_intermediates=attn_shared_cache
         )
 
 
@@ -208,7 +214,9 @@ class TransformerIntermediates:
     layers: list[TransformerLayerIntermediates] | None = None
     memories: list[torch.Tensor] | None = None
 
-    def add_past_cache(self, past_cache: TransformerIntermediates | None) -> TransformerIntermediates:
+    def add_past_cache(
+        self, past_cache: TransformerIntermediates | None
+    ) -> TransformerIntermediates:
         if past_cache is None:
             return self
 
@@ -234,8 +242,12 @@ class TransformerConfig(VariableModuleConfig):
     depth: int = 6
     causal: bool = False
 
-    attention: AttentionConfig | DictConfig | None = field(default_factory=lambda: AttentionConfig())
-    feed_forward: FeedForwardConfig | DictConfig = field(default_factory=lambda: FeedForwardConfig())
+    attention: AttentionConfig | DictConfig | None = field(
+        default_factory=lambda: AttentionConfig()
+    )
+    feed_forward: FeedForwardConfig | DictConfig = field(
+        default_factory=lambda: FeedForwardConfig()
+    )
     cross_attend: bool = False
     cross_attention: AttentionConfig | DictConfig | None = None
 
@@ -262,30 +274,30 @@ class TransformerConfig(VariableModuleConfig):
 @TransformerRegistry.register("default")
 class Transformer(nn.Module, Constructor):
     def __init__(
-            self,
-            dim: int = 384,
-            depth: int = 6,
-            causal: bool = False,
-            attention: AttentionConfig | DictConfig | None = AttentionConfig(),
-            feed_forward: FeedForwardConfig | DictConfig = FeedForwardConfig(),
-            cross_attend: bool = False,
-            cross_attention: AttentionConfig | DictConfig | None = None,
-            pre_norm: bool = True,
-            rms_norm: bool = False,
-            adaptive_norm: bool = False,
-            condition_dim: int | None = None,
-            final_norm_bias: bool = True,
-            context_dim: int | None = None,
-            context_as_input_prefix: bool = False,
-            context_as_attention_prefix: bool = False,
-            context_as_layer_input: bool = False,
-            context_as_layer_input_sum: bool = False,
-            context_layer_ids: Sequence[int] | None = None,
-            skip_connections: bool = False,
-            skip_connection_scale: float | None = None,
-            share_rel_pos_bias: bool = False,
-            memory_tokens: int | None = None,
-            max_memory_len: int | None = None
+        self,
+        dim: int = 384,
+        depth: int = 6,
+        causal: bool = False,
+        attention: AttentionConfig | DictConfig | None = AttentionConfig(),
+        feed_forward: FeedForwardConfig | DictConfig = FeedForwardConfig(),
+        cross_attend: bool = False,
+        cross_attention: AttentionConfig | DictConfig | None = None,
+        pre_norm: bool = True,
+        rms_norm: bool = False,
+        adaptive_norm: bool = False,
+        condition_dim: int | None = None,
+        final_norm_bias: bool = True,
+        context_dim: int | None = None,
+        context_as_input_prefix: bool = False,
+        context_as_attention_prefix: bool = False,
+        context_as_layer_input: bool = False,
+        context_as_layer_input_sum: bool = False,
+        context_layer_ids: Sequence[int] | None = None,
+        skip_connections: bool = False,
+        skip_connection_scale: float | None = None,
+        share_rel_pos_bias: bool = False,
+        memory_tokens: int | None = None,
+        max_memory_len: int | None = None,
     ):
         super().__init__()
 
@@ -294,14 +306,21 @@ class Transformer(nn.Module, Constructor):
         self.pre_norm = pre_norm
         self.adaptive_norm = adaptive_norm
 
-        cross_attention = cross_attention if cross_attend and cross_attention is not None else cross_attention
+        cross_attention = (
+            cross_attention if cross_attend and cross_attention is not None else cross_attention
+        )
         self.cross_attend = cross_attend or cross_attention is not None
 
         assert (
-                int(self.cross_attend) + int(context_as_input_prefix)
-                + int(context_as_attention_prefix) + int(context_as_layer_input) <= 1
-        ), ("Only one of `cross_attend`/`cross_attention`, `context_as_input_prefix` "
-            "and `context_as_attention_prefix` can be used at the same time")
+            int(self.cross_attend)
+            + int(context_as_input_prefix)
+            + int(context_as_attention_prefix)
+            + int(context_as_layer_input)
+            <= 1
+        ), (
+            "Only one of `cross_attend`/`cross_attention`, `context_as_input_prefix` "
+            "and `context_as_attention_prefix` can be used at the same time"
+        )
 
         self.context_as_input_prefix = context_as_input_prefix
         self.context_as_attention_prefix = context_as_attention_prefix
@@ -309,44 +328,58 @@ class Transformer(nn.Module, Constructor):
         self.context_as_layer_input_sum = context_as_layer_input_sum
 
         self.expects_context = (
-                self.cross_attend or self.context_as_input_prefix
-                or self.context_as_attention_prefix or self.context_as_layer_input
+            self.cross_attend
+            or self.context_as_input_prefix
+            or self.context_as_attention_prefix
+            or self.context_as_layer_input
         )
-        self.context_layer_ids = context_layer_ids or set(range(depth)) if self.expects_context else set()
+        self.context_layer_ids = (
+            context_layer_ids or set(range(depth)) if self.expects_context else set()
+        )
 
-        self.layers = nn.ModuleList([
-            TransformerLayer.init(
-                dim=dim,
-                causal=causal,
-                attention=attention,
-                cross_attention=cross_attention if i in self.context_layer_ids else None,
-                feed_forward=feed_forward,
-                pre_norm=pre_norm,
-                rms_norm=rms_norm,
-                adaptive_norm=adaptive_norm,
-                condition_dim=condition_dim,
-                context_as_input_prefix=context_as_input_prefix and i in self.context_layer_ids,
-                context_as_attention_prefix=context_as_attention_prefix and i in self.context_layer_ids
-            )
-            for i in range(depth)
-        ])
+        self.layers = nn.ModuleList(
+            [
+                TransformerLayer.init(
+                    dim=dim,
+                    causal=causal,
+                    attention=attention,
+                    cross_attention=cross_attention if i in self.context_layer_ids else None,
+                    feed_forward=feed_forward,
+                    pre_norm=pre_norm,
+                    rms_norm=rms_norm,
+                    adaptive_norm=adaptive_norm,
+                    condition_dim=condition_dim,
+                    context_as_input_prefix=context_as_input_prefix and i in self.context_layer_ids,
+                    context_as_attention_prefix=context_as_attention_prefix
+                    and i in self.context_layer_ids,
+                )
+                for i in range(depth)
+            ]
+        )
 
-        self.skip_connection_scale = skip_connection_scale or 2 ** -0.5
+        self.skip_connection_scale = skip_connection_scale or 2**-0.5
         self.skip_projections = None
         if skip_connections:
-            self.skip_projections = nn.ModuleList([
-                nn.Linear(dim * 2, dim, bias=False) if (i + 1) > ceil(depth / 2) else None
-                for i in range(depth)
-            ])
+            self.skip_projections = nn.ModuleList(
+                [
+                    nn.Linear(dim * 2, dim, bias=False) if (i + 1) > ceil(depth / 2) else None
+                    for i in range(depth)
+                ]
+            )
 
         self.context_projections = None
         if context_as_layer_input:
             context_dim = context_dim or dim
-            self.context_projections = nn.ModuleList([
-                nn.Linear(int(1 - context_as_layer_input_sum) * dim + context_dim, dim, bias=False)
-                if i in self.context_layer_ids else None
-                for i in range(depth)
-            ])
+            self.context_projections = nn.ModuleList(
+                [
+                    nn.Linear(
+                        int(1 - context_as_layer_input_sum) * dim + context_dim, dim, bias=False
+                    )
+                    if i in self.context_layer_ids
+                    else None
+                    for i in range(depth)
+                ]
+            )
 
         if share_rel_pos_bias:
             for layer in self.layers[1:]:
@@ -362,24 +395,26 @@ class Transformer(nn.Module, Constructor):
         self.norm = LayerNorm(dim, bias=final_norm_bias) if self.pre_norm else nn.Identity()
 
     def forward(
-            self,
-            x: torch.Tensor,
-            mask: torch.Tensor | None = None,
-            context: torch.Tensor | None = None,
-            context_mask: torch.Tensor | None = None,
-            attention_mask: torch.Tensor | None = None,
-            causal: torch.Tensor | None = None,
-            adaptive_condition: torch.Tensor | None = None,
-            cache: TransformerIntermediates | None = None,
-            return_cache: bool = False,
-            memories: list[torch.Tensor] | None = None,
-            return_memories: bool = False,
-            output_layer: int | None = None
+        self,
+        x: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        context: torch.Tensor | None = None,
+        context_mask: torch.Tensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        causal: torch.Tensor | None = None,
+        adaptive_condition: torch.Tensor | None = None,
+        cache: TransformerIntermediates | None = None,
+        return_cache: bool = False,
+        memories: list[torch.Tensor] | None = None,
+        return_memories: bool = False,
+        output_layer: int | None = None,
     ) -> TransformerOutput:
-        assert not (self.expects_context ^ (context is not None)), \
+        assert not (self.expects_context ^ (context is not None)), (
             "`context` must be passed for `cross_attention`/`context_as_input_prefix`/`context_as_attention_prefix`"
-        assert not self.adaptive_norm or adaptive_condition is not None, \
+        )
+        assert not self.adaptive_norm or adaptive_condition is not None, (
             "`adaptive_condition` must be passed for `AdaptiveLayerNorm`"
+        )
 
         if context is not None and context_mask is None:
             context_mask = torch.ones(context.shape[:2], device=x.device, dtype=torch.bool)
@@ -402,7 +437,9 @@ class Transformer(nn.Module, Constructor):
 
         if cache is not None:
             x = x[:, -1:]
-            adaptive_condition = adaptive_condition[:, -1:] if adaptive_condition is not None else None
+            adaptive_condition = (
+                adaptive_condition[:, -1:] if adaptive_condition is not None else None
+            )
 
         num_mem = 0
         if self.memory_tokens is not None:
@@ -413,18 +450,19 @@ class Transformer(nn.Module, Constructor):
                 x = torch.cat((mem, x), dim=1)
 
             if mask is not None:
-                mask = F.pad(mask, (num_mem, 0), value=1.)
+                mask = F.pad(mask, (num_mem, 0), value=1.0)
             if attention_mask is not None:
                 attention_mask = F.pad(attention_mask, (num_mem, 0, num_mem, 0), value=True)
             if adaptive_condition is not None and adaptive_condition.shape[1] > 1:
-                adaptive_condition = F.pad(adaptive_condition, (0, 0, num_mem, 0), value=0.)
+                adaptive_condition = F.pad(adaptive_condition, (0, 0, num_mem, 0), value=0.0)
             if context is not None and self.context_projections is not None:
-                context = F.pad(context, (0, 0, num_mem, 0), value=0.)
+                context = F.pad(context, (0, 0, num_mem, 0), value=0.0)
 
         output_layer = output_layer if output_layer is not None else -1
         output_layer = len(self.layers) + output_layer if output_layer < 0 else output_layer
-        assert 0 <= output_layer < len(self.layers), \
+        assert 0 <= output_layer < len(self.layers), (
             f"Transformer has only {len(self.layers)}, while the passed `output_layer` asks for layer #{output_layer}"
+        )
         full_path = output_layer == len(self.layers) - 1
 
         layer_cache, shared_cache = None, None
@@ -436,12 +474,18 @@ class Transformer(nn.Module, Constructor):
                 layer_cache = cache.layers[layer_idx]
             memory = memories[layer_idx]
 
-            skip_projection = self.skip_projections[layer_idx] if self.skip_projections is not None else None
+            skip_projection = (
+                self.skip_projections[layer_idx] if self.skip_projections is not None else None
+            )
             if skip_projection is not None:
                 x = torch.cat((x, self.skip_connection_scale * skip_connections.pop()), dim=-1)
                 x = skip_projection(x)
 
-            context_projection = self.context_projections[layer_idx] if self.context_projections is not None else None
+            context_projection = (
+                self.context_projections[layer_idx]
+                if self.context_projections is not None
+                else None
+            )
             if context is not None and context_projection is not None:
                 if self.context_as_layer_input_sum:
                     x = x + context_projection(context)
@@ -460,7 +504,7 @@ class Transformer(nn.Module, Constructor):
                 adaptive_condition=adaptive_condition,
                 memory=memory,
                 cache=layer_cache,
-                shared_cache=shared_cache
+                shared_cache=shared_cache,
             )
             x = layer_output.out
             shared_cache = layer_output.shared_intermediates
@@ -472,8 +516,10 @@ class Transformer(nn.Module, Constructor):
                 if memory is None:
                     new_memory = layer_output.intermediates.output[:, num_mem:]
                 else:
-                    new_memory = torch.cat([memory, layer_output.intermediates.output[:, num_mem:]], dim=1)
-                new_memories.append(new_memory[:, -self.max_mem_len:])
+                    new_memory = torch.cat(
+                        [memory, layer_output.intermediates.output[:, num_mem:]], dim=1
+                    )
+                new_memories.append(new_memory[:, -self.max_mem_len :])
 
             if self.skip_projections is not None and layer_idx < len(self.layers) // 2:
                 skip_connections.append(x)
@@ -500,13 +546,13 @@ class Transformer(nn.Module, Constructor):
         intermediates = TransformerIntermediates(
             output=out,
             layers=layer_intermediates,
-            memories=new_memories
+            memories=new_memories,
         )
 
         return TransformerOutput(
             out=out,
             memory_tokens=mem,
-            intermediates=intermediates
+            intermediates=intermediates,
         )
 
 

@@ -1,4 +1,5 @@
-""" Common datasets" utils. """
+"""Common datasets" utils."""
+
 from __future__ import annotations
 
 import random
@@ -9,8 +10,12 @@ import numpy as np
 
 from symupe.utils import find_closest
 from ..tokenizers import (
-    MusicTokenizer, OctupleM, SyMuPe,
-    SequenceType, TokSequence, SEQUENCE_DEFAULT_ENCODING
+    MusicTokenizer,
+    OctupleM,
+    SyMuPe,
+    SequenceType,
+    TokSequence,
+    SEQUENCE_DEFAULT_ENCODING,
 )
 
 
@@ -34,9 +39,11 @@ def _load_tokens(data: dict, tokenizer: MusicTokenizer):
         pedals=data.get("pedals", None),
         interpolated=data.get("interpolated", None),
         type=data.get("type", SequenceType.SCORE),
-        encoding=data.get("encoding", SEQUENCE_DEFAULT_ENCODING[data.get("type", SequenceType.SCORE)]),
+        encoding=data.get(
+            "encoding", SEQUENCE_DEFAULT_ENCODING[data.get("type", SequenceType.SCORE)]
+        ),
         vocab=data.get("vocab", {}),
-        meta=data.get("meta", {})
+        meta=data.get("meta", {}),
     )
     if isinstance(tok_sequence.pedals, np.ndarray) and len(tok_sequence.pedals.shape) == 0:
         tok_sequence.pedals = None
@@ -69,18 +76,29 @@ def get_num_bars(seq, tokenizer: MusicTokenizer):
         raise ValueError(f"Unsupported tokenizer: {tokenizer.__class__.__name__}")
 
 
-def compute_sample_positions(seq_num_elements: np.ndarray, sliding_window: int, backward: bool = True):
+def compute_sample_positions(
+    seq_num_elements: np.ndarray, sliding_window: int, backward: bool = True
+):
     length, sample_positions = 0, []
     for num_elem in seq_num_elements:
         positions = np.arange(
-            0, num_elem - sliding_window // 2 if num_elem > sliding_window // 2 else num_elem, sliding_window
+            0,
+            num_elem - sliding_window // 2 if num_elem > sliding_window // 2 else num_elem,
+            sliding_window,
         )
         if backward:
-            back_shift = -sliding_window // 4 if (num_elem - sliding_window // 2) % sliding_window == 0 else 0
-            positions = np.concatenate([
-                positions,
-                np.arange(num_elem - sliding_window // 2 - back_shift, -1 + sliding_window // 2, -sliding_window)
-            ])
+            back_shift = (
+                -sliding_window // 4
+                if (num_elem - sliding_window // 2) % sliding_window == 0
+                else 0
+            )
+            backward_positions = np.arange(
+                num_elem - sliding_window // 2 - back_shift,
+                -1 + sliding_window // 2,
+                -sliding_window,
+            )
+            positions = np.concatenate([positions, backward_positions])
+
         length += len(positions)
         sample_positions.append(positions)
 
@@ -102,7 +120,7 @@ def cache_to_float(cache: bool | float | int, num_files: int):
         if not (0 <= cache <= 1):
             raise ValueError("cache ratio must be between 0 and 1")
     elif isinstance(cache, int):
-        cache = min(1., cache / num_files)
+        cache = min(1.0, cache / num_files)
         if not (0 <= cache <= 1):
             raise ValueError("cache must be between 0 and 1")
     else:
@@ -111,14 +129,14 @@ def cache_to_float(cache: bool | float | int, num_files: int):
 
 
 def split_metadata(
-        reference_metadata: dict[str, list[str]],
-        splits: dict[str, float],
-        combine_movements: bool = True,
-        seed: int | None = None
+    reference_metadata: dict[str, list[str]],
+    splits: dict[str, float],
+    combine_movements: bool = True,
+    seed: int | None = None,
 ):
     data = {split: dict() for split in splits}
-    split_keys, split_probs = np.array(list(splits.keys())), np.array(list(splits.values()))
-    cum_probs = np.concatenate([[0.], np.cumsum(split_probs)])
+    split_probs = np.array(list(splits.values()))
+    cum_probs = np.concatenate([[0.0], np.cumsum(split_probs)])
 
     if seed is not None:
         random.seed(seed)
@@ -164,15 +182,15 @@ def split_metadata(
 
 
 def split_composer_metadata(
-        reference_metadata: dict[str, dict[str, list[str]]],
-        splits: dict[str, float],
-        combine_movements: bool = True,
-        random_split_threshold: int = 10,
-        seed: int | None = None
+    reference_metadata: dict[str, dict[str, list[str]]],
+    splits: dict[str, float],
+    combine_movements: bool = True,
+    random_split_threshold: int = 10,
+    seed: int | None = None,
 ):
     data = {split: dict() for split in splits}
     split_keys, split_probs = np.array(list(splits.keys())), np.array(list(splits.values()))
-    cum_probs = np.concatenate([[0.], np.cumsum(split_probs)])
+    cum_probs = np.concatenate([[0.0], np.cumsum(split_probs)])
 
     if seed is not None:
         random.seed(seed)

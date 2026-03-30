@@ -1,4 +1,5 @@
-""" MusicTransformer models' evaluator modules for computing and logging metrics during training. """
+"""MusicTransformer models' evaluator modules for computing and logging metrics during training."""
+
 from __future__ import annotations
 
 import torch
@@ -9,23 +10,28 @@ from symupe.models import Evaluator
 from symupe.modules.classes import LanguageModelingMode
 from symupe.modules.metrics import Reduction, accuracy, distance, weighted_distance
 from symupe.modules.tuple_transformer import (
-    TupleTransformerOutput, TupleTransformerCFMOutput, TupleTransformerFMOutput
+    TupleTransformerOutput,
+    TupleTransformerCFMOutput,
+    TupleTransformerFMOutput,
 )
 from .model import (
-    MusicTransformer, MusicTransformerOutput,
-    CFMMusicTransformer, CFMMusicTransformerOutput,
-    FMMusicTransformer, FMMusicTransformerOutput
+    MusicTransformer,
+    MusicTransformerOutput,
+    CFMMusicTransformer,
+    CFMMusicTransformerOutput,
+    FMMusicTransformer,
+    FMMusicTransformerOutput,
 )
 
 
 class MusicTransformerEvaluator(Evaluator):
     def __init__(
-            self,
-            model: MusicTransformer,
-            tokenizer: OctupleM,
-            label_pad_token_id: int = -100,
-            normalized_targets: bool = True,
-            ignore_keys: list[str] | None = None
+        self,
+        model: MusicTransformer,
+        tokenizer: OctupleM,
+        label_pad_token_id: int = -100,
+        normalized_targets: bool = True,
+        ignore_keys: list[str] | None = None,
     ):
         super().__init__(model)
 
@@ -44,10 +50,10 @@ class MusicTransformerEvaluator(Evaluator):
 
     @torch.no_grad()
     def __call__(
-            self,
-            inputs: dict | LMSequenceInputs | LMScorePerformanceInputs,
-            outputs: TupleTransformerOutput | MusicTransformerOutput,
-            ignore_keys: list[str] | None = None
+        self,
+        inputs: dict | LMSequenceInputs | LMScorePerformanceInputs,
+        outputs: TupleTransformerOutput | MusicTransformerOutput,
+        ignore_keys: list[str] | None = None,
     ) -> dict[str, torch.Tensor]:
         metrics = {}
         ignore_keys = ignore_keys or self.ignore_keys
@@ -66,9 +72,15 @@ class MusicTransformerEvaluator(Evaluator):
         token_keys = self.token_keys
         pred_tokens, pred_values = None, None
         if outputs.logits is not None:
-            pred_tokens = torch.cat(list(
-                map(lambda l: torch.argmax(l, dim=-1, keepdim=True), outputs.logits.values())
-            ), dim=-1)
+            pred_tokens = torch.cat(
+                list(
+                    map(
+                        lambda logits: torch.argmax(logits, dim=-1, keepdim=True),
+                        outputs.logits.values(),
+                    )
+                ),
+                dim=-1,
+            )
 
             pred_values = self.tokenizer.decode_values(pred_tokens, token_type=token_keys)
 
@@ -78,7 +90,9 @@ class MusicTransformerEvaluator(Evaluator):
                 token_keys = list(pred_values.keys())
                 pred_values = torch.cat(list(pred_values.values()), dim=-1)[None].float()
 
-            pred_tokens = self.tokenizer.encode_tokens(pred_values, token_type=token_keys, denormalize=True)
+            pred_tokens = self.tokenizer.encode_tokens(
+                pred_values, token_type=token_keys, denormalize=True
+            )
             pred_values = self.tokenizer.denormalize_values(outputs.values, token_type=token_keys)
 
         used_ids = [idx for idx, key in enumerate(self.token_types) if key in token_keys]
@@ -88,7 +102,9 @@ class MusicTransformerEvaluator(Evaluator):
         assert pred_tokens.shape[-1] == labels.shape[-1] == pred_values.shape[-1]
 
         if pred_tokens is not None:
-            metrics["accuracy"] = accuracy(pred_tokens, labels, mask=label_mask, reduction=Reduction.BATCH_MEAN)
+            metrics["accuracy"] = accuracy(
+                pred_tokens, labels, mask=label_mask, reduction=Reduction.BATCH_MEAN
+            )
             for i, key in enumerate(token_keys):
                 if i == labels.shape[-1]:
                     break
@@ -97,7 +113,10 @@ class MusicTransformerEvaluator(Evaluator):
 
                 if torch.any(label_mask[..., i]):
                     metrics[f"accuracy/{key}"] = accuracy(
-                        pred_tokens[..., i], labels[..., i], mask=label_mask[..., i], reduction=Reduction.BATCH_MEAN
+                        pred_tokens[..., i],
+                        labels[..., i],
+                        mask=label_mask[..., i],
+                        reduction=Reduction.BATCH_MEAN,
                     )
 
             if self.normalized_targets:
@@ -114,13 +133,19 @@ class MusicTransformerEvaluator(Evaluator):
 
                     if outputs.values is not None:
                         metrics[f"distance/{key}"] = distance(
-                            pred_values_i, targets_i, mask=label_mask[..., i], reduction=Reduction.BATCH_MEAN
+                            pred_values_i,
+                            targets_i,
+                            mask=label_mask[..., i],
+                            reduction=Reduction.BATCH_MEAN,
                         )
                     else:
                         probs = outputs.logits[key].softmax(dim=-1)
                         metrics[f"distance/{key}"] = weighted_distance(
-                            probs, targets_i, self.token_values[key],
-                            mask=label_mask[..., i], reduction=Reduction.BATCH_MEAN
+                            probs,
+                            targets_i,
+                            self.token_values[key],
+                            mask=label_mask[..., i],
+                            reduction=Reduction.BATCH_MEAN,
                         )
 
         if isinstance(inputs, LMSequenceInputs):
@@ -134,7 +159,10 @@ class MusicTransformerEvaluator(Evaluator):
             pred_tasks = torch.argmax(outputs.task_logits, dim=-1)
             target_tasks = task_ids[:, None].expand(-1, pred_tasks.shape[1])
             metrics["accuracy/task"] = accuracy(
-                pred_tasks, target_tasks, mask=torch.any(label_mask, dim=-1), reduction=Reduction.BATCH_MEAN
+                pred_tasks,
+                target_tasks,
+                mask=torch.any(label_mask, dim=-1),
+                reduction=Reduction.BATCH_MEAN,
             )
 
         if type_ids is not None and outputs.type_logits is not None:
@@ -144,7 +172,10 @@ class MusicTransformerEvaluator(Evaluator):
                 target_types = target_types[:, 1:]
 
             metrics["accuracy/type"] = accuracy(
-                pred_types, target_types, mask=torch.any(label_mask, dim=-1), reduction=Reduction.BATCH_MEAN
+                pred_types,
+                target_types,
+                mask=torch.any(label_mask, dim=-1),
+                reduction=Reduction.BATCH_MEAN,
             )
 
         return metrics
@@ -152,12 +183,12 @@ class MusicTransformerEvaluator(Evaluator):
 
 class CFMMusicTransformerEvaluator(Evaluator):
     def __init__(
-            self,
-            model: CFMMusicTransformer,
-            tokenizer: OctupleM,
-            label_pad_token_id: int = -100,
-            normalized_targets: bool = True,
-            ignore_keys: list[str] | None = None
+        self,
+        model: CFMMusicTransformer,
+        tokenizer: OctupleM,
+        label_pad_token_id: int = -100,
+        normalized_targets: bool = True,
+        ignore_keys: list[str] | None = None,
     ):
         super().__init__(model)
 
@@ -172,10 +203,10 @@ class CFMMusicTransformerEvaluator(Evaluator):
 
     @torch.no_grad()
     def __call__(
-            self,
-            inputs: dict | LMScorePerformanceInputs,
-            outputs: TupleTransformerCFMOutput | CFMMusicTransformerOutput,
-            ignore_keys: list[str] | None = None
+        self,
+        inputs: dict | LMScorePerformanceInputs,
+        outputs: TupleTransformerCFMOutput | CFMMusicTransformerOutput,
+        ignore_keys: list[str] | None = None,
     ) -> dict[str, torch.Tensor]:
         metrics = {}
         ignore_keys = ignore_keys or self.ignore_keys
@@ -193,7 +224,9 @@ class CFMMusicTransformerEvaluator(Evaluator):
         value_keys = self.value_keys
         pred_tokens, pred_values = None, None
         if outputs.pred_values is not None:
-            pred_values = self.tokenizer.denormalize_values(outputs.pred_values, token_type=value_keys)
+            pred_values = self.tokenizer.denormalize_values(
+                outputs.pred_values, token_type=value_keys
+            )
             pred_tokens = self.tokenizer.encode_tokens(pred_values, token_type=value_keys)
 
         used_ids = [idx for idx, key in enumerate(self.token_types) if key in value_keys]
@@ -203,14 +236,19 @@ class CFMMusicTransformerEvaluator(Evaluator):
         assert pred_tokens.shape[-1] == labels.shape[-1] == pred_values.shape[-1]
 
         if pred_tokens is not None:
-            metrics["accuracy"] = accuracy(pred_tokens, labels, mask=label_mask, reduction=Reduction.BATCH_MEAN)
+            metrics["accuracy"] = accuracy(
+                pred_tokens, labels, mask=label_mask, reduction=Reduction.BATCH_MEAN
+            )
             for i, key in enumerate(value_keys):
                 if ignore_keys and key in ignore_keys:
                     continue
 
                 if torch.any(label_mask[..., i]):
                     metrics[f"accuracy/{key}"] = accuracy(
-                        pred_tokens[..., i], labels[..., i], mask=label_mask[..., i], reduction=Reduction.BATCH_MEAN
+                        pred_tokens[..., i],
+                        labels[..., i],
+                        mask=label_mask[..., i],
+                        reduction=Reduction.BATCH_MEAN,
                     )
 
             if self.normalized_targets:
@@ -222,18 +260,27 @@ class CFMMusicTransformerEvaluator(Evaluator):
 
                 if torch.any(label_mask[..., i]):
                     metrics[f"distance/{key}"] = distance(
-                        pred_values[..., i], targets[..., i], mask=label_mask[..., i], reduction=Reduction.BATCH_MEAN
+                        pred_values[..., i],
+                        targets[..., i],
+                        mask=label_mask[..., i],
+                        reduction=Reduction.BATCH_MEAN,
                     )
 
         if pedals is not None and outputs.pred_pedals is not None:
             mask = inputs.get("mask", torch.ones_like(pedals[:, 0], dtype=torch.bool))
 
             metrics["accuracy/Pedal"] = accuracy(
-                outputs.pred_pedals[..., 0], pedals[..., 0], mask=mask, reduction=Reduction.BATCH_MEAN
+                outputs.pred_pedals[..., 0],
+                pedals[..., 0],
+                mask=mask,
+                reduction=Reduction.BATCH_MEAN,
             )
 
             metrics["distance/PedalShift"] = distance(
-                outputs.pred_pedals[..., 1], pedals[..., 1], mask=mask, reduction=Reduction.BATCH_MEAN
+                outputs.pred_pedals[..., 1],
+                pedals[..., 1],
+                mask=mask,
+                reduction=Reduction.BATCH_MEAN,
             )
 
         return metrics
@@ -241,12 +288,12 @@ class CFMMusicTransformerEvaluator(Evaluator):
 
 class FMMusicTransformerEvaluator(Evaluator):
     def __init__(
-            self,
-            model: FMMusicTransformer,
-            tokenizer: OctupleM,
-            label_pad_token_id: int = -100,
-            normalized_targets: bool = True,
-            ignore_keys: list[str] | None = None
+        self,
+        model: FMMusicTransformer,
+        tokenizer: OctupleM,
+        label_pad_token_id: int = -100,
+        normalized_targets: bool = True,
+        ignore_keys: list[str] | None = None,
     ):
         super().__init__(model)
 
@@ -259,10 +306,10 @@ class FMMusicTransformerEvaluator(Evaluator):
 
     @torch.no_grad()
     def __call__(
-            self,
-            inputs: dict | LMScorePerformanceInputs,
-            outputs: TupleTransformerFMOutput | FMMusicTransformerOutput,
-            ignore_keys: list[str] | None = None
+        self,
+        inputs: dict | LMScorePerformanceInputs,
+        outputs: TupleTransformerFMOutput | FMMusicTransformerOutput,
+        ignore_keys: list[str] | None = None,
     ) -> dict[str, torch.Tensor]:
         metrics = {}
         ignore_keys = ignore_keys or self.ignore_keys
@@ -276,17 +323,24 @@ class FMMusicTransformerEvaluator(Evaluator):
         label_mask = labels != self.label_pad_token_id
 
         pred_tokens = outputs.pred_tokens
-        pred_values = self.tokenizer.denormalize_values(outputs.pred_values, token_type=self.token_types)
+        pred_values = self.tokenizer.denormalize_values(
+            outputs.pred_values, token_type=self.token_types
+        )
 
         if pred_tokens is not None:
-            metrics["accuracy"] = accuracy(pred_tokens, labels, mask=label_mask, reduction=Reduction.BATCH_MEAN)
+            metrics["accuracy"] = accuracy(
+                pred_tokens, labels, mask=label_mask, reduction=Reduction.BATCH_MEAN
+            )
             for i, key in enumerate(self.token_types):
                 if ignore_keys and key in ignore_keys:
                     continue
 
                 if torch.any(label_mask[..., i]):
                     metrics[f"accuracy/{key}"] = accuracy(
-                        pred_tokens[..., i], labels[..., i], mask=label_mask[..., i], reduction=Reduction.BATCH_MEAN
+                        pred_tokens[..., i],
+                        labels[..., i],
+                        mask=label_mask[..., i],
+                        reduction=Reduction.BATCH_MEAN,
                     )
 
             if self.normalized_targets:
@@ -298,7 +352,10 @@ class FMMusicTransformerEvaluator(Evaluator):
 
                 if torch.any(label_mask[..., i]):
                     metrics[f"distance/{key}"] = distance(
-                        pred_values[..., i], targets[..., i], mask=label_mask[..., i], reduction=Reduction.BATCH_MEAN
+                        pred_values[..., i],
+                        targets[..., i],
+                        mask=label_mask[..., i],
+                        reduction=Reduction.BATCH_MEAN,
                     )
 
         return metrics

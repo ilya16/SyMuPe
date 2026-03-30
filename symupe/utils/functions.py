@@ -1,4 +1,4 @@
-""" A set of utility classes and functions used throughout the repository. """
+"""A set of utility classes and functions used throughout the repository."""
 
 import random
 import sys
@@ -31,7 +31,9 @@ def find_closest(array: np.ndarray, values, return_values: bool = False) -> np.n
     # find indexes where previous index is closer
     arr_values = array[np.minimum(ids, len(array) - 1)]
     prev_values = array[np.maximum(ids - 1, 0)]
-    prev_idx_is_less = (ids == len(array)) | (np.fabs(values - prev_values) < np.fabs(values - arr_values))
+    prev_idx_is_less = (ids == len(array)) | (
+        np.fabs(values - prev_values) < np.fabs(values - arr_values)
+    )
 
     if isinstance(ids, np.ndarray):
         ids[prev_idx_is_less] -= 1
@@ -51,13 +53,13 @@ def tqdm_iterator(iterable, desc=None, position=0, leave=False, file=sys.stdout,
 
 
 def apply(elements, func, tqdm_enabled=True, desc=None):
-    """ Apply a given `func` over a list of elements."""
+    """Apply a given `func` over a list of elements."""
     iterator = tqdm_iterator(elements, desc=desc) if tqdm_enabled else elements
     return [func(e) for e in iterator]
 
 
 def apply_dict(elements, names, func, tqdm_enabled=True, desc=None):
-    """ Apply a given `func` over a list of named elements."""
+    """Apply a given `func` over a list of named elements."""
     elements = zip(elements, names)
     iterator = tqdm_iterator(elements, desc=desc) if tqdm_enabled else elements
     return {name: func(e) for e, name in iterator}
@@ -84,7 +86,9 @@ def set_random_seed(seed: int) -> None:
 
 def forward_fill(arr: torch.Tensor, nan_value: float | torch.Tensor) -> torch.Tensor:
     if isinstance(arr, torch.Tensor):
-        idx = torch.where(arr != nan_value, torch.arange(len(arr)), torch.tensor(0, device=arr.device))
+        idx = torch.where(
+            arr != nan_value, torch.arange(len(arr)), torch.tensor(0, device=arr.device)
+        )
         idx = torch.cummax(idx, dim=0).values
     else:
         idx = np.where(arr != nan_value, np.arange(len(arr)), 0)
@@ -97,21 +101,11 @@ def backward_fill(arr: torch.Tensor, nan_value: float | torch.Tensor) -> torch.T
     return forward_fill(arr[::-1], nan_value=nan_value)[::-1]
 
 
-def trim_mean(data: np.ndarray, tails: float = 0.05) -> np.ndarray:
-    k = int(tails * len(data))
-
-    if k > 0:
-        sorted_data = np.sort(data)
-        data = sorted_data[k:-k]
-
-    return np.mean(data)
-
-
 def fill_by_mask_and_indices(
-        tensor: torch.Tensor,
-        new_tensor: torch.Tensor,
-        mask: torch.Tensor,
-        dims: torch.Tensor | None = None
+    tensor: torch.Tensor,
+    new_tensor: torch.Tensor,
+    mask: torch.Tensor,
+    dims: torch.Tensor | None = None,
 ) -> torch.Tensor:
     if dims is not None:
         tensor_slice = tensor[..., dims]

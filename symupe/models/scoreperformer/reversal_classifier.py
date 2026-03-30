@@ -15,15 +15,15 @@ class GradientReversalFunction(torch.autograd.Function):
     """Revert gradient without any further input modification."""
 
     @staticmethod
-    def forward(ctx, x, l, c):
-        ctx.l = l
-        ctx.c = c
+    def forward(ctx, x, scale: float = 1.0, clip_value: float = 1.0):
+        ctx.scale = scale
+        ctx.clip_value = clip_value
         return x.view_as(x)
 
     @staticmethod
     def backward(ctx, grad_output):
-        grad_output = grad_output.clamp(-ctx.c, ctx.c)
-        return ctx.l * grad_output.neg(), None, None
+        grad_output = grad_output.clamp(-ctx.clip_value, ctx.clip_value)
+        return ctx.scale * grad_output.neg(), None, None
 
 
 @dataclass
@@ -38,7 +38,7 @@ class ReversalClassifierConfig(ModuleConfig):
     num_classes: int = MISSING
     hidden_dims: list[int] | None = None
     grad_clip_threshold: float = 0.25
-    scale_factor: float = 1.
+    scale_factor: float = 1.0
 
 
 class ReversalClassifier(nn.Module, Constructor):
@@ -53,12 +53,12 @@ class ReversalClassifier(nn.Module, Constructor):
     """
 
     def __init__(
-            self,
-            input_dim: int,
-            num_classes: int,
-            hidden_dims: list[int] | None = None,
-            grad_clip_threshold: float = 0.25,
-            scale_factor: float = 1.
+        self,
+        input_dim: int,
+        num_classes: int,
+        hidden_dims: list[int] | None = None,
+        grad_clip_threshold: float = 0.25,
+        scale_factor: float = 1.0,
     ):
         super().__init__()
         self._lambda = scale_factor
@@ -81,7 +81,7 @@ class ReversalClassifier(nn.Module, Constructor):
 
         self.layers = nn.Sequential(*layers)
 
-    def forward(self, x,  labels: torch.Tensor | None = None) -> ReversalClassifierOutput:
+    def forward(self, x, labels: torch.Tensor | None = None) -> ReversalClassifierOutput:
         x = GradientReversalFunction.apply(x, self._lambda, self._clipping)
         logits = self.layers(x)
 
@@ -109,11 +109,11 @@ class MultiHeadReversalClassifierConfig(ModuleConfig):
 
 class MultiHeadReversalClassifier(nn.Module, Constructor):
     def __init__(
-            self,
-            input_dim: int,
-            num_classes: dict[str, int],
-            classifier: ReversalClassifierConfig,
-            loss_weight: float = 0.01
+        self,
+        input_dim: int,
+        num_classes: dict[str, int],
+        classifier: ReversalClassifierConfig,
+        loss_weight: float = 0.01,
     ):
         super().__init__()
 
@@ -130,12 +130,12 @@ class MultiHeadReversalClassifier(nn.Module, Constructor):
         self.loss_weight = loss_weight
 
     def forward(
-            self,
-            embeddings: torch.Tensor,
-            labels: torch.Tensor | None = None
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor | None = None,
     ) -> MultiHeadReversalClassifierOutput:
         logits = {}
-        loss, losses = 0., {}
+        loss, losses = 0.0, {}
         for i, (key, head) in enumerate(self.heads.items()):
             out = head(embeddings, labels=labels[..., i] if labels is not None else None)
             logits[key] = out.logits
@@ -151,5 +151,5 @@ class MultiHeadReversalClassifier(nn.Module, Constructor):
         return MultiHeadReversalClassifierOutput(
             logits=logits,
             loss=loss if labels is not None else None,
-            losses=losses if labels is not None else None
+            losses=losses if labels is not None else None,
         )

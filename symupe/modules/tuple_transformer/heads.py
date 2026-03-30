@@ -1,4 +1,5 @@
-""" TupleTransformer's language and vector modeling heads. """
+"""TupleTransformer's language and vector modeling heads."""
+
 from __future__ import annotations
 
 from abc import abstractmethod
@@ -14,12 +15,18 @@ from symupe.modules.constructor import Registry, VariableModuleConfig, Construct
 from symupe.modules.layers import ScaledTanh, TimePositionalEmbedding
 from symupe.modules.sampling import (
     filter_and_sample,
-    x2prob, cubic_scheduler, cubic_scheduler_derivative, sample_p
+    x2prob,
+    cubic_scheduler,
+    cubic_scheduler_derivative,
+    sample_p,
 )
 from symupe.modules.transformer import (
-    TransformerConfig, TransformerOutput,
-    DecoderTransformerConfig, DecoderTransformer,
-    EncoderTransformerConfig, EncoderTransformer
+    TransformerConfig,
+    TransformerOutput,
+    DecoderTransformerConfig,
+    DecoderTransformer,
+    EncoderTransformerConfig,
+    EncoderTransformer,
 )
 from .embeddings import TupleTransformerEmbeddings
 
@@ -47,24 +54,24 @@ class _TupleTransformerLMHead(nn.Module, Constructor):
 
     @abstractmethod
     def forward(
-            self,
-            x: torch.Tensor,
-            labels: torch.Tensor | None = None,
-            keys: list[str | int] | None = None
+        self,
+        x: torch.Tensor,
+        labels: torch.Tensor | None = None,
+        keys: list[str | int] | None = None,
     ):
-        ...
+        raise NotImplementedError
 
     def infer(
-            self,
-            x: torch.Tensor,
-            keys: list[str | int] | None = None,
-            temperature: float = 1.,
-            top_k: float | int = -1,
-            top_p: float = 0.8,
-            num_first_mask: int = 1,
-            filter_key_ids: dict[str, list] | None = None,
-            ignore_non_special: list[str] | None = None,
-            tokenizer: OctupleM = None
+        self,
+        x: torch.Tensor,
+        keys: list[str | int] | None = None,
+        temperature: float = 1.0,
+        top_k: float | int = -1,
+        top_p: float = 0.8,
+        num_first_mask: int = 1,
+        filter_key_ids: dict[str, list] | None = None,
+        ignore_non_special: list[str] | None = None,
+        tokenizer: OctupleM = None,
     ) -> tuple[dict[str, torch.Tensor], torch.Tensor, torch.Tensor]:
         mask_value = -float("Inf")
         filter_key_ids = filter_key_ids or {}
@@ -82,14 +89,16 @@ class _TupleTransformerLMHead(nn.Module, Constructor):
                 key_logits[:, filter_ids] = mask_value
 
             if key in ignore_non_special:
-                key_logits[:, tokenizer.zero_token:] = mask_value
+                key_logits[:, tokenizer.zero_token :] = mask_value
 
             pred_tokens[key] = filter_and_sample(
                 key_logits, temperature=temperature, top_k=top_k, top_p=top_p
             )
 
         pred_tokens = torch.cat(list(pred_tokens.values()), dim=-1)[None]
-        pred_values = tokenizer.decode_values(pred_tokens, token_type=list(logits.keys()), normalize=True).float()
+        pred_values = tokenizer.decode_values(
+            pred_tokens, token_type=list(logits.keys()), normalize=True
+        ).float()
 
         return logits, pred_tokens, pred_values
 
@@ -103,25 +112,29 @@ class TupleTransformerLMHeadConfig(_TupleTransformerLMHeadConfig):
 @TupleTransformerHeadsRegistry.register("lm")
 class TupleTransformerLMHead(_TupleTransformerLMHead):
     def __init__(
-            self,
-            dim: int,
-            num_tokens: dict[str, int] | None = None,
-            embeddings: TupleTransformerEmbeddings | None = None,
-            keys: list[str] | None = None,
-            bias: bool = False
+        self,
+        dim: int,
+        num_tokens: dict[str, int] | None = None,
+        embeddings: TupleTransformerEmbeddings | None = None,
+        keys: list[str] | None = None,
+        bias: bool = False,
     ):
         assert num_tokens is not None or embeddings is not None
         super().__init__()
 
         self.num_tokens = num_tokens or embeddings.num_tokens
-        self.heads = nn.ModuleDict({
-            key: nn.Linear(dim, num, bias=bias)
-            for key, num in self.num_tokens.items()
-            if not keys or key in keys
-        })
+        self.heads = nn.ModuleDict(
+            {
+                key: nn.Linear(dim, num, bias=bias)
+                for key, num in self.num_tokens.items()
+                if not keys or key in keys
+            }
+        )
         self.keys = list(self.heads.keys())
 
-    def forward(self, x: torch.Tensor, keys: list[str | int] | None = None, **kwargs) -> dict[str, torch.Tensor]:
+    def forward(
+        self, x: torch.Tensor, keys: list[str | int] | None = None, **kwargs
+    ) -> dict[str, torch.Tensor]:
         logits = {
             key: head(x)
             for i, (key, head) in enumerate(self.heads.items())
@@ -140,12 +153,12 @@ class TupleTransformerTiedLMHeadConfig(_TupleTransformerLMHeadConfig):
 @TupleTransformerHeadsRegistry.register("lm-tied")
 class TupleTransformerTiedLMHead(_TupleTransformerLMHead):
     def __init__(
-            self,
-            dim: int,
-            embeddings: TupleTransformerEmbeddings,
-            reuse_projection: bool = True,
-            emb_norm: bool = True,
-            keys: list[str] | None = None
+        self,
+        dim: int,
+        embeddings: TupleTransformerEmbeddings,
+        reuse_projection: bool = True,
+        emb_norm: bool = True,
+        keys: list[str] | None = None,
     ):
         super().__init__()
 
@@ -155,14 +168,17 @@ class TupleTransformerTiedLMHead(_TupleTransformerLMHead):
 
         self.project_emb = nn.Linear(dim, self.total_emb_dim, bias=False)
         if reuse_projection:
-            assert dim == embeddings.project_emb.out_features, \
-                f"Projection layer could be reused only if last input tensor dimension " \
+            assert dim == embeddings.project_emb.out_features, (
+                f"Projection layer could be reused only if last input tensor dimension "
                 f"is equal to projection layer's `out_features = {embeddings.project_emb.out_features}`"
+            )
             self.project_emb.weight = embeddings.project_emb.weight
 
         self.norm = nn.LayerNorm(self.total_emb_dim) if emb_norm else nn.Identity()
 
-    def forward(self, x: torch.Tensor, keys: list[str | int] | None = None, **kwargs) -> dict[str, torch.Tensor]:
+    def forward(
+        self, x: torch.Tensor, keys: list[str | int] | None = None, **kwargs
+    ) -> dict[str, torch.Tensor]:
         token_embs = self.norm(x @ self.project_emb.weight).split(self.split_dims, dim=-1)
 
         logits = {
@@ -174,103 +190,11 @@ class TupleTransformerTiedLMHead(_TupleTransformerLMHead):
 
 
 @dataclass
-class TupleTransformerTiedProjLMHeadConfig(_TupleTransformerLMHeadConfig):
-    _target_: str = "lm-tied-proj"
-    emb_norm: bool = True
-
-
-@TupleTransformerHeadsRegistry.register("lm-tied-proj")
-class TupleTransformerTiedProjLMHead(_TupleTransformerLMHead):
-    def __init__(
-            self,
-            dim: int,
-            embeddings: TupleTransformerEmbeddings,
-            num_tokens: dict[str, int] | None = None,
-            keys: list[str] | None = None,
-            split: bool = False,
-            emb_norm: bool = True
-    ):
-        assert num_tokens is not None or embeddings is not None
-        super().__init__()
-
-        self.total_emb_dim = embeddings.total_emb_dim
-
-        self.split = split
-        self.split_dims = [token_emb.embedding_dim for token_emb in embeddings.embs.values()]
-
-        self.project_emb = nn.Linear(dim, self.total_emb_dim, bias=False)
-        assert dim == embeddings.project_emb.out_features, \
-            f"Projection layer could be reused only if last input tensor dimension " \
-            f"is equal to projection layer's `out_features = {embeddings.project_emb.out_features}`"
-        self.project_emb.weight = embeddings.project_emb.weight
-
-        self.norm = nn.LayerNorm(self.total_emb_dim) if emb_norm else nn.Identity()
-
-        num_tokens = num_tokens or embeddings.num_tokens
-        self.heads = nn.ModuleDict({
-            key: nn.Linear(embeddings.embs[key].embedding_dim if split else self.total_emb_dim, num, bias=False)
-            for key, num in num_tokens.items()
-            if not keys or key in keys
-        })
-
-    def forward(self, x: torch.Tensor, keys: list[str | int] | None = None, **kwargs) -> dict[str, torch.Tensor]:
-        token_emb = self.norm(x @ self.project_emb.weight)
-
-        if self.split:
-            token_embs = token_emb.split(self.split_dims, dim=-1)
-            logits = {
-                key: head(token_embs[i])
-                for i, (key, head) in enumerate(self.heads.items())
-                if keys is None or i in keys or key in keys
-            }
-        else:
-            logits = {
-                key: head(token_emb)
-                for i, (key, head) in enumerate(self.heads.items())
-                if keys is None or i in keys or key in keys
-            }
-        return logits
-
-
-@dataclass
-class TupleTransformerTiedSplitLMHeadConfig(_TupleTransformerLMHeadConfig):
-    _target_: str = "lm-tied-split"
-
-
-@TupleTransformerHeadsRegistry.register("lm-tied-split")
-class TupleTransformerTiedSplitLMHead(_TupleTransformerLMHead):
-    def __init__(
-            self,
-            dim: int,
-            embeddings: TupleTransformerEmbeddings,
-            keys: list[str] | None = None
-    ):
-        super().__init__()
-
-        to_embs = {}
-        for key, token_emb in embeddings.embs.items():
-            if not keys or key in keys:
-                to_embs[key] = nn.Sequential(
-                    nn.Linear(dim, token_emb.embedding_dim),
-                    nn.LayerNorm(token_emb.embedding_dim),
-                )
-
-        self.to_embs = nn.ModuleDict(to_embs)
-        self.embs = [embeddings.embs]
-
-    def forward(self, x: torch.Tensor, keys: list[str | int] | None = None, **kwargs) -> dict[str, torch.Tensor]:
-        logits = {
-            key: self.to_embs[key](x) @ self.embs[0][key].weight.t()
-            for i, key in enumerate(self.embs[0].keys())
-            if keys is None or i in keys or key in keys
-        }
-        return logits
-
-
-@dataclass
 class TupleTransformerCausalLMHeadConfig(_TupleTransformerLMHeadConfig):
     _target_: str = "lm-causal"
-    transformer: DictConfig | TransformerConfig = field(default_factory=lambda: DecoderTransformerConfig())
+    transformer: DictConfig | TransformerConfig = field(
+        default_factory=lambda: DecoderTransformerConfig()
+    )
     type_embeddings: bool = False
     prior_input: bool = True
     bias: bool = False
@@ -279,21 +203,26 @@ class TupleTransformerCausalLMHeadConfig(_TupleTransformerLMHeadConfig):
 @TupleTransformerHeadsRegistry.register("lm-causal")
 class TupleTransformerCausalLMHead(_TupleTransformerLMHead):
     def __init__(
-            self,
-            dim: int,
-            num_tokens: dict[str, int] | None = None,
-            embeddings: TupleTransformerEmbeddings | None = None,
-            transformer: DictConfig | TransformerConfig = DecoderTransformerConfig(),
-            type_embeddings: bool = False,
-            prior_input: bool = True,
-            keys: list[str] | None = None,
-            bias: bool = False
+        self,
+        dim: int,
+        num_tokens: dict[str, int] | None = None,
+        embeddings: TupleTransformerEmbeddings | None = None,
+        transformer: DictConfig | TransformerConfig = DecoderTransformerConfig(),
+        type_embeddings: bool = False,
+        prior_input: bool = True,
+        keys: list[str] | None = None,
+        bias: bool = False,
     ):
         assert embeddings is not None
         super().__init__()
 
         self.embedding_dim = list(embeddings.embs.values())[0].embedding_dim
-        assert all([token_emb.embedding_dim == self.embedding_dim for token_emb in embeddings.embs.values()])
+        assert all(
+            [
+                token_emb.embedding_dim == self.embedding_dim
+                for token_emb in embeddings.embs.values()
+            ]
+        )
 
         num_embeddings = len(keys) if keys is not None else len(embeddings.embs)
 
@@ -302,36 +231,42 @@ class TupleTransformerCausalLMHead(_TupleTransformerLMHead):
 
         self.type_embeddings = None
         if type_embeddings:
-            self.type_embeddings = nn.Parameter(0.01 * torch.randn((num_embeddings, self.embedding_dim)))
+            self.type_embeddings = nn.Parameter(
+                0.01 * torch.randn((num_embeddings, self.embedding_dim))
+            )
 
         self.prior_input = prior_input
 
         input_dim = self.embedding_dim * 2 if prior_input else self.embedding_dim
-        self.project_in = nn.Linear(
-            input_dim, transformer.dim, bias=False
-        ) if input_dim != transformer.dim else nn.Identity()
+        self.project_in = (
+            nn.Linear(input_dim, transformer.dim, bias=False)
+            if input_dim != transformer.dim
+            else nn.Identity()
+        )
 
         self.transformer = DecoderTransformer.init(transformer)
 
         self.num_tokens = num_tokens or embeddings.num_tokens
-        self.heads = nn.ModuleDict({
-            key: nn.Linear(transformer.dim, num, bias=bias)
-            for key, num in self.num_tokens.items()
-            if not keys or key in keys
-        })
+        self.heads = nn.ModuleDict(
+            {
+                key: nn.Linear(transformer.dim, num, bias=bias)
+                for key, num in self.num_tokens.items()
+                if not keys or key in keys
+            }
+        )
         self.keys = list(self.heads.keys())
 
     def forward(
-            self,
-            x: torch.Tensor,
-            labels: torch.Tensor,
-            keys: list[str | int] | None = None,
+        self,
+        x: torch.Tensor,
+        labels: torch.Tensor,
+        keys: list[str | int] | None = None,
     ) -> dict[str, torch.Tensor]:
         b, t = x.shape[:2]
 
-        labels_embs = torch.stack(list(
-            self.token_emb[0]._forward_embeddings(labels, keys=self.keys).values()
-        ), dim=-2)
+        labels_embs = torch.stack(
+            list(self.token_emb[0]._forward_embeddings(labels, keys=self.keys).values()), dim=-2
+        )
         labels_embs = labels_embs.view(b * t, -1, self.embedding_dim)
         labels_embs = F.pad(labels_embs, (0, 0, 1, 0))[:, :-1]
 
@@ -343,12 +278,14 @@ class TupleTransformerCausalLMHead(_TupleTransformerLMHead):
 
         x = labels_embs
         if self.prior_input:
-            x = torch.cat([prior_embs, labels_embs], dim=-1)  # combine with embeddings of known past labels
+            x = torch.cat(
+                [prior_embs, labels_embs], dim=-1
+            )  # combine with embeddings of known past labels
 
         x = self.project_in(x)
         x = self.transformer(
             x,
-            context=prior_embs if self.transformer.expects_context else None
+            context=prior_embs if self.transformer.expects_context else None,
         ).out  # pass through transformer
         x = x.view(b, t, prior_embs.shape[-2], -1)
 
@@ -361,16 +298,16 @@ class TupleTransformerCausalLMHead(_TupleTransformerLMHead):
         return logits
 
     def infer(
-            self,
-            x: torch.Tensor,
-            keys: list[str | int] | None = None,
-            temperature: float = 1.,
-            top_k: float | int = -1,
-            top_p: float = 0.8,
-            num_first_mask: int = 1,
-            filter_key_ids: dict[str, list] | None = None,
-            ignore_non_special: list[str] | None = None,
-            tokenizer: OctupleM = None
+        self,
+        x: torch.Tensor,
+        keys: list[str | int] | None = None,
+        temperature: float = 1.0,
+        top_k: float | int = -1,
+        top_p: float = 0.8,
+        num_first_mask: int = 1,
+        filter_key_ids: dict[str, list] | None = None,
+        ignore_non_special: list[str] | None = None,
+        tokenizer: OctupleM = None,
     ) -> tuple[dict[str, torch.Tensor], torch.Tensor, torch.Tensor]:
         x = x[:, None] if x.ndim == 2 else x
         b, t = x.shape[:2]
@@ -387,15 +324,18 @@ class TupleTransformerCausalLMHead(_TupleTransformerLMHead):
 
         x = labels_embs
         if self.prior_input:
-            x = torch.cat([prior_embs, labels_embs], dim=-1)  # combine with embeddings of known past labels
+            # combine with embeddings of known past labels
+            x = torch.cat([prior_embs, labels_embs], dim=-1)
 
         logits, pred_tokens = {}, []
         cache = None
         for i, (key, head) in enumerate(self.heads.items()):
-            x_i = self.project_in(x[:, :i + 1])
+            x_i = self.project_in(x[:, : i + 1])
             output: TransformerOutput = self.transformer(
-                x_i, context=prior_embs if self.transformer.expects_context else None,
-                cache=cache, return_cache=True
+                x_i,
+                context=prior_embs if self.transformer.expects_context else None,
+                cache=cache,
+                return_cache=True,
             )
             out_i, cache = output.out, output.intermediates
             key_logits = head(out_i[:, -1])
@@ -407,9 +347,11 @@ class TupleTransformerCausalLMHead(_TupleTransformerLMHead):
                 key_logits[..., filter_ids] = mask_value
 
             if key in ignore_non_special:
-                key_logits[..., tokenizer.zero_token:] = mask_value
+                key_logits[..., tokenizer.zero_token :] = mask_value
 
-            pred_tokens_i = filter_and_sample(key_logits, temperature=temperature, top_k=top_k, top_p=top_p)
+            pred_tokens_i = filter_and_sample(
+                key_logits, temperature=temperature, top_k=top_k, top_p=top_p
+            )
             if keys is None or key in keys:
                 logits[key] = key_logits
                 pred_tokens.append(pred_tokens_i.view(b, t, 1))
@@ -418,10 +360,12 @@ class TupleTransformerCausalLMHead(_TupleTransformerLMHead):
                 next_label_emb = self.token_emb[0].embs[key](pred_tokens_i.squeeze(1))
                 if self.type_embeddings is not None:
                     next_label_emb = next_label_emb + self.type_embeddings[i + 1]
-                x[:, i + 1, -self.embedding_dim:] = next_label_emb
+                x[:, i + 1, -self.embedding_dim :] = next_label_emb
 
         pred_tokens = torch.cat(pred_tokens, dim=-1)
-        pred_values = tokenizer.decode_values(pred_tokens, token_type=list(logits.keys()), normalize=True).float()
+        pred_values = tokenizer.decode_values(
+            pred_tokens, token_type=list(logits.keys()), normalize=True
+        ).float()
 
         return logits, pred_tokens, pred_values
 
@@ -429,8 +373,10 @@ class TupleTransformerCausalLMHead(_TupleTransformerLMHead):
 @dataclass
 class TupleTransformerDFMHeadConfig(_TupleTransformerLMHeadConfig):
     _target_: str = "dfm"
-    transformer: DictConfig | TransformerConfig = field(default_factory=lambda: EncoderTransformerConfig())
-    time_embedding_dim: int = 64,
+    transformer: DictConfig | TransformerConfig = field(
+        default_factory=lambda: EncoderTransformerConfig()
+    )
+    time_embedding_dim: int = (64,)
     type_embeddings: bool = False
     distribution: str = "uniform"
     bias: bool = False
@@ -439,22 +385,27 @@ class TupleTransformerDFMHeadConfig(_TupleTransformerLMHeadConfig):
 @TupleTransformerHeadsRegistry.register("dfm")
 class TupleTransformerDFMHead(_TupleTransformerLMHead):
     def __init__(
-            self,
-            dim: int,
-            num_tokens: dict[str, int] | None = None,
-            embeddings: TupleTransformerEmbeddings | None = None,
-            transformer: DictConfig | TransformerConfig = EncoderTransformerConfig(),
-            time_embedding_dim: int = 64,
-            type_embeddings: bool = False,
-            distribution: str = "uniform",
-            keys: list[str] | None = None,
-            bias: bool = False
+        self,
+        dim: int,
+        num_tokens: dict[str, int] | None = None,
+        embeddings: TupleTransformerEmbeddings | None = None,
+        transformer: DictConfig | TransformerConfig = EncoderTransformerConfig(),
+        time_embedding_dim: int = 64,
+        type_embeddings: bool = False,
+        distribution: str = "uniform",
+        keys: list[str] | None = None,
+        bias: bool = False,
     ):
         assert embeddings is not None
         super().__init__()
 
         self.embedding_dim = list(embeddings.embs.values())[0].embedding_dim
-        assert all([token_emb.embedding_dim == self.embedding_dim for token_emb in embeddings.embs.values()])
+        assert all(
+            [
+                token_emb.embedding_dim == self.embedding_dim
+                for token_emb in embeddings.embs.values()
+            ]
+        )
 
         num_embeddings = len(keys) if keys is not None else len(embeddings.embs)
 
@@ -463,12 +414,16 @@ class TupleTransformerDFMHead(_TupleTransformerLMHead):
 
         self.type_embeddings = None
         if type_embeddings:
-            self.type_embeddings = nn.Parameter(0.01 * torch.randn((num_embeddings, self.embedding_dim)))
+            self.type_embeddings = nn.Parameter(
+                0.01 * torch.randn((num_embeddings, self.embedding_dim))
+            )
 
         input_dim = self.embedding_dim * 2
-        self.project_in = nn.Linear(
-            input_dim, transformer.dim, bias=False
-        ) if input_dim != transformer.dim else nn.Identity()
+        self.project_in = (
+            nn.Linear(input_dim, transformer.dim, bias=False)
+            if input_dim != transformer.dim
+            else nn.Identity()
+        )
 
         self.time_embedding_dim = time_embedding_dim
         self.time_emb = TimePositionalEmbedding(
@@ -476,30 +431,32 @@ class TupleTransformerDFMHead(_TupleTransformerLMHead):
         )
 
         self.transformer = EncoderTransformer.init(
-            transformer,
-            adaptive_norm=True,
-            condition_dim=self.time_embedding_dim
+            transformer, adaptive_norm=True, condition_dim=self.time_embedding_dim
         )
 
         self.num_tokens = num_tokens or embeddings.num_tokens
-        self.heads = nn.ModuleDict({
-            key: nn.Linear(transformer.dim, num, bias=bias)
-            for key, num in self.num_tokens.items()
-            if not keys or key in keys
-        })
+        self.heads = nn.ModuleDict(
+            {
+                key: nn.Linear(transformer.dim, num, bias=bias)
+                for key, num in self.num_tokens.items()
+                if not keys or key in keys
+            }
+        )
         self.keys = list(self.heads.keys())
 
-        self.register_buffer("token_nums", torch.tensor(list(self.num_tokens.values())), persistent=False)
+        self.register_buffer(
+            "token_nums", torch.tensor(list(self.num_tokens.values())), persistent=False
+        )
 
         self.mask_token_id = 1
         assert distribution in ("mask", "uniform")
         self.distribution = distribution
 
     def forward(
-            self,
-            x: torch.Tensor,
-            labels: torch.Tensor,
-            keys: list[str | int] | None = None
+        self,
+        x: torch.Tensor,
+        labels: torch.Tensor,
+        keys: list[str | int] | None = None,
     ) -> dict[str, torch.Tensor]:
         b, t = x.shape[:2]
 
@@ -508,7 +465,9 @@ class TupleTransformerDFMHead(_TupleTransformerLMHead):
 
         # x_0 is noisy/masked input
         if self.distribution == "uniform":
-            x_0 = (torch.rand(b * t, len(self.token_nums), device=x.device) * self.token_nums).long()
+            x_0 = (
+                torch.rand(b * t, len(self.token_nums), device=x.device) * self.token_nums
+            ).long()
         else:
             x_0 = torch.full_like(x_1, fill_value=self.mask_token_id)
 
@@ -520,9 +479,9 @@ class TupleTransformerDFMHead(_TupleTransformerLMHead):
         mask = torch.rand_like(x_1.float()) < cubic_scheduler(time_steps)
         x_t[mask] = x_1[mask]
 
-        x_t_embs = torch.stack(list(
-            self.token_emb[0]._forward_embeddings(x_t, keys=self.keys).values()
-        ), dim=-2)
+        x_t_embs = torch.stack(
+            list(self.token_emb[0]._forward_embeddings(x_t, keys=self.keys).values()), dim=-2
+        )
 
         if self.type_embeddings is not None:
             x_t_embs = x_t_embs + self.type_embeddings[None]
@@ -530,15 +489,15 @@ class TupleTransformerDFMHead(_TupleTransformerLMHead):
         prior_embs = self.project_emb(x)  # initial embedding for each token
         prior_embs = prior_embs.view(b * t, -1, self.embedding_dim)
 
-        x = torch.cat([prior_embs, x_t_embs], dim=-1)  # combine with embeddings of known past labels
+        x = torch.cat(
+            [prior_embs, x_t_embs], dim=-1
+        )  # combine with embeddings of known past labels
         x = self.project_in(x)
 
         time_embeddings = self.time_emb(time_steps)
 
-        out = self.transformer(
-            x,
-            adaptive_condition=time_embeddings
-        ).out  # pass through transformer
+        # pass through transformer
+        out = self.transformer(x, adaptive_condition=time_embeddings).out
         out = out.view(b, t, prior_embs.shape[-2], -1)
 
         logits = {
@@ -550,17 +509,17 @@ class TupleTransformerDFMHead(_TupleTransformerLMHead):
         return logits
 
     def infer(
-            self,
-            x: torch.Tensor,
-            keys: list[str | int] | None = None,
-            temperature: float = 1.,
-            top_k: float | int = -1,
-            top_p: float = 0.8,
-            steps: int = 4,
-            num_first_mask: int = 1,
-            filter_key_ids: dict[str, list] | None = None,
-            ignore_non_special: list[str] | None = None,
-            tokenizer: OctupleM = None
+        self,
+        x: torch.Tensor,
+        keys: list[str | int] | None = None,
+        temperature: float = 1.0,
+        top_k: float | int = -1,
+        top_p: float = 0.8,
+        steps: int = 4,
+        num_first_mask: int = 1,
+        filter_key_ids: dict[str, list] | None = None,
+        ignore_non_special: list[str] | None = None,
+        tokenizer: OctupleM = None,
     ) -> tuple[dict[str, torch.Tensor], torch.Tensor, torch.Tensor]:
         x = x[:, None] if x.ndim == 2 else x
         b, t = x.shape[:2]
@@ -572,9 +531,16 @@ class TupleTransformerDFMHead(_TupleTransformerLMHead):
         prior_embs = prior_embs.view(b * t, -1, self.embedding_dim)
 
         if self.distribution == "uniform":
-            x_0 = (torch.rand(b * t, len(self.token_nums), device=x.device) * self.token_nums).long()
+            x_0 = (
+                torch.rand(b * t, len(self.token_nums), device=x.device) * self.token_nums
+            ).long()
         else:
-            x_0 = torch.full((b * t, len(self.keys)), fill_value=self.mask_token_id, dtype=torch.long, device=x.device)
+            x_0 = torch.full(
+                (b * t, len(self.keys)),
+                fill_value=self.mask_token_id,
+                dtype=torch.long,
+                device=x.device,
+            )
 
         time_steps = torch.linspace(0, 1, steps + 1)
         time_embeddings = self.time_emb(time_steps)
@@ -585,22 +551,24 @@ class TupleTransformerDFMHead(_TupleTransformerLMHead):
         for i, time_step in enumerate(time_steps[:-1]):
             dt = time_steps[i + 1] - time_steps[i]
 
-            delta_t = {key: x2prob(x_t[..., i], num) for i, (key, num) in enumerate(self.num_tokens.items())}
+            delta_t = {
+                key: x2prob(x_t[..., i], num)
+                for i, (key, num) in enumerate(self.num_tokens.items())
+            }
 
-            x_t_embs = torch.stack(list(
-                self.token_emb[0]._forward_embeddings(x_t, keys=self.keys).values()
-            ), dim=-2)
+            x_t_embs = torch.stack(
+                list(self.token_emb[0]._forward_embeddings(x_t, keys=self.keys).values()), dim=-2
+            )
 
             if self.type_embeddings is not None:
                 x_t_embs = x_t_embs + self.type_embeddings[None]
 
-            x_i = torch.cat([prior_embs, x_t_embs], dim=-1)  # combine with embeddings of known past labels
+            x_i = torch.cat(
+                [prior_embs, x_t_embs], dim=-1
+            )  # combine with embeddings of known past labels
             x_i = self.project_in(x_i)
 
-            out = self.transformer(
-                x_i,
-                adaptive_condition=time_embeddings[i][None]
-            ).out
+            out = self.transformer(x_i, adaptive_condition=time_embeddings[i][None]).out
 
             p_1t = {
                 key: head(out[..., i, :])
@@ -614,14 +582,18 @@ class TupleTransformerDFMHead(_TupleTransformerLMHead):
                     key_logits[..., filter_ids] = mask_value
 
                 if key in ignore_non_special:
-                    key_logits[..., tokenizer.zero_token:] = mask_value
+                    key_logits[..., tokenizer.zero_token :] = mask_value
 
             if time_step < time_steps[-2]:
-                kappa_coeff = cubic_scheduler_derivative(time_step) / (1 - cubic_scheduler(time_step))
+                kappa_coeff = cubic_scheduler_derivative(time_step) / (
+                    1 - cubic_scheduler(time_step)
+                )
 
                 p_t, x_t = {}, {}
                 for i, (key, num) in enumerate(self.num_tokens.items()):
-                    p_t[key] = delta_t[key] + dt * kappa_coeff * (p_1t[key].softmax(-1) - delta_t[key])
+                    p_t[key] = delta_t[key] + dt * kappa_coeff * (
+                        p_1t[key].softmax(-1) - delta_t[key]
+                    )
                     x_t[key] = sample_p(p_t[key])
 
                 x_t = torch.stack(list(x_t.values()), dim=-1)
@@ -632,7 +604,9 @@ class TupleTransformerDFMHead(_TupleTransformerLMHead):
         for key, p1t_i in p_1t.items():
             x_1[key] = sample_p(p1t_i.softmax(-1))
         pred_tokens = torch.stack(list(x_1.values()), dim=-1).view(b, t, -1)
-        pred_values = tokenizer.decode_values(pred_tokens, token_type=list(logits.keys()), normalize=True).float()
+        pred_values = tokenizer.decode_values(
+            pred_tokens, token_type=list(logits.keys()), normalize=True
+        ).float()
 
         return logits, pred_tokens, pred_values
 
@@ -642,7 +616,7 @@ class TupleTransformerDFMHead(_TupleTransformerLMHead):
 
 @dataclass
 class _TupleTransformerValueHeadConfig(TupleTransformerHeadsConfig):
-    ...
+    pass
 
 
 class _TupleTransformerValueHead(nn.Module, Constructor):
@@ -651,13 +625,13 @@ class _TupleTransformerValueHead(nn.Module, Constructor):
 
     @abstractmethod
     def forward(self, x: torch.Tensor):
-        ...
+        raise NotImplementedError
 
     def infer(
-            self,
-            x: torch.Tensor,
-            keys: list[str | int] | None = None,
-            tokenizer: OctupleM = None
+        self,
+        x: torch.Tensor,
+        keys: list[str | int] | None = None,
+        tokenizer: OctupleM = None,
     ) -> tuple[list[str] | None, torch.Tensor, torch.Tensor]:
         pred_values = self(x, keys=keys)
 
@@ -682,11 +656,11 @@ class TupleTransformerValueHeadConfig(_TupleTransformerValueHeadConfig):
 @TupleTransformerHeadsRegistry.register("value")
 class TupleTransformerValueHead(_TupleTransformerValueHead):
     def __init__(
-            self,
-            dim: int,
-            num_features: int | None = None,
-            keys: list[str] | None = None,
-            ranges: list[tuple[float, float] | None] | None = None
+        self,
+        dim: int,
+        num_features: int | None = None,
+        keys: list[str] | None = None,
+        ranges: list[tuple[float, float] | None] | None = None,
     ):
         super().__init__()
         assert num_features is not None or keys is not None
@@ -696,19 +670,20 @@ class TupleTransformerValueHead(_TupleTransformerValueHead):
         self.limiters = None
         if ranges is not None:
             assert len(ranges) == self.num_features
-            self.limiters = nn.ModuleList([
-                ScaledTanh(*value_range) if value_range is not None else nn.Identity()
-                for value_range in ranges
-            ])
+            self.limiters = nn.ModuleList(
+                [
+                    ScaledTanh(*value_range) if value_range is not None else nn.Identity()
+                    for value_range in ranges
+                ]
+            )
 
     def forward(self, x: torch.Tensor, keys: list[str | int] | None = None) -> torch.Tensor:
         values = self.head(x)
 
         if self.limiters is not None:
-            values = torch.stack([
-                self.limiters[i](values[..., i])
-                for i in range(len(self.limiters))
-            ], dim=-1)
+            values = torch.stack(
+                [self.limiters[i](values[..., i]) for i in range(len(self.limiters))], dim=-1
+            )
 
         return values
 
@@ -723,25 +698,31 @@ class TupleTransformerSplitValueHeadConfig(_TupleTransformerValueHeadConfig):
 @TupleTransformerHeadsRegistry.register("value-split")
 class TupleTransformerSplitValueHead(_TupleTransformerValueHead):
     def __init__(
-            self,
-            dim: int,
-            keys: list[str],
-            ranges: dict[str, tuple[float, float] | None] | None = None
+        self,
+        dim: int,
+        keys: list[str],
+        ranges: dict[str, tuple[float, float] | None] | None = None,
     ):
         super().__init__()
 
         self.num_features = len(keys)
 
         ranges = ranges or {}
-        self.heads = nn.ModuleDict({
-            key: nn.Sequential(
-                nn.Linear(dim, 1),
-                ScaledTanh(*ranges[key]) if key in ranges and ranges[key] is not None else nn.Identity()
-            )
-            for key in keys
-        })
+        self.heads = nn.ModuleDict(
+            {
+                key: nn.Sequential(
+                    nn.Linear(dim, 1),
+                    ScaledTanh(*ranges[key])
+                    if key in ranges and ranges[key] is not None
+                    else nn.Identity(),
+                )
+                for key in keys
+            }
+        )
 
-    def forward(self, x: torch.Tensor, keys: list[str | int] | None = None) -> dict[str, torch.Tensor]:
+    def forward(
+        self, x: torch.Tensor, keys: list[str | int] | None = None
+    ) -> dict[str, torch.Tensor]:
         values = {
             key: layer(x).squeeze(-1)
             for i, (key, layer) in enumerate(self.heads.items())
@@ -763,12 +744,12 @@ class TupleTransformerEmbeddingHeadConfig(TupleTransformerHeadsConfig):
 @TupleTransformerHeadsRegistry.register("embedding")
 class TupleTransformerEmbeddingHead(nn.Module, Constructor):
     def __init__(
-            self,
-            dim: int,
-            emb_dim: int,
-            hidden_dim: int | None = None,
-            depth: int = 2,
-            detach_inputs: bool | float = False
+        self,
+        dim: int,
+        emb_dim: int,
+        hidden_dim: int | None = None,
+        depth: int = 2,
+        detach_inputs: bool | float = False,
     ):
         super().__init__()
 

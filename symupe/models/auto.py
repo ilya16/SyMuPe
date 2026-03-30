@@ -15,16 +15,16 @@ class AutoModel:
 
     @classmethod
     def register(cls, model_cls: type[Model]):
-        """ Registers a class into the AutoModel registry. """
+        """Registers a class into the AutoModel registry."""
         cls.MODELS[model_cls.__name__] = model_cls
 
     @classmethod
     def from_checkpoint(
-            cls,
-            checkpoint_path: str,
-            from_ema: bool = False,
-            load_weights: bool = True,
-            strict: bool = True
+        cls,
+        checkpoint_path: str,
+        from_ema: bool = False,
+        load_weights: bool = True,
+        strict: bool = True,
     ) -> Model:
         """
         Load a model from a monolithic training checkpoint (.pt).
@@ -49,11 +49,7 @@ class AutoModel:
 
     @classmethod
     def from_pretrained(
-            cls,
-            pretrained_path: str,
-            strict: bool = True,
-            device: str = "cpu",
-            **kwargs
+        cls, pretrained_path: str, strict: bool = True, device: str = "cpu", **kwargs
     ) -> Model:
         """
         Load a model from the Hugging Face Hub or a local directory.
@@ -66,7 +62,9 @@ class AutoModel:
         if os.path.isdir(pretrained_path):
             config_path = os.path.join(pretrained_path, Model.CONFIG_NAME)
         else:
-            config_path = hf_hub_download(repo_id=pretrained_path, filename=Model.CONFIG_NAME, **kwargs)
+            config_path = hf_hub_download(
+                repo_id=pretrained_path, filename=Model.CONFIG_NAME, **kwargs
+            )
 
         config = load_json(config_path)
         model = cls._get_model_class(config.get("_name_")).from_pretrained(
@@ -92,5 +90,5 @@ class AutoEvaluator:
 
     @classmethod
     def register(cls, evaluator_cls: type[Evaluator]):
-        """ Registers a class into the AutoEvaluator registry. """
+        """Registers a class into the AutoEvaluator registry."""
         cls.EVALUATORS[evaluator_cls.__name__] = evaluator_cls

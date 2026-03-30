@@ -1,4 +1,5 @@
 """Base tokenizer class, extending miditok.MusicTokenizer."""
+
 from __future__ import annotations
 
 import json
@@ -10,11 +11,17 @@ from pathlib import Path
 import numpy as np
 from huggingface_hub import hf_hub_download
 from miditok import MusicTokenizer as _MusicTokenizer, Event
-from miditok.constants import TIME_SIGNATURE, MIDI_INSTRUMENTS, DEFAULT_TOKENIZER_FILE_NAME, CURRENT_MIDITOK_VERSION
+from miditok.constants import (
+    TIME_SIGNATURE,
+    MIDI_INSTRUMENTS,
+    DEFAULT_TOKENIZER_FILE_NAME,
+    CURRENT_MIDITOK_VERSION,
+)
 from miditok.utils import (
-    is_track_empty, merge_same_program_tracks,
+    is_track_empty,
+    merge_same_program_tracks,
     remove_duplicated_notes,
-    get_score_ticks_per_beat
+    get_score_ticks_per_beat,
 )
 from symusic import Score, Track, Note, TimeSignature, Tempo
 from symusic.core import NoteTickList, TempoTickList, TimeSignatureTickList
@@ -31,12 +38,12 @@ class MusicTokenizer(_MusicTokenizer, ABC):
     """
 
     def preprocess_score(
-            self,
-            score: Score,
-            quantize_times: bool = True,
-            quantize_velocities: bool = True,
-            quantize_time_signatures: bool = True,
-            quantize_tempos: bool = True
+        self,
+        score: Score,
+        quantize_times: bool = True,
+        quantize_velocities: bool = True,
+        quantize_time_signatures: bool = True,
+        quantize_tempos: bool = True,
     ) -> Score:
         r"""
         Pre-process a ``symusic.Score`` object to resample its time and events values.
@@ -76,9 +83,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
             max_ts_denom = max(ts.denominator for ts in time_signatures_copy)
             new_tpq = int(self.config.max_num_pos_per_beat * max_ts_denom / 4)
         else:
-            time_signatures_copy = TimeSignatureTickList(
-                [TimeSignature(0, *TIME_SIGNATURE)]
-            )
+            time_signatures_copy = TimeSignatureTickList([TimeSignature(0, *TIME_SIGNATURE)])
             new_tpq = self.config.max_num_pos_per_beat
 
         if quantize_times:
@@ -93,10 +98,12 @@ class MusicTokenizer(_MusicTokenizer, ABC):
 
         # Process time signature changes
         # We need to do it before computing the ticks_per_beat sections
-        if quantize_time_signatures and self.config.use_time_signatures and len(score.time_signatures) > 0:
-            self._preprocess_time_signatures(
-                score.time_signatures, score.ticks_per_quarter
-            )
+        if (
+            quantize_time_signatures
+            and self.config.use_time_signatures
+            and len(score.time_signatures) > 0
+        ):
+            self._preprocess_time_signatures(score.time_signatures, score.ticks_per_quarter)
 
         # Compute resampling ratios to update times of events when several time sig,
         # and ticks per beat ratios.
@@ -105,7 +112,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         # ticks_per_beat ratios are used to adjust durations values according to the
         # tokenizer's vocabulary, i.e. *Duration* tokens.
         if not self._note_on_off or (
-                self.config.use_sustain_pedals and self.config.sustain_pedal_duration
+            self.config.use_sustain_pedals and self.config.sustain_pedal_duration
         ):
             if self.config.use_time_signatures and len(score.time_signatures) > 0:
                 ticks_per_beat = get_score_ticks_per_beat(score)
@@ -115,8 +122,8 @@ class MusicTokenizer(_MusicTokenizer, ABC):
             ticks_per_beat = None
 
         if (
-                self.config.use_time_signatures
-                and len({ts.denominator for ts in score.time_signatures}) > 1
+            self.config.use_time_signatures
+            and len({ts.denominator for ts in score.time_signatures}) > 1
         ):
             tpq_resampling_factors = self._get_score_resampling_factor(score)
         else:
@@ -127,9 +134,9 @@ class MusicTokenizer(_MusicTokenizer, ABC):
             # Delete track only there is nothing inside being used
             program = -1 if score.tracks[t].is_drum else score.tracks[t].program
             if is_track_empty(
-                    score.tracks[t],
-                    check_pedals=self.config.use_sustain_pedals,
-                    check_pitch_bend=self.config.use_pitch_bends,
+                score.tracks[t],
+                check_pedals=self.config.use_sustain_pedals,
+                check_pitch_bend=self.config.use_pitch_bends,
             ) or (self.config.use_programs and program not in self.config.programs):
                 del score.tracks[t]
                 continue
@@ -141,7 +148,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
                     tpq_resampling_factors,
                     ticks_per_beat,
                     quantize_times=quantize_times,
-                    quantize_velocities=quantize_velocities
+                    quantize_velocities=quantize_velocities,
                 )
 
             if quantize_times:
@@ -159,9 +166,9 @@ class MusicTokenizer(_MusicTokenizer, ABC):
 
             # Delete track only there is nothing inside being used
             if is_track_empty(
-                    score.tracks[t],
-                    check_pedals=self.config.use_sustain_pedals,
-                    check_pitch_bend=self.config.use_pitch_bends,
+                score.tracks[t],
+                check_pedals=self.config.use_sustain_pedals,
+                check_pitch_bend=self.config.use_pitch_bends,
             ):
                 del score.tracks[t]
                 continue
@@ -169,9 +176,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         # Process tempo changes
         if self.config.use_tempos:
             score.tempos = self._preprocess_tempos(
-                score.tempos,
-                tpq_resampling_factors,
-                quantize_tempos=quantize_tempos
+                score.tempos, tpq_resampling_factors, quantize_tempos=quantize_tempos
             )
 
         # We do not change key signature changes, markers and lyrics here as they are
@@ -186,7 +191,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         ticks_per_beat: np.ndarray = None,
         min_duration: int = 1,
         quantize_times: bool = True,
-        quantize_velocities: bool = True
+        quantize_velocities: bool = True,
     ) -> None:
         r"""
         Resample inplace the note velocities, remove notes outside of pitch range.
@@ -225,9 +230,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
             else self.config.pitch_range
         )
         idx_out_of_pitch_range = np.where(
-            np.logical_or(
-                note_soa["pitch"] < pitch_range[0], note_soa["pitch"] > pitch_range[1]
-            )
+            np.logical_or(note_soa["pitch"] < pitch_range[0], note_soa["pitch"] > pitch_range[1])
         )[0]
         if len(idx_out_of_pitch_range) > 0:
             mask = np.ones(len(note_soa["time"]), dtype=bool)
@@ -240,9 +243,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
 
         # Compute new velocities
         if self.config.use_velocities and quantize_velocities:
-            note_soa["velocity"] = find_closest(
-                self.velocities, np.array(note_soa["velocity"])
-            )
+            note_soa["velocity"] = find_closest(self.velocities, np.array(note_soa["velocity"]))
 
         # Adjust times if needed
         if quantize_times:
@@ -251,9 +252,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
                 resampling_factors = self._MusicTokenizer__convert_resampling_ratios_ticks_to_idx(
                     resampling_factors, note_soa["time"]
                 )
-                note_soa["time"] = self._adjust_time_to_tpb(
-                    note_soa["time"], resampling_factors
-                )
+                note_soa["time"] = self._adjust_time_to_tpb(note_soa["time"], resampling_factors)
 
             # Resample duration values if NoteOff, otherwise adjust to the vocab
             program = -1 if track.is_drum else track.program
@@ -264,9 +263,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
                     note_soa["duration"] = self._adjust_time_to_tpb(
                         note_soa["duration"], resampling_factors, min_duration
                     )
-                    self._adjust_offset_spanning_across_time_sig(
-                        note_soa, resampling_factors
-                    )
+                    self._adjust_offset_spanning_across_time_sig(note_soa, resampling_factors)
 
         # Symusic automatically sorts the notes by (time, duration, pitch) keys when
         # reading a music file. We hence don't need to sort the notes.
@@ -289,10 +286,10 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         track.notes = notes_new
 
     def _preprocess_tempos(
-            self,
-            tempos: TempoTickList,
-            resampling_factors: np.ndarray = None,
-            quantize_tempos: bool = True
+        self,
+        tempos: TempoTickList,
+        resampling_factors: np.ndarray = None,
+        quantize_tempos: bool = True,
     ) -> TempoTickList:
         r"""
         Resample the tempo values of tempo change events.
@@ -322,13 +319,13 @@ class MusicTokenizer(_MusicTokenizer, ABC):
 
         # Find the closest tempos
         if quantize_tempos:
-            tempos_soa["mspq"] = find_closest(self._tempos_mspq, tempos_soa["mspq"], return_values=True)
+            tempos_soa["mspq"] = find_closest(
+                self._tempos_mspq, tempos_soa["mspq"], return_values=True
+            )
 
         # Adjust times if needed
         if resampling_factors is not None:
-            tempos_soa["time"] = self._adjust_time_to_tpb(
-                tempos_soa["time"], resampling_factors
-            )
+            tempos_soa["time"] = self._adjust_time_to_tpb(tempos_soa["time"], resampling_factors)
 
         # Find groups of tempos at the same onset ticks, equal consecutive ones
         # Keep only last tempo change for groups with same tick
@@ -360,8 +357,8 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         # Make sure there is at least one tempo at tick 0
         if len(tempos) > 0:
             if (
-                    self.config.delete_equal_successive_tempo_changes
-                    and tempos[0].tempo == self.default_tempo
+                self.config.delete_equal_successive_tempo_changes
+                and tempos[0].tempo == self.default_tempo
             ):
                 tempos[0].time = 0
             elif tempos[0].time != 0:
@@ -372,16 +369,16 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         return tempos
 
     def _build_score(
-            self,
-            times: np.ndarray,
-            durations: np.ndarray,
-            pitches: np.ndarray,
-            velocities: np.array,
-            programs: np.ndarray | None,
-            time_signatures: list[TimeSignature] | None,
-            tempos: list[Tempo] | None,
-            time_division: int | None = None,
-            ttype: str = "tick"
+        self,
+        times: np.ndarray,
+        durations: np.ndarray,
+        pitches: np.ndarray,
+        velocities: np.array,
+        programs: np.ndarray | None,
+        time_signatures: list[TimeSignature] | None,
+        tempos: list[Tempo] | None,
+        time_division: int | None = None,
+        ttype: str = "tick",
     ) -> Score:
         r"""
         Build symusic.Score MIDI from the provided data.
@@ -400,7 +397,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
                 program=0 if program == -1 else program,
                 is_drum=program == -1,
                 name="Drums" if program == -1 else MIDI_INSTRUMENTS[program]["name"],
-                ttype=ttype
+                ttype=ttype,
             )
 
             program_ids = np.where(programs == program)[0]
@@ -409,7 +406,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
                 duration=durations[program_ids],
                 pitch=pitches[program_ids],
                 velocity=velocities[program_ids],
-                ttype=ttype
+                ttype=ttype,
             )
 
         score.tracks = list(tracks.values())
@@ -417,7 +414,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         return score
 
     def _ids_to_tokens(
-            self, ids: list[int | list[int]], as_str: bool = True
+        self, ids: list[int | list[int]], as_str: bool = True
     ) -> list[str | Event | list[str | Event]]:
         r"""
         Convert a sequence of ids (int) to their tokens format (str or Event).
@@ -437,10 +434,10 @@ class MusicTokenizer(_MusicTokenizer, ABC):
 
         if isinstance(ids[0], list) or isinstance(ids[0], np.ndarray):  # multiple vocabularies
             ids = np.array(ids) if isinstance(ids, list) else ids
-            tokens = np.stack([
-                np.array(list(self.vocab[i].keys()))[ids[:, i]]
-                for i in range(ids.shape[1])
-            ], axis=1)
+            tokens = np.stack(
+                [np.array(list(self.vocab[i].keys()))[ids[:, i]] for i in range(ids.shape[1])],
+                axis=1,
+            )
             return tokens.tolist()
 
         for id_ in ids:
@@ -458,19 +455,21 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         return {token: self[token] for token in self.special_tokens}
 
     def tokens_to_midi_messages(
-            self,
-            tokens: TokSequence,
-            context: TokSequenceContext | None = None,
-            note_attributes: bool = True,
-            note_on_events: bool = True,
-            note_off_events: bool = True,
-            sort: bool = True
+        self,
+        tokens: TokSequence,
+        context: TokSequenceContext | None = None,
+        note_attributes: bool = True,
+        note_on_events: bool = True,
+        note_off_events: bool = True,
+        sort: bool = True,
     ):
         assert note_on_events or note_off_events
         tokens = tokens.numpy()
 
-        note_on_times, note_off_times, pitches, velocities, new_context = self._tokens_to_midi_messages(
-            tokens=tokens, context=context, note_attributes=note_attributes
+        note_on_times, note_off_times, pitches, velocities, new_context = (
+            self._tokens_to_midi_messages(
+                tokens=tokens, context=context, note_attributes=note_attributes
+            )
         )
 
         messages = []
@@ -480,7 +479,11 @@ class MusicTokenizer(_MusicTokenizer, ABC):
             if note_on_events:
                 messages.append(np.stack([note_on_times, midi_msgs, pitches, velocities], axis=-1))
             if note_off_events:
-                messages.append(np.stack([note_off_times, midi_msgs, pitches, np.zeros(velocities.shape[0])], axis=-1))
+                messages.append(
+                    np.stack(
+                        [note_off_times, midi_msgs, pitches, np.zeros(velocities.shape[0])], axis=-1
+                    )
+                )
         else:
             if note_on_events:
                 messages.append(note_on_times)
@@ -495,10 +498,10 @@ class MusicTokenizer(_MusicTokenizer, ABC):
 
     @abstractmethod
     def _tokens_to_midi_messages(
-            self,
-            tokens: TokSequence,
-            context: TokSequenceContext | None = None,
-            note_attributes: bool = True
+        self,
+        tokens: TokSequence,
+        context: TokSequenceContext | None = None,
+        note_attributes: bool = True,
     ):
         raise NotImplementedError
 
@@ -511,17 +514,17 @@ class MusicTokenizer(_MusicTokenizer, ABC):
 
     @classmethod
     def _from_pretrained(
-            cls,
-            *,
-            model_id: str,
-            revision: str | None,
-            cache_dir: str | Path | None,
-            force_download: bool,
-            proxies: dict | None = None,
-            resume_download: bool = False,
-            local_files_only: bool,
-            token: str | bool | None,
-            **kwargs,
+        cls,
+        *,
+        model_id: str,
+        revision: str | None,
+        cache_dir: str | Path | None,
+        force_download: bool,
+        proxies: dict | None = None,
+        resume_download: bool = False,
+        local_files_only: bool,
+        token: str | bool | None,
+        **kwargs,
     ) -> MusicTokenizer:
         # Called by `ModelHubMixin.from_pretrained`
         pretrained_path = Path(model_id)
@@ -545,6 +548,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
                 )
 
                 import inspect
+
                 hf_download_params = inspect.signature(hf_hub_download).parameters
                 if "proxies" in hf_download_params:
                     hf_hub_kwargs["proxies"] = proxies

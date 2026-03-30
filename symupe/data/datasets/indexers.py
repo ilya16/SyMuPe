@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..tokenizers import TokSequence
+from symupe.data.tokenizers import TokSequence
 
 
 class TokenSequenceIndexer:
@@ -8,7 +8,7 @@ class TokenSequenceIndexer:
         self.tokenizer = tokenizer
 
     def compute_bar_indices(self, seq: np.ndarray) -> np.ndarray:
-        ...
+        raise NotImplementedError
 
 
 class TokenSequenceBarIndexer(TokenSequenceIndexer):

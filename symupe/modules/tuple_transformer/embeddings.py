@@ -1,4 +1,5 @@
-""" TupleTransformer's token and value embeddings. """
+"""TupleTransformer's token and value embeddings."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -10,8 +11,10 @@ from omegaconf import MISSING
 from symupe.data.tokenizers.constants import MASK_TOKEN, SOS_TOKEN, EOS_TOKEN
 from symupe.modules.constructor import Constructor, Registry, VariableModuleConfig
 from symupe.modules.transformer import (
-    DiscreteContinuousEmbedding, DiscreteSinusoidalEmbedding,
-    AttentionConfig, Attention
+    DiscreteContinuousEmbedding,
+    DiscreteSinusoidalEmbedding,
+    AttentionConfig,
+    Attention,
 )
 from symupe.utils import ExplicitEnum
 
@@ -50,35 +53,36 @@ class TupleTransformerEmbeddingsConfig(VariableModuleConfig):
 @TupleTransformerEmbeddingsRegistry.register("simple")
 class TupleTransformerEmbeddings(nn.Module, Constructor):
     def __init__(
-            self,
-            num_tokens: dict[str, int],
-            emb_dims: dict[str, int] | int,
-            mode: str = EmbeddingMode.CONCAT,
-            project_emb_dim: int | None = None,
-            project_bias: bool = True,
-            emb_norm: bool = False,
-            discrete: bool | list[str] = True,
-            continuous: bool | list[str] = False,
-            sinusoidal: bool | list[str] = False,
-            sinusoidal_learned: bool = False,
-            sinusoidal_dense: bool = False,
-            token_values: dict[str, list] | None = None,
-            num_first_discrete: int = 0,
-            special_tokens: dict[str, int] | None = None,
-            embedding_kwargs: dict | None = None,
-            tie_keys: dict[str, str] | None = None,
-            attention: AttentionConfig | None = None,
-            type_embeddings: bool = False
+        self,
+        num_tokens: dict[str, int],
+        emb_dims: dict[str, int] | int,
+        mode: str = EmbeddingMode.CONCAT,
+        project_emb_dim: int | None = None,
+        project_bias: bool = True,
+        emb_norm: bool = False,
+        discrete: bool | list[str] = True,
+        continuous: bool | list[str] = False,
+        sinusoidal: bool | list[str] = False,
+        sinusoidal_learned: bool = False,
+        sinusoidal_dense: bool = False,
+        token_values: dict[str, list] | None = None,
+        num_first_discrete: int = 0,
+        special_tokens: dict[str, int] | None = None,
+        embedding_kwargs: dict | None = None,
+        tie_keys: dict[str, str] | None = None,
+        attention: AttentionConfig | None = None,
+        type_embeddings: bool = False,
     ):
         super().__init__()
 
         self.mode = mode
 
         if self.mode == EmbeddingMode.SUM or attention is not None:
-            assert (
-                    isinstance(emb_dims, int)
-                    or all([emb_dim == list(emb_dims.values())[0] for emb_dim in emb_dims.values()])
-            ), "`emb_dims` in TupleTokenEmbeddings' `sum`/`attention` mode should be the same for all keys."
+            assert isinstance(emb_dims, int) or all(
+                [emb_dim == list(emb_dims.values())[0] for emb_dim in emb_dims.values()]
+            ), (
+                "`emb_dims` in TupleTokenEmbeddings' `sum`/`attention` mode should be the same for all keys."
+            )
 
         if isinstance(discrete, bool):
             discrete_keys = [key for key in num_tokens] if discrete else []
@@ -96,9 +100,14 @@ class TupleTransformerEmbeddings(nn.Module, Constructor):
             sinusoidal_keys = sinusoidal
 
         for key in num_tokens:
-            assert not (key in continuous_keys and key in sinusoidal_keys), \
+            assert not (key in continuous_keys and key in sinusoidal_keys), (
                 f"Embedding for token type `{key}` should be either Continuous or Sinusoidal."
-            if key not in continuous_keys and key not in sinusoidal_keys and key not in discrete_keys:
+            )
+            if (
+                key not in continuous_keys
+                and key not in sinusoidal_keys
+                and key not in discrete_keys
+            ):
                 discrete_keys.append(key)
 
         token_values = token_values or {}
@@ -121,7 +130,7 @@ class TupleTransformerEmbeddings(nn.Module, Constructor):
                     num_first_discrete=num_first_discrete,
                     token_values=token_values.get(key, None),
                     padding_idx=0,
-                    **embedding_kwargs
+                    **embedding_kwargs,
                 )
             elif key in sinusoidal_keys:
                 sinusoidal_learned = sinusoidal_learned or sinusoidal_dense
@@ -133,11 +142,13 @@ class TupleTransformerEmbeddings(nn.Module, Constructor):
                     num_first_discrete=num_first_discrete,
                     token_values=token_values.get(key, None),
                     padding_idx=0,
-                    **embedding_kwargs
+                    **embedding_kwargs,
                 )
             else:
                 embeddings[key] = nn.Embedding(num, emb_dim, padding_idx=0)
-            total_emb_dim += emb_dim if self.mode == EmbeddingMode.CONCAT else emb_dim - total_emb_dim
+            total_emb_dim += (
+                emb_dim if self.mode == EmbeddingMode.CONCAT else emb_dim - total_emb_dim
+            )
 
         self.embs = nn.ModuleDict(embeddings)
         self.norm = nn.LayerNorm(total_emb_dim) if emb_norm else nn.Identity()
@@ -153,7 +164,7 @@ class TupleTransformerEmbeddings(nn.Module, Constructor):
             self.attention = Attention.init(
                 attention,
                 dim=emb_dim,
-                causal=False
+                causal=False,
             )
 
         self.type_embeddings = None
@@ -189,28 +200,25 @@ class TupleTransformerEmbeddings(nn.Module, Constructor):
             nn.init.xavier_uniform_(self.project_emb.weight)
 
     def _forward_embeddings(
-            self,
-            x: torch.Tensor,
-            values: torch.Tensor | None = None,
-            keys: list[str] | None = None
+        self,
+        x: torch.Tensor,
+        values: torch.Tensor | None = None,
+        keys: list[str] | None = None,
     ) -> dict[str, torch.Tensor]:
         keys = keys or self.embs.keys()
         return {
             key: self.embs[key](x[..., i], values=values[..., i] if values is not None else values)
-            if key in self.continuous_keys or key in self.sinusoidal_keys else self.embs[key](x[..., i])
+            if key in self.continuous_keys or key in self.sinusoidal_keys
+            else self.embs[key](x[..., i])
             for i, key in enumerate(keys)
         }
 
-    def _forward_project(
-            self,
-            token_embs: dict[str, torch.Tensor]
-    ) -> torch.Tensor:
+    def _forward_project(self, token_embs: dict[str, torch.Tensor]) -> torch.Tensor:
         token_embs = list(token_embs.values())
 
         if self.type_embeddings is not None:
             token_embs = [
-                token_emb + self.type_embeddings[i]
-                for i, token_emb in enumerate(token_embs)
+                token_emb + self.type_embeddings[i] for i, token_emb in enumerate(token_embs)
             ]
 
         if self.attention is not None:
@@ -233,15 +241,15 @@ class TupleTransformerEmbeddings(nn.Module, Constructor):
         return self.project_emb(self.norm(total_token_emb))
 
     def forward(
-            self,
-            tokens: torch.Tensor,
-            values: torch.Tensor | None = None,
-            cache: torch.Tensor | None = None,
-            return_embeddings: bool = False
+        self,
+        tokens: torch.Tensor,
+        values: torch.Tensor | None = None,
+        cache: torch.Tensor | None = None,
+        return_embeddings: bool = False,
     ) -> torch.Tensor | tuple[torch.Tensor, dict[str, torch.Tensor]]:
         if cache is not None:
-            tokens = tokens[:, cache.shape[1]:]
-            values = values[:, cache.shape[1]:] if values is not None else values
+            tokens = tokens[:, cache.shape[1] :]
+            values = values[:, cache.shape[1] :] if values is not None else values
 
         token_embs = self._forward_embeddings(tokens, values)
         token_emb = self._forward_project(token_embs)
@@ -271,25 +279,25 @@ class MultiSeqTupleTransformerEmbeddingsConfig(TupleTransformerEmbeddingsConfig)
 @TupleTransformerEmbeddingsRegistry.register("multi-seq")
 class MultiSeqTupleTransformerEmbeddings(TupleTransformerEmbeddings):
     def __init__(
-            self,
-            num_tokens: dict[str, int],
-            emb_dims: dict[str, int] | int,
-            mode: str = EmbeddingMode.CONCAT,
-            project_emb_dim: int | None = None,
-            project_bias: bool = True,
-            emb_norm: bool = False,
-            discrete: bool | list[str] = True,
-            continuous: bool | list[str] = False,
-            sinusoidal: bool | list[str] = False,
-            sinusoidal_learned: bool = False,
-            sinusoidal_dense: bool = False,
-            token_values: dict[str, list] | None = None,
-            num_first_discrete: int = 0,
-            special_tokens: dict[str, int] | None = None,
-            embedding_kwargs: dict | None = None,
-            tie_keys: dict[str, str] | None = None,
-            multi_mode: str = MultiSeqEmbeddingMode.PRE_SUM,
-            num_sequences: int = 2
+        self,
+        num_tokens: dict[str, int],
+        emb_dims: dict[str, int] | int,
+        mode: str = EmbeddingMode.CONCAT,
+        project_emb_dim: int | None = None,
+        project_bias: bool = True,
+        emb_norm: bool = False,
+        discrete: bool | list[str] = True,
+        continuous: bool | list[str] = False,
+        sinusoidal: bool | list[str] = False,
+        sinusoidal_learned: bool = False,
+        sinusoidal_dense: bool = False,
+        token_values: dict[str, list] | None = None,
+        num_first_discrete: int = 0,
+        special_tokens: dict[str, int] | None = None,
+        embedding_kwargs: dict | None = None,
+        tie_keys: dict[str, str] | None = None,
+        multi_mode: str = MultiSeqEmbeddingMode.PRE_SUM,
+        num_sequences: int = 2,
     ):
         super().__init__(
             num_tokens=num_tokens,
@@ -307,7 +315,7 @@ class MultiSeqTupleTransformerEmbeddings(TupleTransformerEmbeddings):
             num_first_discrete=num_first_discrete,
             special_tokens=special_tokens,
             embedding_kwargs=embedding_kwargs,
-            tie_keys=tie_keys
+            tie_keys=tie_keys,
         )
 
         self.multi_mode = multi_mode
@@ -317,22 +325,24 @@ class MultiSeqTupleTransformerEmbeddings(TupleTransformerEmbeddings):
             self.project_multiemb = nn.Linear(num_sequences * project_emb_dim, project_emb_dim)
 
     def forward(
-            self,
-            tokens: torch.Tensor | list[torch.Tensor],
-            values: torch.Tensor | list[torch.Tensor] | None = None,
-            cache: torch.Tensor | None = None,
-            return_embeddings: bool = False
+        self,
+        tokens: torch.Tensor | list[torch.Tensor],
+        values: torch.Tensor | list[torch.Tensor] | None = None,
+        cache: torch.Tensor | None = None,
+        return_embeddings: bool = False,
     ) -> torch.Tensor | tuple[torch.Tensor, list[dict[str, torch.Tensor]]]:
         if isinstance(tokens, list) and len(tokens) == 1:
             tokens = tokens[0]
             values = values[0] if isinstance(values, list) else values
 
         if isinstance(tokens, torch.Tensor):
-            return super().forward(tokens, values=values, cache=cache, return_embeddings=return_embeddings)
+            return super().forward(
+                tokens, values=values, cache=cache, return_embeddings=return_embeddings
+            )
 
         if cache is not None:
-            tokens = [t[:, cache.shape[1]:] for t in tokens]
-            values = [v[:, cache.shape[1]:] for v in values] if values is not None else values
+            tokens = [t[:, cache.shape[1] :] for t in tokens]
+            values = [v[:, cache.shape[1] :] for v in values] if values is not None else values
 
         tokens = torch.stack(tokens, dim=0)
         values = torch.stack(values, dim=0) if values is not None else None
@@ -344,10 +354,7 @@ class MultiSeqTupleTransformerEmbeddings(TupleTransformerEmbeddings):
                 for key, token_emb in token_embs.items()
             }
 
-            total_token_embs = {
-                key: sum(token_embs[key])
-                for key in token_embs
-            }
+            total_token_embs = {key: sum(token_embs[key]) for key in token_embs}
             token_emb = self._forward_project(total_token_embs)
         elif self.multi_mode.startswith("post"):
             token_embs = [
@@ -380,7 +387,9 @@ def complex_log(float_input: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
     return torch.complex(real, imag)
 
 
-def associative_scan(values: torch.Tensor, coeffs: torch.Tensor, dim: int = -1, decimals: int = 4) -> torch.Tensor:
+def associative_scan(
+    values: torch.Tensor, coeffs: torch.Tensor, dim: int = -1, decimals: int = 4
+) -> torch.Tensor:
     # https://github.com/pytorch/pytorch/issues/53095
     log_values = complex_log(values.float())
     log_coeffs = complex_log(coeffs.float())
@@ -407,16 +416,16 @@ class PositionTupleTransformerEmbeddingsConfig(VariableModuleConfig):
 @TupleTransformerEmbeddingsRegistry.register("position")
 class PositionTupleTransformerEmbeddings(nn.Module, Constructor):
     def __init__(
-            self,
-            token_dims: dict[str, int],
-            emb_dims: dict[str, int] | int,
-            prefix: bool = True,
-            interval: bool = True,
-            project_emb_dim: int = 512,
-            emb_norm: bool = False,
-            sinusoidal_learned: bool = True,
-            special_tokens: dict[str, int] | None = None,
-            embedding_kwargs: dict | None = None
+        self,
+        token_dims: dict[str, int],
+        emb_dims: dict[str, int] | int,
+        prefix: bool = True,
+        interval: bool = True,
+        project_emb_dim: int = 512,
+        emb_norm: bool = False,
+        sinusoidal_learned: bool = True,
+        special_tokens: dict[str, int] | None = None,
+        embedding_kwargs: dict | None = None,
     ):
         super().__init__()
 
@@ -441,7 +450,7 @@ class PositionTupleTransformerEmbeddings(nn.Module, Constructor):
                 learned=sinusoidal_learned,
                 num_first_discrete=num_first_discrete,
                 padding_idx=0,
-                **embedding_kwargs
+                **embedding_kwargs,
             )
 
             total_emb_dim += emb_dim * num_sequences
@@ -472,43 +481,40 @@ class PositionTupleTransformerEmbeddings(nn.Module, Constructor):
         nn.init.normal_(self.project_emb.weight, std=1e-2)
 
     def _forward_embeddings(
-            self,
-            x: torch.Tensor,
-            values: torch.Tensor,
-            label: str
+        self,
+        x: torch.Tensor,
+        values: torch.Tensor,
+        label: str,
     ) -> dict[str, torch.Tensor]:
         return {
             f"{key}/{label}": emb(x[..., i], values=values[..., i])
             for i, (key, emb) in enumerate(self.embs.items())
         }
 
-    def _forward_project(
-            self,
-            token_embs: dict[str, torch.Tensor]
-    ) -> torch.Tensor:
+    def _forward_project(self, token_embs: dict[str, torch.Tensor]) -> torch.Tensor:
         token_embs = list(token_embs.values())
         total_token_emb = torch.cat(token_embs, dim=-1)
         return self.project_emb(self.norm(total_token_emb))
 
     def forward(
-            self,
-            tokens: torch.Tensor,
-            values: torch.Tensor,
-            cache: torch.Tensor | None = None,
-            return_embeddings: bool = False
+        self,
+        tokens: torch.Tensor,
+        values: torch.Tensor,
+        cache: torch.Tensor | None = None,
+        return_embeddings: bool = False,
     ) -> torch.Tensor | tuple[torch.Tensor, dict[str, torch.Tensor]]:
         assert values is not None, "`values` should be used with PositionTupleTokenEmbeddings"
 
         if cache is not None:
-            tokens = tokens[:, cache.shape[1]:]
-            values = values[:, cache.shape[1]:]
+            tokens = tokens[:, cache.shape[1] :]
+            values = values[:, cache.shape[1] :]
 
         tokens = tokens[..., self.token_dims]
         values = values[..., self.token_dims].clone()
 
         special_mask = tokens <= self.num_first_discrete
         tokens = tokens.masked_fill(~special_mask, self.num_first_discrete)
-        values[special_mask] = 0.
+        values[special_mask] = 0.0
         special_mask &= (tokens != self.sos_token_id) * (tokens != self.eos_token_id)
 
         pos_embs = {}
@@ -516,10 +522,12 @@ class PositionTupleTransformerEmbeddings(nn.Module, Constructor):
             unknown_mask = torch.cumsum(special_mask, dim=1).bool()
 
             pos_known = torch.cumsum(values, dim=1)
-            pos_known[unknown_mask] = 0.
+            pos_known[unknown_mask] = 0.0
 
             tokens_known = tokens.clone()
-            tokens_known[unknown_mask * (tokens_known == self.num_first_discrete)] = self.mask_token_id
+            tokens_known[unknown_mask * (tokens_known == self.num_first_discrete)] = (
+                self.mask_token_id
+            )
 
             prefix_pos_embs = self._forward_embeddings(tokens_known, pos_known, "prefix")
             pos_embs.update(**prefix_pos_embs)

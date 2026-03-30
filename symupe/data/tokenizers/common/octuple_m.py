@@ -4,6 +4,7 @@ introduced in MusicBERT https://arxiv.org/abs/2106.05630
 
 Reimagines the Octuple tokenizer in MidiTok package (https://github.com/Natooz/MidiTok)
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -23,8 +24,11 @@ from ..classes import TokSequence, SequenceType, EncodingType, TokSequenceContex
 from ..constants import (
     TICKS_PER_QUARTER,
     SPECIAL_TOKENS_VALUE,
-    MASK_TOKEN, SOS_TOKEN, EOS_TOKEN, IGNORE_TOKEN,
-    BAR_LINE_TOKEN
+    MASK_TOKEN,
+    SOS_TOKEN,
+    EOS_TOKEN,
+    IGNORE_TOKEN,
+    BAR_LINE_TOKEN,
 )
 from ..midi_tokenizer import MusicTokenizer
 from ...midi.beats import get_bar_beat_ticks
@@ -55,7 +59,9 @@ class OctupleM(MusicTokenizer):
         self.config.use_pitchdrum_tokens = False
         self.config.delete_equal_successive_tempo_changes = True
         self.config.delete_equal_successive_time_sig_changes = True
-        self.one_token_stream = self.config.one_token_stream_for_programs  # override miditok's configuration
+
+        # override miditok's configuration
+        self.one_token_stream = self.config.one_token_stream_for_programs
         self._disable_attribute_controls()
 
         additional_params = self.config.additional_params
@@ -73,7 +79,9 @@ class OctupleM(MusicTokenizer):
         additional_params["compound_time_signature"] = additional_params.get(
             "compound_time_signature", additional_params.get("compound_time_signatures", False)
         )
-        additional_params["time_signature_max_position"] = additional_params.get("time_signature_max_position", False)
+        additional_params["time_signature_max_position"] = additional_params.get(
+            "time_signature_max_position", False
+        )
 
         # data preprocessing
         additional_params["fill_unperformed_notes"] = True
@@ -88,7 +96,10 @@ class OctupleM(MusicTokenizer):
 
         :param midi: MIDI object to preprocess
         """
-        if self.config.additional_params["fill_unperformed_notes"] and midi.tracks[-1].name != UNPERFORMED_TRACK_NAME:
+        if (
+            self.config.additional_params["fill_unperformed_notes"]
+            and midi.tracks[-1].name != UNPERFORMED_TRACK_NAME
+        ):
             notes = []
             for m in midi.markers:
                 if m.text.startswith("NoteS"):
@@ -101,12 +112,12 @@ class OctupleM(MusicTokenizer):
         return midi
 
     def preprocess_score(
-            self,
-            score: Score,
-            quantize_times: bool = True,
-            quantize_velocities: bool = True,
-            quantize_time_signatures: bool = True,
-            quantize_tempos: bool = True
+        self,
+        score: Score,
+        quantize_times: bool = True,
+        quantize_velocities: bool = True,
+        quantize_time_signatures: bool = True,
+        quantize_tempos: bool = True,
     ) -> Score:
         r"""
         Pre-process a ``symusic.Score`` to be used by OctupleM encoding.
@@ -126,12 +137,10 @@ class OctupleM(MusicTokenizer):
             quantize_times=quantize_times,
             quantize_velocities=quantize_velocities,
             quantize_time_signatures=quantize_time_signatures,
-            quantize_tempos=quantize_tempos
+            quantize_tempos=quantize_tempos,
         )
 
-    def _add_time_events(
-            self, events: list[Event], time_division: int
-    ) -> list[list[Event]]:
+    def _add_time_events(self, events: list[Event], time_division: int) -> list[list[Event]]:
         r"""
         Create the time events from a list of global and track events.
 
@@ -144,9 +153,9 @@ class OctupleM(MusicTokenizer):
         ...
 
     def midi_to_tokens(
-            self,
-            midi: Score,
-            apply_bpe: bool = True,
+        self,
+        midi: Score,
+        apply_bpe: bool = True,
     ) -> TokSequence | list[TokSequence]:
         r"""
         Tokenize a MIDI file.
@@ -164,7 +173,7 @@ class OctupleM(MusicTokenizer):
             midi,
             quantize_times=False,
             quantize_velocities=False,
-            quantize_tempos=False
+            quantize_tempos=False,
         )
 
         # Sort notes and compute note order change
@@ -185,9 +194,9 @@ class OctupleM(MusicTokenizer):
         return tokens
 
     def _score_to_tokens(
-            self,
-            score: Score,
-            attribute_controls_indexes: Mapping[int, Mapping[int, Sequence[int] | bool]] | None = None
+        self,
+        score: Score,
+        attribute_controls_indexes: Mapping[int, Mapping[int, Sequence[int] | bool]] | None = None,
     ) -> TokSequence | list[TokSequence]:
         r"""
         Convert a **preprocessed** file object to a sequence of tokens.
@@ -218,21 +227,27 @@ class OctupleM(MusicTokenizer):
             velocity_values = note_soa["velocity"]
             duration_values = note_soa["duration"] / ticks_per_sample
 
-            track_values = np.stack([
-                bar_values,
-                pos_values,
-                pitch_values,
-                duration_values,
-                velocity_values,
-            ], axis=1)
+            track_values = np.stack(
+                [
+                    bar_values,
+                    pos_values,
+                    pitch_values,
+                    duration_values,
+                    velocity_values,
+                ],
+                axis=1,
+            )
 
             if self.config.use_tempos:
                 tempo_soa = score.tempos.numpy()
                 tempo_ids = np.minimum(
-                    np.searchsorted(tempo_soa["time"], ticks, side="right") - 1, tempo_soa["time"].shape[0] - 1
+                    np.searchsorted(tempo_soa["time"], ticks, side="right") - 1,
+                    tempo_soa["time"].shape[0] - 1,
                 )
                 tempo_values = tempo_qpm_to_mspq(tempo_soa["mspq"])
-                track_values = np.concatenate([track_values, tempo_values[tempo_ids][:, None]], axis=1)
+                track_values = np.concatenate(
+                    [track_values, tempo_values[tempo_ids][:, None]], axis=1
+                )
 
             if self.config.use_time_signatures:
                 ts_soa = score.time_signatures.numpy()
@@ -240,22 +255,36 @@ class OctupleM(MusicTokenizer):
 
                 if self.config.additional_params["compound_time_signature"]:
                     beat_values = np.array([1 / denom for denom in ts_soa["denominator"]])
-                    track_values = np.concatenate([track_values, beat_values[ts_ids][:, None]], axis=1)
+                    track_values = np.concatenate(
+                        [track_values, beat_values[ts_ids][:, None]], axis=1
+                    )
 
                     if self.config.additional_params["time_signature_max_position"]:
-                        num_quarters = np.array([
-                            4 * num / denom for num, denom in zip(ts_soa["numerator"], ts_soa["denominator"])
-                        ])
+                        num_quarters = np.array(
+                            [
+                                4 * num / denom
+                                for num, denom in zip(ts_soa["numerator"], ts_soa["denominator"])
+                            ]
+                        )
                         max_position_values = num_quarters * self.config.max_num_pos_per_beat
-                        track_values = np.concatenate([track_values, max_position_values[ts_ids][:, None]], axis=1)
+                        track_values = np.concatenate(
+                            [track_values, max_position_values[ts_ids][:, None]], axis=1
+                        )
                     else:
                         num_beats_values = np.array([num for num in ts_soa["numerator"]])
-                        track_values = np.concatenate([track_values, num_beats_values[ts_ids][:, None]], axis=1)
+                        track_values = np.concatenate(
+                            [track_values, num_beats_values[ts_ids][:, None]], axis=1
+                        )
                 else:
-                    ts_values = np.array([
-                        num + 1 / denom for num, denom in zip(ts_soa["numerator"], ts_soa["denominator"])
-                    ])
-                    track_values = np.concatenate([track_values, ts_values[ts_ids][:, None]], axis=1)
+                    ts_values = np.array(
+                        [
+                            num + 1 / denom
+                            for num, denom in zip(ts_soa["numerator"], ts_soa["denominator"])
+                        ]
+                    )
+                    track_values = np.concatenate(
+                        [track_values, ts_values[ts_ids][:, None]], axis=1
+                    )
 
             if self.config.use_programs:
                 program_values = np.full_like(track_values[0], fill_value=track.program)
@@ -268,9 +297,12 @@ class OctupleM(MusicTokenizer):
             tokens = self.encode_tokens(values)
 
             if self.config.use_programs:
-                sort_ids = np.lexsort([
-                    tokens[:, 2], tokens[:, self.vocab_types_idx["Program"], tokens[:, 1], tokens[:, 0]]
-                ])
+                sort_ids = np.lexsort(
+                    [
+                        tokens[:, 2],
+                        tokens[:, self.vocab_types_idx["Program"], tokens[:, 1], tokens[:, 0]],
+                    ]
+                )
             else:
                 sort_ids = np.lexsort([tokens[:, 2], tokens[:, 1], tokens[:, 0]])
             values, tokens = values[sort_ids], tokens[sort_ids]
@@ -285,20 +317,22 @@ class OctupleM(MusicTokenizer):
             values=values,
             type=SequenceType.SCORE,
             encoding=EncodingType.SCORE,
-            vocab={ttype: idx for ttype, idx in self.vocab_types_idx.items() if idx < len(tokens[0])},
+            vocab={
+                ttype: idx for ttype, idx in self.vocab_types_idx.items() if idx < len(tokens[0])
+            },
             meta={
                 "time_division": score.ticks_per_quarter,
-                "bars": int(tokens[-1, self.vocab_types_idx["Bar"]] - self.zero_token + 1)
-            }
+                "bars": int(tokens[-1, self.vocab_types_idx["Bar"]] - self.zero_token + 1),
+            },
         )
 
         return tok_sequence
 
     def decode_note_positions(
-            self,
-            tokens: TokSequence,
-            context: TokSequenceContext | None = None,
-            time_division: int | None = TICKS_PER_QUARTER
+        self,
+        tokens: TokSequence,
+        context: TokSequenceContext | None = None,
+        time_division: int | None = TICKS_PER_QUARTER,
     ) -> tuple[dict[str, any], TokSequenceContext]:
         time_division = time_division or self.time_division
 
@@ -324,9 +358,12 @@ class OctupleM(MusicTokenizer):
         )
 
         note_on_times, note_off_times = self._decode_note_times(
-            note_on_ticks, note_off_ticks,
-            tempos, tempo_ticks, tempo_times,
-            time_division=time_division
+            note_on_ticks,
+            note_off_ticks,
+            tempos,
+            tempo_ticks,
+            tempo_times,
+            time_division=time_division,
         )
 
         position_data = {
@@ -335,7 +372,7 @@ class OctupleM(MusicTokenizer):
             "note_off_ticks": note_off_ticks,
             "note_on_times": note_on_times,
             "note_off_times": note_off_times,
-            "tempos": (tempos, tempo_ticks, tempo_times)
+            "tempos": (tempos, tempo_ticks, tempo_times),
         }
 
         # Build new context
@@ -345,7 +382,9 @@ class OctupleM(MusicTokenizer):
             tempo_times = np.concatenate([prev_tempo_times, tempo_times[1:]], axis=0)
 
         # remove duplicates by ticks and tempos
-        tempos, tempo_ticks, tempo_times = self._filter_equal_tempos(tempos, tempo_ticks, tempo_times)
+        tempos, tempo_ticks, tempo_times = self._filter_equal_tempos(
+            tempos, tempo_ticks, tempo_times
+        )
 
         def extend_context(prev_data, new_data):
             return np.concatenate([prev_data, new_data]) if prev_data is not None else new_data
@@ -361,14 +400,14 @@ class OctupleM(MusicTokenizer):
         return position_data, new_context
 
     def _decode_tempos(
-            self,
-            tempo_values: np.ndarray,
-            prev_tempos: np.ndarray,
-            prev_tempo_ticks: np.ndarray,
-            prev_tempo_times: np.ndarray,
-            beat_ticks: np.ndarray,
-            score_ticks: np.ndarray,
-            time_division: int | None = None
+        self,
+        tempo_values: np.ndarray,
+        prev_tempos: np.ndarray,
+        prev_tempo_ticks: np.ndarray,
+        prev_tempo_times: np.ndarray,
+        beat_ticks: np.ndarray,
+        score_ticks: np.ndarray,
+        time_division: int | None = None,
     ):
         time_division = time_division or self.time_division
 
@@ -381,45 +420,51 @@ class OctupleM(MusicTokenizer):
             tempos = np.concatenate([[prev_tempos[-1]], tempos])
 
         prev_tempo_tick = 0 if prev_tempo_ticks is None else prev_tempo_ticks[-1]
-        prev_tempo_time = 0. if prev_tempo_times is None else prev_tempo_times[-1]
+        prev_tempo_time = 0.0 if prev_tempo_times is None else prev_tempo_times[-1]
 
         # Tempo ticks and Tempo changes
         tempo_ticks = score_ticks[tempo_indices]  # Note: position at the start of the beat
-        tempo_ticks = beat_ticks[np.minimum(
-            np.searchsorted(beat_ticks, tempo_ticks, side="right") - 1, beat_ticks.shape[0] - 1
-        )]
+        tempo_ticks = beat_ticks[
+            np.minimum(
+                np.searchsorted(beat_ticks, tempo_ticks, side="right") - 1, beat_ticks.shape[0] - 1
+            )
+        ]
         tempo_ticks[0] = prev_tempo_tick
 
         if start_tempo_change:
-            tempo_ticks = np.concatenate([
-                [tempo_ticks[0]],
-                [beat_ticks[np.minimum(
-                    np.searchsorted(beat_ticks, score_ticks[0], side="right") - 1, beat_ticks.shape[0] - 1
-                )]],
-                tempo_ticks[1:]
-            ])
+            new_tempo_tick = beat_ticks[
+                np.minimum(
+                    np.searchsorted(beat_ticks, score_ticks[0], side="right") - 1,
+                    beat_ticks.shape[0] - 1,
+                )
+            ]
+            tempo_ticks = np.concatenate([[tempo_ticks[0]], [new_tempo_tick], tempo_ticks[1:]])
 
         tempo_times = np.cumsum(
-            np.concatenate([[prev_tempo_time], np.diff(tempo_ticks) / time_division * 60 / tempos[:-1]])
+            np.concatenate(
+                [[prev_tempo_time], np.diff(tempo_ticks) / time_division * 60 / tempos[:-1]]
+            )
         )
 
         return tempos, tempo_ticks, tempo_times
 
     def _decode_note_times(
-            self,
-            note_on_ticks,
-            note_off_ticks,
-            tempos: np.ndarray,
-            tempo_ticks: np.ndarray,
-            tempo_times: np.ndarray,
-            time_division: int | None = None
+        self,
+        note_on_ticks,
+        note_off_ticks,
+        tempos: np.ndarray,
+        tempo_ticks: np.ndarray,
+        tempo_times: np.ndarray,
+        time_division: int | None = None,
     ):
         time_division = time_division or self.time_division
 
         note_ticks = np.concatenate([note_on_ticks, note_off_ticks])
 
         tempo_ids = np.searchsorted(tempo_ticks, note_ticks, side="right") - 1
-        _tempos, _tempo_ticks, _tempo_times = map(lambda t: t[tempo_ids], (tempos, tempo_ticks, tempo_times))
+        _tempos, _tempo_ticks, _tempo_times = map(
+            lambda t: t[tempo_ids], (tempos, tempo_ticks, tempo_times)
+        )
         note_times = _tempo_times + (note_ticks - _tempo_ticks) / time_division * 60 / _tempos
 
         note_on_times, note_off_times = np.split(note_times, 2)
@@ -427,26 +472,26 @@ class OctupleM(MusicTokenizer):
         return note_on_times, note_off_times
 
     @staticmethod
-    def _filter_equal_tempos(
-            tempos: np.ndarray,
-            tempo_ticks: np.ndarray,
-            tempo_times: np.ndarray
-    ):
+    def _filter_equal_tempos(tempos: np.ndarray, tempo_ticks: np.ndarray, tempo_times: np.ndarray):
         # remove duplicates by ticks and tempos
         _tempo_ticks = np.concatenate([tempo_ticks, [-1]])
         mask = (_tempo_ticks[1:] - _tempo_ticks[:-1]) != 0
-        tempos, tempo_ticks, tempo_times = map(lambda t: t[mask], (tempos, tempo_ticks, tempo_times))
+        tempos, tempo_ticks, tempo_times = map(
+            lambda t: t[mask], (tempos, tempo_ticks, tempo_times)
+        )
 
         _tempos = np.concatenate([[-1], tempos])
         mask = (_tempos[1:] - _tempos[:-1]) != 0
-        tempos, tempo_ticks, tempo_times = map(lambda t: t[mask], (tempos, tempo_ticks, tempo_times))
+        tempos, tempo_ticks, tempo_times = map(
+            lambda t: t[mask], (tempos, tempo_ticks, tempo_times)
+        )
 
         return tempos, tempo_ticks, tempo_times
 
     def _tokens_to_score(
-            self,
-            tokens: TokSequence | list[TokSequence],
-            programs: list[tuple[int, bool]] | None = None
+        self,
+        tokens: TokSequence | list[TokSequence],
+        programs: list[tuple[int, bool]] | None = None,
     ) -> Score:
         r"""
         Convert tokens (:class:`miditok.TokSequence`) into a ``symusic.Score``.
@@ -474,7 +519,7 @@ class OctupleM(MusicTokenizer):
         time_signatures = TimeSignature.from_numpy(
             time=time_sig_ticks,
             numerator=time_sigs[:, 0],
-            denominator=time_sigs[:, 1]
+            denominator=time_sigs[:, 1],
         )
 
         # Process Tempo changes
@@ -486,8 +531,11 @@ class OctupleM(MusicTokenizer):
             if len(tempos) > 0:
                 # Get beat ticks to tie Tempo change to them
                 beat_ticks = ticks_data["beat"]
-                tempo_ticks = note_on_ticks[tempo_indices]  # Note: position at the start of the beat
-                tempo_ticks = beat_ticks[np.minimum(np.searchsorted(beat_ticks, tempo_ticks), beat_ticks.shape[0] - 1)]
+                # Note: position at the start of the beat
+                tempo_ticks = note_on_ticks[tempo_indices]
+                tempo_ticks = beat_ticks[
+                    np.minimum(np.searchsorted(beat_ticks, tempo_ticks), beat_ticks.shape[0] - 1)
+                ]
                 tempo_ticks[0] = 0
             else:
                 tempo_ticks = [0]
@@ -497,23 +545,31 @@ class OctupleM(MusicTokenizer):
             tempos = [Tempo(time=0, qpm=TEMPO)]
 
         # Process Programs
-        programs = self.get_values(tokens, "Program", from_ids=True) if self.config.use_programs else None
+        programs = (
+            self.get_values(tokens, "Program", from_ids=True) if self.config.use_programs else None
+        )
 
         score = self._build_score(
-            times=note_on_ticks, durations=durations, pitches=pitches, velocities=velocities,
-            programs=programs, time_signatures=time_signatures, tempos=tempos,
-            time_division=time_division, ttype="tick"
+            times=note_on_ticks,
+            durations=durations,
+            pitches=pitches,
+            velocities=velocities,
+            programs=programs,
+            time_signatures=time_signatures,
+            tempos=tempos,
+            time_division=time_division,
+            ttype="tick",
         )
         return score
 
     def _tokens_to_midi_messages(
-            self,
-            tokens: TokSequence,
-            context: TokSequenceContext | None = None,
-            note_attributes: bool = True,
-            note_on_events: bool = True,
-            note_off_events: bool = True,
-            sort: bool = True
+        self,
+        tokens: TokSequence,
+        context: TokSequenceContext | None = None,
+        note_attributes: bool = True,
+        note_on_events: bool = True,
+        note_off_events: bool = True,
+        sort: bool = True,
     ):
         position_data, new_context = self.decode_note_positions(tokens=tokens, context=context)
 
@@ -536,11 +592,13 @@ class OctupleM(MusicTokenizer):
         """
         vocab = tokens.vocab or self.vocab_types_idx
 
-        sort_ids = np.lexsort((
-            tokens.ids[:, vocab["Pitch"]],
-            tokens.ids[:, vocab["Position"]],
-            tokens.ids[:, vocab["Bar"]]
-        ))
+        sort_ids = np.lexsort(
+            (
+                tokens.ids[:, vocab["Pitch"]],
+                tokens.ids[:, vocab["Position"]],
+                tokens.ids[:, vocab["Bar"]],
+            )
+        )
 
         tokens.ids = tokens.ids[sort_ids]
         if tokens.values is not None:
@@ -566,7 +624,9 @@ class OctupleM(MusicTokenizer):
         vocab = []
 
         # BAR
-        vocab.append([f"Bar_{i}" for i in range(self.config.additional_params["real_max_bar_embedding"])])
+        vocab.append(
+            [f"Bar_{i}" for i in range(self.config.additional_params["real_max_bar_embedding"])]
+        )
 
         # POSITION
         self._max_num_quarters = max(map(lambda ts: ceil(4 * ts[0] / ts[1]), self.time_signatures))
@@ -579,14 +639,16 @@ class OctupleM(MusicTokenizer):
 
         # DURATION
         self.durations = [(0, 0, self.durations[0][-1])] + self.durations  # allow 0 duration
-        vocab.append([f'Duration_{".".join(map(str, duration))}' for duration in self.durations])
+        vocab.append([f"Duration_{'.'.join(map(str, duration))}" for duration in self.durations])
         self._tpb_to_time_array = self._MusicTokenizer__create_tpb_to_ticks_array()
         self._tpb_tokens_to_ticks = self._MusicTokenizer__create_tpb_tokens_to_ticks()
         self._tpb_ticks_to_tokens = self._MusicTokenizer__create_tpb_ticks_to_tokens()
 
         # VELOCITY
         velocity_step = round(128 / self.config.num_velocities)
-        self.velocities = np.concatenate((np.arange(0, 127, velocity_step), [127]))   # allow 0 (unperformed note)
+        self.velocities = np.concatenate(
+            (np.arange(0, 127, velocity_step), [127])
+        )  # allow 0 (unperformed note)
         vocab.append([f"Velocity_{i}" for i in self.velocities])
 
         # TEMPO
@@ -601,13 +663,18 @@ class OctupleM(MusicTokenizer):
                     self.durations[np.where(self.duration_values == 4 / d)[0][0]]
                     for d in denominators
                 ]
-                vocab.append([f'Duration_{".".join(map(str, duration))}' for duration in beat_durations])
+                vocab.append(
+                    [f"Duration_{'.'.join(map(str, duration))}" for duration in beat_durations]
+                )
                 self._beat_durations = 1 / np.array(denominators)
 
                 if self.config.additional_params["time_signature_max_position"]:
-                    max_bar_positions = sorted(set(
-                        self.config.max_num_pos_per_beat * 4 * num / denom for num, denom in self.time_signatures
-                    ))
+                    max_bar_positions = sorted(
+                        set(
+                            self.config.max_num_pos_per_beat * 4 * num / denom
+                            for num, denom in self.time_signatures
+                        )
+                    )
                     vocab.append([f"Position_{i}" for i in max_bar_positions])
                     self._max_bar_positions = np.array(max_bar_positions)
                 else:
@@ -621,9 +688,7 @@ class OctupleM(MusicTokenizer):
             vocab.append([f"Program_{i}" for i in self.config.programs])
 
         token_types = self._get_token_types()
-        self.vocab_types_idx = {
-            ttype: idx for idx, ttype in enumerate(token_types)
-        }
+        self.vocab_types_idx = {ttype: idx for idx, ttype in enumerate(token_types)}
 
         return vocab
 
@@ -653,10 +718,10 @@ class OctupleM(MusicTokenizer):
         return {}  # not relevant for Octuple
 
     def has_token_types(
-            self,
-            tokens: TokSequence,
-            token_types: str | list[str],
-            check_values: bool = True
+        self,
+        tokens: TokSequence,
+        token_types: str | list[str],
+        check_values: bool = True,
     ) -> bool:
         token_types = [token_types] if isinstance(token_types, str) else token_types
         vocab = tokens.vocab or self.vocab_types_idx
@@ -664,16 +729,18 @@ class OctupleM(MusicTokenizer):
             return False
         if not check_values:
             return True
-        # return backend(tokens).all(self.get_values(tokens, token_types) > SPECIAL_TOKENS_VALUE)
+
         _backend = backend(tokens)
         values = self.get_values(tokens, token_types)
-        return _backend.all(_backend.logical_or(values > SPECIAL_TOKENS_VALUE, values < self.ignore_value))
+        return _backend.all(
+            _backend.logical_or(values > SPECIAL_TOKENS_VALUE, values < self.ignore_value)
+        )
 
     def get_values(
-            self,
-            tokens: TokSequence,
-            token_type: str | list[str] | None,
-            from_ids: bool = False
+        self,
+        tokens: TokSequence,
+        token_type: str | list[str] | None,
+        from_ids: bool = False,
     ):
         assert tokens.ids is not None or tokens.values is not None
         from_ids = (from_ids and tokens.ids is not None) or tokens.values is None
@@ -686,10 +753,9 @@ class OctupleM(MusicTokenizer):
                 return tokens.values
         elif isinstance(token_type, list):
             if from_ids:
-                return backend(tokens).stack([
-                    self.decode_values(tokens.ids, _token_type)
-                    for _token_type in token_type
-                ], -1)
+                return backend(tokens).stack(
+                    [self.decode_values(tokens.ids, _token_type) for _token_type in token_type], -1
+                )
             else:
                 return tokens.values[:, [vocab[_token_type] for _token_type in token_type]]
         else:
@@ -699,11 +765,11 @@ class OctupleM(MusicTokenizer):
                 return tokens.values[:, vocab[token_type]]
 
     def _transform_tokens_or_values(
-            self,
-            tokens_or_values: np.ndarray | torch.Tensor | TokSequence | int | float,
-            transform_func: callable,
-            token_type: str | list[str] | None = None,
-            vocab: dict[str, int] | None = None
+        self,
+        tokens_or_values: np.ndarray | torch.Tensor | TokSequence | int | float,
+        transform_func: callable,
+        token_type: str | list[str] | None = None,
+        vocab: dict[str, int] | None = None,
     ) -> np.ndarray | torch.Tensor | TokSequence:
         is_array = isinstance(tokens_or_values, (np.ndarray, torch.Tensor))
         is_torch = isinstance(tokens_or_values, torch.Tensor)
@@ -727,7 +793,9 @@ class OctupleM(MusicTokenizer):
 
             outputs = np.stack(new_tokens_or_values, axis=-1)
         elif is_array and tokens_or_values.ndim >= 2:
-            outputs = transform_func(tokens_or_values[..., vocab[token_type]], token_type=token_type)
+            outputs = transform_func(
+                tokens_or_values[..., vocab[token_type]], token_type=token_type
+            )
         else:
             outputs = transform_func(tokens_or_values, token_type=token_type)
 
@@ -736,12 +804,12 @@ class OctupleM(MusicTokenizer):
         return outputs
 
     def encode_tokens(
-            self,
-            values: np.ndarray | torch.Tensor | TokSequence,
-            token_type: str | list[str] | None = None,
-            vocab: dict[str, int] | None = None,
-            denormalize: bool = False,
-            clip: bool = False
+        self,
+        values: np.ndarray | torch.Tensor | TokSequence,
+        token_type: str | list[str] | None = None,
+        vocab: dict[str, int] | None = None,
+        denormalize: bool = False,
+        clip: bool = False,
     ) -> np.ndarray | torch.Tensor:
         r"""
         Encode tokens from values for all or a provided `token_type`.
@@ -757,16 +825,17 @@ class OctupleM(MusicTokenizer):
         tokens = self._transform_tokens_or_values(
             values.values if is_tok_seq else values,
             transform_func=partial(self._values_to_tokens, denormalize=denormalize, clip=clip),
-            token_type=token_type, vocab=values.vocab if is_tok_seq else vocab
+            token_type=token_type,
+            vocab=values.vocab if is_tok_seq else vocab,
         )
         return tokens.long() if isinstance(tokens, torch.Tensor) else tokens.astype(int)
 
     def _values_to_tokens(
-            self,
-            values: np.ndarray,
-            token_type: str,
-            denormalize: bool = False,
-            clip: bool = False
+        self,
+        values: np.ndarray,
+        token_type: str,
+        denormalize: bool = False,
+        clip: bool = False,
     ) -> np.ndarray:
         r"""
         Encode tokens from values for a given token_type.
@@ -795,16 +864,20 @@ class OctupleM(MusicTokenizer):
         elif token_type == "Velocity":
             tokens = find_closest(self.velocities, values)
         elif token_type == "Duration":
-            tokens = find_closest(self.duration_values[1:] * self.config.max_num_pos_per_beat, values) + 1
+            tokens = (
+                find_closest(self.duration_values[1:] * self.config.max_num_pos_per_beat, values)
+                + 1
+            )
             tokens[values == self.duration_values[0] * self.config.max_num_pos_per_beat] = 0
         elif token_type == "Tempo":
             tokens = find_closest(self.tempos, values)
         elif token_type == "TimeSig":
-            time_sigs = np.stack([
-                np.floor(values[~is_special]),
-                (1 / (values[~is_special] % 1.)).round()
-            ], axis=1)
-            tokens[~is_special] = np.where(np.all(time_sigs[..., None] == np.array(self.time_signatures), axis=-1))[1]
+            time_sigs = np.stack(
+                [np.floor(values[~is_special]), (1 / (values[~is_special] % 1.0)).round()], axis=1
+            )
+            tokens[~is_special] = np.where(
+                np.all(time_sigs[..., None] == np.array(self.time_signatures), axis=-1)
+            )[1]
         elif token_type == "BeatDuration":
             tokens = np.argmin(np.fabs(values[..., None] - self._beat_durations), axis=-1)
         elif token_type == "MaxPosition":
@@ -820,12 +893,12 @@ class OctupleM(MusicTokenizer):
         return tokens
 
     def decode_values(
-            self,
-            tokens: np.ndarray | torch.Tensor | TokSequence,
-            token_type: str | list[str] | None = None,
-            vocab: dict[str, int] | None = None,
-            clip: bool = False,
-            normalize: bool = False
+        self,
+        tokens: np.ndarray | torch.Tensor | TokSequence,
+        token_type: str | list[str] | None = None,
+        vocab: dict[str, int] | None = None,
+        clip: bool = False,
+        normalize: bool = False,
     ) -> np.ndarray | torch.Tensor:
         r"""
         Decode values from tokens for all or a provided `token_type`.
@@ -841,16 +914,17 @@ class OctupleM(MusicTokenizer):
         values = self._transform_tokens_or_values(
             tokens.ids if is_tok_seq else tokens,
             transform_func=partial(self._tokens_to_values, clip=clip, normalize=normalize),
-            token_type=token_type, vocab=tokens.vocab if is_tok_seq else vocab
+            token_type=token_type,
+            vocab=tokens.vocab if is_tok_seq else vocab,
         )
         return values
 
     def _tokens_to_values(
-            self,
-            tokens: np.ndarray,
-            token_type: str,
-            clip: bool = False,
-            normalize: bool = False
+        self,
+        tokens: np.ndarray,
+        token_type: str,
+        clip: bool = False,
+        normalize: bool = False,
     ) -> np.ndarray:
         r"""
         Decode values from tokens for a given token_type.
@@ -897,10 +971,10 @@ class OctupleM(MusicTokenizer):
         return values
 
     def clip_values(
-            self,
-            values: np.ndarray | torch.Tensor | TokSequence,
-            token_type: str | list[str] | None = None,
-            vocab: dict[str, int] | None = None
+        self,
+        values: np.ndarray | torch.Tensor | TokSequence,
+        token_type: str | list[str] | None = None,
+        vocab: dict[str, int] | None = None,
     ) -> np.ndarray | torch.Tensor | TokSequence:
         if isinstance(values, TokSequence):
             if token_type is not None:
@@ -908,7 +982,7 @@ class OctupleM(MusicTokenizer):
                 for key in token_type:
                     idx = values.vocab[key]
                     values.values[..., idx] = self._transform_tokens_or_values(
-                       values.values[..., idx], transform_func=self._clip_values, token_type=key
+                        values.values[..., idx], transform_func=self._clip_values, token_type=key
                     )
             else:
                 values.values = self._transform_tokens_or_values(
@@ -931,7 +1005,9 @@ class OctupleM(MusicTokenizer):
         elif token_type in ("Pitch", "Velocity"):
             values = np.clip(values, 0, 127)
         elif token_type == "Duration":
-            values = np.clip(values, 0., self.duration_values[-1] * self.config.max_num_pos_per_beat)
+            values = np.clip(
+                values, 0.0, self.duration_values[-1] * self.config.max_num_pos_per_beat
+            )
         elif token_type == "Tempo":
             values = np.clip(values, self.tempos[0], self.tempos[-1])
 
@@ -939,10 +1015,10 @@ class OctupleM(MusicTokenizer):
         return values
 
     def normalize_values(
-            self,
-            values: np.ndarray | torch.Tensor | TokSequence,
-            token_type: str | list[str] | None = None,
-            vocab: dict[str, int] | None = None
+        self,
+        values: np.ndarray | torch.Tensor | TokSequence,
+        token_type: str | list[str] | None = None,
+        vocab: dict[str, int] | None = None,
     ) -> np.ndarray | torch.Tensor | TokSequence:
         if isinstance(values, TokSequence):
             values.values = self._transform_tokens_or_values(
@@ -966,14 +1042,13 @@ class OctupleM(MusicTokenizer):
             values = values / 127
         elif token_type == "Tempo":
             values = values.copy()
-            non_zero = values > 0.
+            non_zero = values > 0.0
             values[non_zero] = np.log2(values[non_zero] / TEMPO)
         elif token_type == "TimeSig":
             values = values.copy()
-            time_sigs = np.stack([
-                np.floor(values[~is_special]),
-                (1 / (values[~is_special] % 1.)).round()
-            ], axis=1)
+            time_sigs = np.stack(
+                [np.floor(values[~is_special]), (1 / (values[~is_special] % 1.0)).round()], axis=1
+            )
             values[~is_special] = time_sigs[:, 0] / time_sigs[:, 1]
         elif token_type == "BeatDuration":
             return values
@@ -984,10 +1059,10 @@ class OctupleM(MusicTokenizer):
         return values
 
     def denormalize_values(
-            self,
-            values: np.ndarray | torch.Tensor | TokSequence,
-            token_type: str | list[str] | None = None,
-            vocab: dict[str, int] | None = None
+        self,
+        values: np.ndarray | torch.Tensor | TokSequence,
+        token_type: str | list[str] | None = None,
+        vocab: dict[str, int] | None = None,
     ) -> np.ndarray | torch.Tensor | TokSequence:
         if isinstance(values, TokSequence):
             values.values = self._transform_tokens_or_values(
@@ -1021,10 +1096,7 @@ class OctupleM(MusicTokenizer):
         values[is_special] = special_values
         return values
 
-    def token_values(
-            self,
-            normalize: bool | list[str] = False
-    ) -> dict[str, np.ndarray]:
+    def token_values(self, normalize: bool | list[str] = False) -> dict[str, np.ndarray]:
         r"""
         Return a dictionary of all values associated with all token indices for each token type.
 
@@ -1043,10 +1115,10 @@ class OctupleM(MusicTokenizer):
         return token_values
 
     def compute_ticks(
-            self,
-            tokens: TokSequence,
-            context: TokSequenceContext | None = None,
-            time_division: int | None = None
+        self,
+        tokens: TokSequence,
+        context: TokSequenceContext | None = None,
+        time_division: int | None = None,
     ) -> dict[str, np.ndarray | tuple[np.ndarray, np.ndarray]]:
         r"""
         Compute tick positions for time signatures, note onsets, bars and beats.
@@ -1066,7 +1138,9 @@ class OctupleM(MusicTokenizer):
         prev_score_ticks = context.score_ticks if context.score_ticks is not None else None
 
         # Compute tick positions considering the previous context
-        if self.config.use_time_signatures and self.has_token_types(tokens, self.time_signature_tokens):
+        if self.config.use_time_signatures and self.has_token_types(
+            tokens, self.time_signature_tokens
+        ):
             # Compute ticks per position for each note according to time signatures
             if additional_params["compound_time_signature"]:
                 all_beat_values = self.get_values(tokens, "BeatDuration", from_ids=True)
@@ -1074,14 +1148,16 @@ class OctupleM(MusicTokenizer):
 
                 if additional_params["time_signature_max_position"]:
                     all_max_positions = self.get_values(tokens, "MaxPosition", from_ids=True)
-                    all_num_beats = all_max_positions / self.config.max_num_pos_per_beat / 4 * all_beat_values
+                    all_num_beats = (
+                        all_max_positions / self.config.max_num_pos_per_beat / 4 * all_beat_values
+                    )
                 else:
                     all_num_beats = self.get_values(tokens, "BeatsInBar", from_ids=True)
             else:
                 all_time_sig_values = self.get_values(tokens, "TimeSig", from_ids=True)
 
                 all_num_beats = np.floor(all_time_sig_values)
-                all_beat_values = (1 / (all_time_sig_values % 1.)).round()
+                all_beat_values = (1 / (all_time_sig_values % 1.0)).round()
 
             all_time_sigs = np.stack([all_num_beats, all_beat_values], axis=1).astype(int)
             ticks_per_pos = ticks_per_sample * 4 / all_time_sigs[:, 1]
@@ -1104,7 +1180,11 @@ class OctupleM(MusicTokenizer):
             repeated_time_sig = np.all(time_sigs[0] == prev_time_sigs[-1])
             if repeated_time_sig:
                 time_sigs = time_sigs[1:]
-            time_sigs = np.concatenate([prev_time_sigs, time_sigs]) if len(time_sigs) > 0 else prev_time_sigs
+            time_sigs = (
+                np.concatenate([prev_time_sigs, time_sigs])
+                if len(time_sigs) > 0
+                else prev_time_sigs
+            )
 
         ticks_per_bar = time_division * 4 * time_sigs[:, 0] / time_sigs[:, 1]
         ticks_per_beat = ticks_per_bar // time_sigs[:, 0]
@@ -1116,19 +1196,26 @@ class OctupleM(MusicTokenizer):
             bars = self.get_values(tokens, "Bar").astype(int)
 
             # Compute time signature ticks
-            time_sig_bars = bars[time_sig_indices[int(repeated_time_sig):]]
+            time_sig_bars = bars[time_sig_indices[int(repeated_time_sig) :]]
             if prev_time_sigs is not None:
-                prev_time_sig_bars = np.sum(np.diff(prev_time_sig_ticks) / ticks_per_bar[:len(prev_time_sig_ticks) - 1])
+                prev_time_sig_bars = np.sum(
+                    np.diff(prev_time_sig_ticks) / ticks_per_bar[: len(prev_time_sig_ticks) - 1]
+                )
                 time_sig_bars = np.concatenate([[prev_time_sig_bars], time_sig_bars])
 
-            time_sig_ticks = np.concatenate([
-                prev_time_sig_ticks,
-                prev_time_sig_ticks[-1] + np.cumsum(
-                    ticks_per_bar[len(prev_time_sig_ticks) - 1:-1] * np.diff(time_sig_bars)
-                )
-            ])
+            time_sig_ticks = np.concatenate(
+                [
+                    prev_time_sig_ticks,
+                    prev_time_sig_ticks[-1]
+                    + np.cumsum(
+                        ticks_per_bar[len(prev_time_sig_ticks) - 1 : -1] * np.diff(time_sig_bars)
+                    ),
+                ]
+            )
         else:
-            assert additional_params["use_position_shifts"] and self.has_token_types(tokens, "PositionShift")
+            assert additional_params["use_position_shifts"] and self.has_token_types(
+                tokens, "PositionShift"
+            )
             note_on_ticks = np.cumsum(self.get_values(tokens, "PositionShift")) * ticks_per_sample
 
             # Incorporate previous note on ticks
@@ -1136,12 +1223,14 @@ class OctupleM(MusicTokenizer):
                 note_on_ticks = note_on_ticks + prev_score_ticks[-1]
 
             # Compute time signature ticks
-            time_sig_ticks = np.concatenate([
-                prev_time_sig_ticks if prev_time_sigs is not None else [],
-                note_on_ticks[time_sig_indices][int(repeated_time_sig):]
-            ])
-            if time_sig_ticks[0] != 0.:
-                time_sig_ticks[0] = 0.
+            time_sig_ticks = np.concatenate(
+                [
+                    prev_time_sig_ticks if prev_time_sigs is not None else [],
+                    note_on_ticks[time_sig_indices][int(repeated_time_sig) :],
+                ]
+            )
+            if time_sig_ticks[0] != 0.0:
+                time_sig_ticks[0] = 0.0
 
         # Compute ticks for each bar
         bar_ticks, beat_ticks = [], []
@@ -1150,14 +1239,18 @@ class OctupleM(MusicTokenizer):
             time_sig_ticks[i + 1] -= (time_sig_ticks[i + 1] - time_sig_ticks[i]) % ticks_per_bar[i]
 
             bar_ticks.append(np.arange(time_sig_ticks[i], time_sig_ticks[i + 1], ticks_per_bar[i]))
-            beat_ticks.append(np.arange(time_sig_ticks[i], time_sig_ticks[i + 1], ticks_per_beat[i]))
+            beat_ticks.append(
+                np.arange(time_sig_ticks[i], time_sig_ticks[i + 1], ticks_per_beat[i])
+            )
 
         bar_ticks = np.concatenate(bar_ticks) if len(bar_ticks) else []
         if has_score:
             last_tick = time_sig_ticks[-1] + (bars[-1] - len(bar_ticks) + 1) * ticks_per_bar[-1]
         else:
             last_tick = note_on_ticks.max() + ticks_per_bar[-1]
-        bar_ticks = np.concatenate([bar_ticks, np.arange(time_sig_ticks[-1], last_tick + 1, ticks_per_bar[-1])])
+        bar_ticks = np.concatenate(
+            [bar_ticks, np.arange(time_sig_ticks[-1], last_tick + 1, ticks_per_bar[-1])]
+        )
 
         beat_ticks.append(np.arange(time_sig_ticks[-1], last_tick + 1, ticks_per_beat[-1]))
         beat_ticks = np.concatenate(beat_ticks)
@@ -1178,16 +1271,16 @@ class OctupleM(MusicTokenizer):
             "time_sig": (time_sigs, time_sig_ticks),
             "ticks_per_pos": ticks_per_pos,
             "bar": bar_ticks,
-            "beat": beat_ticks
+            "beat": beat_ticks,
         }
 
         return ticks_data
 
     def compute_bar_beat_onset_indices(
-            self,
-            tokens: TokSequence | None,
-            ticks_data: dict[str, np.ndarray | tuple[np.ndarray, np.ndarray]] | None = None,
-            shift_to_zero: bool = False
+        self,
+        tokens: TokSequence | None,
+        ticks_data: dict[str, np.ndarray | tuple[np.ndarray, np.ndarray]] | None = None,
+        shift_to_zero: bool = False,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         r"""
         Compute bar, beat and onset indices for each note in the sequence.
@@ -1214,7 +1307,9 @@ class OctupleM(MusicTokenizer):
             bars, beats, onsets = map(lambda s: s - s.min(), (bars, beats, onsets))
         return bars, beats, onsets
 
-    def compute_position_shifts(self, positions: np.ndarray, onset_shift: bool = False) -> np.ndarray:
+    def compute_position_shifts(
+        self, positions: np.ndarray, onset_shift: bool = False
+    ) -> np.ndarray:
         r"""
         Compute absolute position shifts between onsets from positions.
 
@@ -1232,21 +1327,22 @@ class OctupleM(MusicTokenizer):
         return pos_shifts
 
     def shift_positions(
-            self,
-            tokens: TokSequence,
-            shifts: dict[str, int | float] | None = None,
-            inverse_shifts: bool = False,
-            normalized_values: bool = False,
-            shift_to_zero: bool = False
+        self,
+        tokens: TokSequence,
+        shifts: dict[str, int | float] | None = None,
+        inverse_shifts: bool = False,
+        normalized_values: bool = False,
+        shift_to_zero: bool = False,
     ) -> tuple[TokSequence, dict[str, int | float]]:
         assert not shift_to_zero or shifts is None
 
         vocab = tokens.vocab or self.vocab_types_idx
 
         has_bars = (
-                tokens.encoding != EncodingType.TIME_PERFORMANCE
-                and "Bar" in vocab and "Position" in vocab
-                and self.has_token_types(tokens, ["Bar", "Position"])
+            tokens.encoding != EncodingType.TIME_PERFORMANCE
+            and "Bar" in vocab
+            and "Position" in vocab
+            and self.has_token_types(tokens, ["Bar", "Position"])
         )
 
         shifts = shifts or {"Bar": 0}
@@ -1264,9 +1360,13 @@ class OctupleM(MusicTokenizer):
             tokens.ids[:, bar_index] += bar_shift
             if tokens.values is not None:
                 if normalized_values:
-                    tokens.values[:, bar_index] = self.denormalize_values(tokens.values[:, bar_index], "Bar")
+                    tokens.values[:, bar_index] = self.denormalize_values(
+                        tokens.values[:, bar_index], "Bar"
+                    )
                     tokens.values[:, bar_index] += bar_shift
-                    tokens.values[:, bar_index] = self.normalize_values(tokens.values[:, bar_index], "Bar")
+                    tokens.values[:, bar_index] = self.normalize_values(
+                        tokens.values[:, bar_index], "Bar"
+                    )
                 else:
                     tokens.values[:, bar_index] += bar_shift
 
@@ -1278,11 +1378,15 @@ class OctupleM(MusicTokenizer):
         _backend = backend(tokens)
         sos_token_id = self[0, SOS_TOKEN]
 
-        tokens.ids = _backend.concatenate((_backend.full_like(tokens.ids[:1], sos_token_id), tokens.ids), 0)
+        tokens.ids = _backend.concatenate(
+            (_backend.full_like(tokens.ids[:1], sos_token_id), tokens.ids), 0
+        )
         if tokens.values is not None:
-            tokens.values = _backend.concatenate((
-                _backend.full_like(tokens.values[:1], SPECIAL_TOKENS_VALUE - sos_token_id), tokens.values
-            ), 0)
+            values = (
+                _backend.full_like(tokens.values[:1], SPECIAL_TOKENS_VALUE - sos_token_id),
+                tokens.values,
+            )
+            tokens.values = _backend.concatenate(values, 0)
         if tokens.interpolated is not None:
             tokens.interpolated = _backend.concatenate((_backend.zeros(1), tokens.interpolated), 0)
 
@@ -1295,11 +1399,15 @@ class OctupleM(MusicTokenizer):
         _backend = backend(tokens)
         eos_token_id = self[0, token_name]
 
-        tokens.ids = _backend.concatenate((tokens.ids, _backend.full_like(tokens.ids[:1], eos_token_id)), 0)
+        tokens.ids = _backend.concatenate(
+            (tokens.ids, _backend.full_like(tokens.ids[:1], eos_token_id)), 0
+        )
         if tokens.values is not None:
-            tokens.values = _backend.concatenate((
-                tokens.values, _backend.full_like(tokens.values[:1], SPECIAL_TOKENS_VALUE - eos_token_id)
-            ), 0)
+            values = (
+                tokens.values,
+                _backend.full_like(tokens.values[:1], SPECIAL_TOKENS_VALUE - eos_token_id),
+            )
+            tokens.values = _backend.concatenate(values, 0)
         if tokens.interpolated is not None:
             tokens.interpolated = _backend.concatenate((tokens.interpolated, _backend.zeros(1)), 0)
 
@@ -1323,7 +1431,7 @@ class OctupleM(MusicTokenizer):
         new_values[:, vocab["Pitch"]] = SPECIAL_TOKENS_VALUE - token_id
         new_values[:, vocab["Bar"]] = _backend.arange(min_bar, max_bar + 1)
         if start:
-            new_values[:, vocab["Position"]] = 0.
+            new_values[:, vocab["Position"]] = 0.0
         else:
             ticks_data = self.compute_ticks(tokens, time_division=self.config.max_num_pos_per_beat)
             new_values[:, vocab["Position"]] = np.diff(ticks_data["bar"][min_bar:])
@@ -1332,7 +1440,9 @@ class OctupleM(MusicTokenizer):
             tokens,
             ids=self.encode_tokens(new_values),
             values=new_values,
-            interpolated=np.zeros_like(new_values[:, 0]) if tokens.interpolated is not None else None
+            interpolated=(
+                np.zeros_like(new_values[:, 0]) if tokens.interpolated is not None else None
+            ),
         )
         new_tokens = tokens + new_tokens
 
@@ -1343,8 +1453,12 @@ class OctupleM(MusicTokenizer):
                 continue
             type_idx = vocab[token_type]
             fill_func = backward_fill if start else forward_fill
-            new_tokens.values[:, type_idx] = fill_func(new_tokens.values[:, type_idx], self.ignore_value)
-            new_tokens.ids[:, type_idx] = self.encode_tokens(new_tokens.values[:, type_idx], token_type=token_type)
+            new_tokens.values[:, type_idx] = fill_func(
+                new_tokens.values[:, type_idx], self.ignore_value
+            )
+            new_tokens.ids[:, type_idx] = self.encode_tokens(
+                new_tokens.values[:, type_idx], token_type=token_type
+            )
         tokens.ids, tokens.values = new_tokens.ids, new_tokens.values
         tokens.interpolated = new_tokens.interpolated
 
@@ -1368,8 +1482,8 @@ class OctupleM(MusicTokenizer):
     def sizes(self) -> dict[str, int]:
         sizes = {k: len(v) for k, v in zip(self.vocab_types_idx, self.vocab)}
         sizes["Bar"] -= (
-                self.config.additional_params["real_max_bar_embedding"]
-                - self.config.additional_params["max_bar_embedding"]
+            self.config.additional_params["real_max_bar_embedding"]
+            - self.config.additional_params["max_bar_embedding"]
         )
         return sizes
 
@@ -1388,10 +1502,9 @@ class OctupleM(MusicTokenizer):
     @property
     def duration_values(self) -> np.ndarray:
         if self._duration_values is None:
-            self._duration_values = np.array([
-                (beat * res + pos) / res if res > 0 else 0
-                for beat, pos, res in self.durations
-            ])
+            self._duration_values = np.array(
+                [(beat * res + pos) / res if res > 0 else 0 for beat, pos, res in self.durations]
+            )
         return self._duration_values
 
     @property
@@ -1400,7 +1513,9 @@ class OctupleM(MusicTokenizer):
             if self.config.additional_params["compound_time_signature"]:
                 return [
                     "BeatDuration",
-                    "MaxPosition" if self.config.additional_params["time_signature_max_position"] else "BeatsInBar"
+                    "MaxPosition"
+                    if self.config.additional_params["time_signature_max_position"]
+                    else "BeatsInBar",
                 ]
             else:
                 return ["TimeSig"]

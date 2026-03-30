@@ -7,7 +7,7 @@ from .classes import (
     TokSequenceContext,
     TokenizerConfig,
     ENCODING_SORTING,
-    SEQUENCE_DEFAULT_ENCODING
+    SEQUENCE_DEFAULT_ENCODING,
 )
 from .common import OctupleM
 from .midi_tokenizer import MusicTokenizer
@@ -15,14 +15,13 @@ from .symupe import (
     SyMuPeBase,
     SyMuPe,
     SyMuPeLocal,
-
+    SyMuPeTransformer,
+    # derivatives
     SyMuPeOnset,
     SyMuPeBeat,
     SyMuPeBar,
     SyMuPeWindow,
     SyMuPeWindowRecompute,
-
-    SyMuPeTransformer
 )
 
 
@@ -47,5 +46,5 @@ TOKENIZERS = {
     TokenizerType.SyMuPeBeat: SyMuPeBeat,
     TokenizerType.SyMuPeBar: SyMuPeBar,
     TokenizerType.SyMuPeWindow: SyMuPeWindow,
-    TokenizerType.SyMuPeWindowRecompute: SyMuPeWindowRecompute
+    TokenizerType.SyMuPeWindowRecompute: SyMuPeWindowRecompute,
 }

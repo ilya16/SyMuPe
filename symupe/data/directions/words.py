@@ -1,4 +1,5 @@
-""" Utility functions for word-based direction markings. """
+"""Utility functions for word-based direction markings."""
+
 from __future__ import annotations
 
 import string

@@ -8,8 +8,8 @@ import warnings
 from contextlib import contextmanager
 from pathlib import Path
 
-import numpy as np
 import numba as nb
+import numpy as np
 import parangonar as pa
 import parangonar.match.matchers
 import partitura as pt
@@ -38,7 +38,7 @@ class FileType(ExplicitEnum):
 FILE_EXT = {
     FileType.MIDI: ".mid",
     FileType.ALIGN: "_align.txt",
-    FileType.ALIGN_COMPRESSED: "_align.npz"
+    FileType.ALIGN_COMPRESSED: "_align.npz",
 }
 
 
@@ -60,17 +60,17 @@ def time_limit(seconds):
 
 
 class ParangonarAligner(Aligner):
-    """ Wrapper for Parangonar Alignment Tool.
+    """Wrapper for Parangonar Alignment Tool.
 
     Links:
         https://github.com/sildater/parangonar
     """
 
     def __init__(
-            self,
-            midi_dir: str | Path | None = None,
-            alignments_dir: str | Path | None = None,
-            save_compressed: bool = False
+        self,
+        midi_dir: str | Path | None = None,
+        alignments_dir: str | Path | None = None,
+        save_compressed: bool = False,
     ):
         self.midi_dir = Path(midi_dir) if alignments_dir is not None else None
         self.alignments_dir = Path(alignments_dir) if alignments_dir is not None else None
@@ -80,15 +80,15 @@ class ParangonarAligner(Aligner):
         self.matcher.onset_matcher.dtw = DynamicTimeWarpingSingleLoop()
 
     def align(
-            self,
-            score_midi: str | Path,
-            perf_midi: str | Path,
-            score_note_array: np.ndarray | None = None,
-            perf_note_array: np.ndarray | None = None,
-            process_ornaments: bool = True,
-            save_alignment: bool = False,
-            timeout: float | None = 1000.,
-            memory_limit: int | None = None
+        self,
+        score_midi: str | Path,
+        perf_midi: str | Path,
+        score_note_array: np.ndarray | None = None,
+        perf_note_array: np.ndarray | None = None,
+        process_ornaments: bool = True,
+        save_alignment: bool = False,
+        timeout: float | None = 1000.0,
+        memory_limit: int | None = None,
     ):
         start_time = time.perf_counter()
 
@@ -102,14 +102,20 @@ class ParangonarAligner(Aligner):
         try:
             with warnings.catch_warnings(), time_limit(time_left):
                 warnings.simplefilter("ignore")
-                score = pt.load_score_midi(filename=score_midi, part_voice_assign_mode=4, estimate_voice_info=False)
+                score = pt.load_score_midi(
+                    filename=score_midi,
+                    part_voice_assign_mode=4,
+                    estimate_voice_info=False,
+                )
 
                 if score_note_array is None:
                     score_note_array = score.note_array(include_grace_notes=True)
             score_note_array["id"] = [f"n{i}" for i in range(len(score_note_array))]
         except TimeoutError:
-            msg = f"TimeoutExpired@pt.load_score_midi: computation of the score note array " \
-                  f"exceeded time limit of {time_left:.2f}s"
+            msg = (
+                f"TimeoutExpired@pt.load_score_midi: computation of the score note array "
+                f"exceeded time limit of {time_left:.2f}s"
+            )
             return None, paths, [msg]
         except Exception as e:
             msg = f"Error@pt.load_score_midi: computation of the score note array failed with ({repr(e)})"
@@ -122,8 +128,10 @@ class ParangonarAligner(Aligner):
                 if perf_note_array is None:
                     perf_note_array = load_performance_note_array(midi_path=perf_midi)
         except TimeoutError:
-            msg = f"TimeoutExpired@pt.load_performance_midi: computation of the performance note array " \
-                  f"exceeded time limit of {time_left:.2f}s"
+            msg = (
+                f"TimeoutExpired@pt.load_performance_midi: computation of the performance note array "
+                f"exceeded time limit of {time_left:.2f}s"
+            )
             return None, paths, [msg]
         except Exception as e:
             msg = f"Error@pt.load_performance_midi: computation of the performance note array failed with ({repr(e)})"
@@ -132,9 +140,13 @@ class ParangonarAligner(Aligner):
         time_left = int(timeout - (time.perf_counter() - start_time))
         try:
             with time_limit(time_left):
-                if len(score_note_array) == len(perf_note_array) == 1:  # parangonar hangs on one note pairs
+                if (
+                    len(score_note_array) == len(perf_note_array) == 1
+                ):  # parangonar hangs on one note pairs
                     if score_note_array[0]["pitch"] == perf_note_array[0]["pitch"]:
-                        pred_alignment = [{"label": "match", "score_id": "n0", "performance_id": "n0"}]
+                        pred_alignment = [
+                            {"label": "match", "score_id": "n0", "performance_id": "n0"}
+                        ]
                     else:
                         pred_alignment = [
                             {"label": "deletion", "score_id": "n0"},
@@ -145,11 +157,13 @@ class ParangonarAligner(Aligner):
                         score_note_array,
                         perf_note_array,
                         score,
-                        process_ornaments=process_ornaments
+                        process_ornaments=process_ornaments,
                     )
         except TimeoutError:
-            msg = f"TimeoutExpired@compute_alignment: computation of the alignment " \
-                  f"exceeded time limit of {time_left:.2f}s"
+            msg = (
+                f"TimeoutExpired@compute_alignment: computation of the alignment "
+                f"exceeded time limit of {time_left:.2f}s"
+            )
             return None, paths, [msg]
         except Exception as e:
             msg = f"Error@compute_alignment: computation of the alignment failed with ({repr(e)})"
@@ -157,10 +171,17 @@ class ParangonarAligner(Aligner):
 
         # prepare alignment name and path
         if self.midi_dir is not None:
-            perf_name = os.path.relpath(perf_midi, self.midi_dir).replace(FILE_EXT[FileType.MIDI], "")
-            score_name = os.path.relpath(score_midi, self.midi_dir).replace(FILE_EXT[FileType.MIDI], "")
+            perf_name = os.path.relpath(perf_midi, self.midi_dir).replace(
+                FILE_EXT[FileType.MIDI], ""
+            )
+            score_name = os.path.relpath(score_midi, self.midi_dir).replace(
+                FILE_EXT[FileType.MIDI], ""
+            )
         else:
-            perf_name, score_name = os.path.basename(perf_midi), os.path.basename(score_midi)
+            perf_name, score_name = (
+                os.path.basename(perf_midi),
+                os.path.basename(score_midi),
+            )
         score_short_name = os.path.basename(score_name)
 
         perf_name = perf_name.replace("_processed", "")
@@ -171,7 +192,7 @@ class ParangonarAligner(Aligner):
             score_midi = preprocess_midi(
                 Score(score_midi),
                 cut_overlapped_notes=True,
-                clean_duplicates=True
+                clean_duplicates=True,
             ).to("second")
 
             pairs = []
@@ -184,7 +205,7 @@ class ParangonarAligner(Aligner):
                         idx=idx,
                         pitch=int(note["pitch"]),
                         start=round(float(score_midi.tracks[0].notes[idx].start), 6),
-                        end=round(float(score_midi.tracks[0].notes[idx].end), 6)
+                        end=round(float(score_midi.tracks[0].notes[idx].end), 6),
                     )
 
                 perf_note = None
@@ -195,43 +216,51 @@ class ParangonarAligner(Aligner):
                         idx=idx,
                         pitch=int(note["pitch"]),
                         start=round(float(note["onset_sec"]), 6),
-                        end=round(float(note["onset_sec"]) + float(note["duration_sec"]), 6)
+                        end=round(float(note["onset_sec"]) + float(note["duration_sec"]), 6),
                     )
 
                 pairs.append(AlignmentPair(score_note=score_note, perf_note=perf_note))
 
             alignment = Alignment(pairs=pairs, score_name=score_name, perf_name=perf_name)
-            alignment.preprocess_pairs(sort=True, clean_duplicates=True)  # parangonar might output duplicates
+
+            # parangonar might output duplicates
+            alignment.preprocess_pairs(sort=True, clean_duplicates=True)
 
             if save_alignment:
                 assert self.alignments_dir is not None
                 align_path = self.alignments_dir / (
-                        align_name + FILE_EXT[FileType.ALIGN_COMPRESSED if self.save_compressed else FileType.ALIGN]
+                    align_name
+                    + FILE_EXT[
+                        FileType.ALIGN_COMPRESSED if self.save_compressed else FileType.ALIGN
+                    ]
                 )
                 paths[DataType.ALIGNMENT][FileType.ALIGN.value] = align_path
 
                 os.makedirs(os.path.dirname(align_path), exist_ok=True)
 
-                alignment.save(align_path)  # compression is detected from the path extension
+                # compression is detected from the path extension
+                alignment.save(align_path)
 
         except Exception as e:
-            msg = f"Error@process_alignment: post-processing of the alignment failed with ({repr(e)})"
+            msg = (
+                f"Error@process_alignment: post-processing of the alignment failed with ({repr(e)})"
+            )
             return None, paths, [msg]
 
         return alignment, paths, []
 
     def compute_alignment(
-            self,
-            score_note_array,
-            perf_note_array,
-            score: pt.score.Score | None = None,
-            process_ornaments: bool = True
+        self,
+        score_note_array,
+        perf_note_array,
+        score: pt.score.Score | None = None,
+        process_ornaments: bool = True,
     ):
         return self.matcher(
             score_note_array,
             perf_note_array,
             process_ornaments=process_ornaments and score is not None,
-            score_part=score[0] if score is not None else None
+            score_part=score[0] if score is not None else None,
         )  # if a score part is passed, ornaments can be handled separately
 
 
@@ -268,16 +297,12 @@ class DynamicTimeWarpingSingleLoop(object):
     """
     pure python vanilla Dynamic Time Warping
     """
-    def __call__(
-            self,
-            X, Y,
-            return_path=True,
-            return_cost_matrix=False
-    ):
+
+    def __call__(self, X, Y, return_path: bool = True, return_cost_matrix: bool = False):
         # Compute the pw distances and accumulated cost matrix
         Y1 = np.full((len(Y), max(map(len, Y))), fill_value=-1)
         for i, y in enumerate(Y):
-            Y1[i, :len(y)] = list(y)
+            Y1[i, : len(y)] = list(y)
 
         dtwd_matrix = cdist_dtw_single_loop(X, Y1)
 
@@ -430,7 +455,7 @@ def unique_alignments(xs, ys, threshold=None):
     used_x = set()
     tuples = list()
     for x in xs:
-        if not x in used_x:
+        if x not in used_x:
             current_x_mask = xs[p[:, 0]] == x
             if current_x_mask.sum() > 1:
                 current_ids = p[current_x_mask, :]
@@ -453,10 +478,9 @@ def unique_alignments(xs, ys, threshold=None):
             candidate_dist = np.min(np.abs(current_x - current_y))
             candidate_id = np.argmin(np.abs(current_x - current_y))
             if threshold is None or candidate_dist < threshold:
-                tuples.append(
-                    (current_ids[candidate_id, 0], current_ids[candidate_id, 1])
-                )
+                tuples.append((current_ids[candidate_id, 0], current_ids[candidate_id, 1]))
             used_x.update(set(np.unique(current_x)))
     return tuples
+
 
 parangonar.match.matchers.unique_alignments = unique_alignments

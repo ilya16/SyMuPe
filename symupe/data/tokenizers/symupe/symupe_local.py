@@ -3,6 +3,7 @@ SyMuPeLocal encoding.
 
 Adapts the ideas of the SPMuple encoding from ScorePerformer with local window tempos to SyMuPe encoding.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -64,21 +65,27 @@ class SyMuPeLocal(SyMuPe):
 
         # tempo encoding/decoding parameters
         additional_params["onset_tempos"] = additional_params.get("onset_tempos", False)
-        additional_params["tempo_window"] = additional_params.get("tempo_window", 8.)
-        additional_params["tempo_min_onset_dist"] = additional_params.get("tempo_min_onset_dist", 0.5)
+        additional_params["tempo_window"] = additional_params.get("tempo_window", 8.0)
+        additional_params["tempo_min_onset_dist"] = additional_params.get(
+            "tempo_min_onset_dist", 0.5
+        )
         additional_params["tempo_min_onsets"] = additional_params.get("tempo_min_onsets", 8)
 
-        additional_params["use_quantized_tempos"] = additional_params.get("use_quantized_tempos", False)
-        additional_params["decode_recompute_tempos"] = additional_params.get("decode_recompute_tempos", False)
+        additional_params["use_quantized_tempos"] = additional_params.get(
+            "use_quantized_tempos", False
+        )
+        additional_params["decode_recompute_tempos"] = additional_params.get(
+            "decode_recompute_tempos", False
+        )
 
         # outlier detection and processing
         additional_params["limit_onset_devs"] = additional_params.get("limit_onset_devs", True)
 
     def _encode_performance(
-            self,
-            midi: Score,
-            score_tokens: TokSequence,
-            note_alignment: np.ndarray | None = None
+        self,
+        midi: Score,
+        score_tokens: TokSequence,
+        note_alignment: np.ndarray | None = None,
     ) -> TokSequence:
         r"""
         Tokenize a performance MIDI file into :class:`miditok.TokSequence`
@@ -103,7 +110,7 @@ class SyMuPeLocal(SyMuPe):
 
         self._current_midi_metadata = {
             "time_division": midi.ticks_per_quarter,
-            "tempos": midi.tempos
+            "tempos": midi.tempos,
         }
 
         # Merge track into one
@@ -151,7 +158,7 @@ class SyMuPeLocal(SyMuPe):
         perf_offset_times = time_mapper.t2s((perf_positions + perf_durations) * ticks_per_sample)
 
         # Record performed notes
-        is_performed = values[:, self.vocab_types_idx["Velocity"]] > 0.
+        is_performed = values[:, self.vocab_types_idx["Velocity"]] > 0.0
 
         # Mask out score ticks for unperformed notes
         performed_ticks = score_ticks.copy()
@@ -163,12 +170,11 @@ class SyMuPeLocal(SyMuPe):
         # Compute initial tempo using a subset of onset pairs
         start_pairs = onset_pairs[onset_pairs[:, 1] <= 2 * additional_params["tempo_window"]]
         if len(start_pairs) < additional_params["tempo_min_onsets"]:
-            start_pairs = onset_pairs[:additional_params["tempo_min_onsets"]]
+            start_pairs = onset_pairs[: additional_params["tempo_min_onsets"]]
 
         # Compute weighted initial tempo
         initial_tempo = self.compute_local_tempo(
-            distances=start_pairs[start_pairs[:, 1] > 0.] - start_pairs[0],
-            tempo_scale=tempo_scale
+            distances=start_pairs[start_pairs[:, 1] > 0.0] - start_pairs[0], tempo_scale=tempo_scale
         )
         self._current_midi_metadata["initial_tempo"] = initial_tempo
 
@@ -201,29 +207,24 @@ class SyMuPeLocal(SyMuPe):
             # Limit relative onset deviations to max relative onset deviation if required
             # Compute the required onset shift (such that all deviations fall under
             # the maximum relative onset deviation) and shift the deviating notes
-            if additional_params["limit_onset_devs"] \
-                    and note_abs_rel_onset_devs.max() > self.rel_onset_deviations[-1]:
+            if (
+                additional_params["limit_onset_devs"]
+                and note_abs_rel_onset_devs.max() > self.rel_onset_deviations[-1]
+            ):
                 # Compute time shift for the deviating notes
                 shift_ids = np.where(note_abs_rel_onset_devs > self.rel_onset_deviations[-1])
                 note_shifts = np.zeros_like(note_onset_devs)
                 note_shifts[shift_ids] = (
-                        self.rel_onset_deviations[-1]
-                        * onset_time_shift * np.sign(note_rel_onset_devs[shift_ids])
-                        - note_onset_devs[shift_ids]
+                    self.rel_onset_deviations[-1]
+                    * onset_time_shift
+                    * np.sign(note_rel_onset_devs[shift_ids])
+                    - note_onset_devs[shift_ids]
                 )
 
-                # if len(note_shifts) > 1:
                 perf_times[onset_mask] += note_shifts
                 perf_offset_times[onset_mask] += note_shifts
                 onset_pairs[i + 1, 1] = perf_times[onset_mask].mean()
                 onset_time = onset_pairs[i + 1, 1]
-                # else:
-                #     start_idx = np.where(onset_mask)[0][0]
-                #     _onset_shift = note_shifts[0]
-                #     perf_times[start_idx:] += _onset_shift
-                #     perf_offset_times[start_idx:] += _onset_shift
-                #     onset_pairs[i + 1:, 1] += _onset_shift
-                #     onset_time += _onset_shift
 
             if additional_params["onset_tempos"]:
                 tempo = self.compute_onset_tempo(
@@ -234,10 +235,12 @@ class SyMuPeLocal(SyMuPe):
                     tempo = initial_tempo  # not enough history, use initial tempo
                 else:
                     # Cut onsets in a local window
-                    pairs_in_window = self.filter_onsets_in_window(onset_time, onset_pairs[:i + 1])
+                    pairs_in_window = self.filter_onsets_in_window(onset_time, onset_pairs[: i + 1])
 
                     # Compute local tempo
-                    tempo = self.compute_local_tempo(distances=onset_pair - pairs_in_window, tempo_scale=tempo_scale)
+                    tempo = self.compute_local_tempo(
+                        distances=onset_pair - pairs_in_window, tempo_scale=tempo_scale
+                    )
 
             tempos.append(tempo)
 
@@ -246,14 +249,16 @@ class SyMuPeLocal(SyMuPe):
             note_onsets[onset_mask] = onset_pairs[i + 1]
 
         # Save MIDI data for external use
-        self._current_midi_metadata.update(**{
-            "onset_pairs": onset_pairs,
-            "tempos": np.array(tempos),
-            "note_tempos": note_tempos
-        })
+        self._current_midi_metadata.update(
+            **{
+                "onset_pairs": onset_pairs,
+                "tempos": np.array(tempos),
+                "note_tempos": note_tempos,
+            }
+        )
 
         # Assign neighbouring tempos for not performed notes
-        is_empty = note_tempos == 0.
+        is_empty = note_tempos == 0.0
         if np.any(is_empty):
             fill_ids = np.where(~is_empty, np.arange(is_empty.shape[0]), 0)
             np.maximum.accumulate(fill_ids, axis=0, out=fill_ids)
@@ -269,7 +274,9 @@ class SyMuPeLocal(SyMuPe):
         note_onset_devs[~is_performed] = 0  # zero out onsets for not performed notes
 
         note_rel_onset_devs = np.zeros_like(note_onset_devs)
-        note_rel_onset_devs[is_performed] = note_onset_devs[is_performed] / note_time_shifts[is_performed]
+        note_rel_onset_devs[is_performed] = (
+            note_onset_devs[is_performed] / note_time_shifts[is_performed]
+        )
 
         # Compute performed durations RelativePerformedDuration values
         perf_time_durations = perf_offset_times - perf_times
@@ -278,38 +285,51 @@ class SyMuPeLocal(SyMuPe):
         note_rel_perf_durations = perf_time_durations / score_time_durations
         note_rel_perf_durations[~is_performed] = 1  # "zero out" durations for not performed notes
 
-        self._current_midi_metadata.update(**{
-            "perf_times": perf_times,
-            "note_time_shifts": note_time_shifts,
-            "note_onset_devs": note_onset_devs,
-            "score_time_durations": score_time_durations,
-            "perf_time_durations": perf_time_durations
-        })
+        self._current_midi_metadata.update(
+            **{
+                "perf_times": perf_times,
+                "note_time_shifts": note_time_shifts,
+                "note_onset_devs": note_onset_devs,
+                "score_time_durations": score_time_durations,
+                "perf_time_durations": perf_time_durations,
+            }
+        )
 
         # Append RelOnsetDev and RelPerfDuration values
-        values = np.concatenate([
-            values,
-            note_rel_onset_devs[:, None],
-            note_rel_perf_durations[:, None]
-        ], axis=1)
+        values = np.concatenate(
+            [
+                values,
+                note_rel_onset_devs[:, None],
+                note_rel_perf_durations[:, None],
+            ],
+            axis=1,
+        )
 
         # Append TimeShift/TimeDuration values
         if additional_params["use_time_tokens"]:
             sort_ids = np.argsort(perf_times)
-            perf_time_shifts = np.diff(np.concatenate([[0.], perf_times[sort_ids]]))[np.argsort(sort_ids)]
-            values = np.concatenate([
-                values,
-                perf_time_shifts[:, None] * 1000.,
-                perf_time_durations[:, None] * 1000.
-            ], axis=1)
+            perf_time_shifts = np.diff(np.concatenate([[0.0], perf_times[sort_ids]]))[
+                np.argsort(sort_ids)
+            ]
+            values = np.concatenate(
+                [
+                    values,
+                    perf_time_shifts[:, None] * 1000.0,
+                    perf_time_durations[:, None] * 1000.0,
+                ],
+                axis=1,
+            )
 
             # Append TimePosition values
             if additional_params["use_time_positions"]:
-                values = np.concatenate([
-                    values,
-                    (perf_times[:, None] // 1.),
-                    np.round((perf_times[:, None] % 1.) * 1000., 3)
-                ], axis=1)
+                values = np.concatenate(
+                    [
+                        values,
+                        (perf_times[:, None] // 1.0),
+                        np.round((perf_times[:, None] % 1.0) * 1000.0, 3),
+                    ],
+                    axis=1,
+                )
 
         # Convert values to tokens and build final TokSequence
         tokens = self.encode_tokens(values, clip=True)
@@ -323,30 +343,31 @@ class SyMuPeLocal(SyMuPe):
             meta={
                 "time_division": midi.ticks_per_quarter,
                 "bars": int(tokens[-1, self.vocab_types_idx["Bar"]] - self.zero_token + 1),
-                "initial_tempo": initial_tempo
-            }
+                "initial_tempo": initial_tempo,
+            },
         )
 
     def decode_note_positions(
-            self,
-            tokens: TokSequence,
-            context: TokSequenceContext | None = None,
-            time_division: int = TICKS_PER_QUARTER
+        self,
+        tokens: TokSequence,
+        context: TokSequenceContext | None = None,
+        time_division: int = TICKS_PER_QUARTER,
     ) -> tuple[dict[str, any], TokSequenceContext]:
         additional_params = self.config.additional_params
         time_division = time_division or self.time_division
 
         context = context or TokSequenceContext()
-        prev_note_on_times = context.note_on_times if context.note_on_times is not None else np.zeros(1)
+        prev_note_on_times = (
+            context.note_on_times if context.note_on_times is not None else np.zeros(1)
+        )
 
         ticks_data, score_ticks = None, None
         note_on_times, note_off_times = None, None
         tempos, tempo_ticks, tempo_times = None, None, None
         onset_pairs = None
 
-        has_time_tokens = (
-                additional_params["use_time_tokens"]
-                and self.has_token_types(tokens, ["TimeShift", "TimeDuration"])
+        has_time_tokens = additional_params["use_time_tokens"] and self.has_token_types(
+            tokens, ["TimeShift", "TimeDuration"]
         )
         if has_time_tokens:
             # Note times
@@ -356,14 +377,14 @@ class SyMuPeLocal(SyMuPe):
             perf_time_durations = self.get_values(tokens, "TimeDuration")
             note_off_times = note_on_times + perf_time_durations
 
-        has_score = (
-                self.has_token_types(tokens, ["Bar", "Position"])
-                or (
-                        additional_params["use_position_shifts"]
-                        and self.has_token_types(tokens, ["PositionShift"])
-                )
+        has_score = self.has_token_types(tokens, ["Bar", "Position"]) or (
+            additional_params["use_position_shifts"]
+            and self.has_token_types(tokens, ["PositionShift"])
         )
-        if has_score and tokens.type not in (SequenceType.TIME_PERFORMANCE, SequenceType.TIME_PERFORMANCE_SUSTAIN):
+        if has_score and tokens.type not in (
+            SequenceType.TIME_PERFORMANCE,
+            SequenceType.TIME_PERFORMANCE_SUSTAIN,
+        ):
             tempo_scale = 60 / time_division
 
             meta = tokens.meta or {}
@@ -377,7 +398,7 @@ class SyMuPeLocal(SyMuPe):
             score_durations = ticks_data["duration"]
 
             # Record performed notes
-            is_performed = self.get_values(tokens, "Velocity") != 0.
+            is_performed = self.get_values(tokens, "Velocity") != 0.0
 
             # Get unique performed score onsets
             score_onsets = np.unique(score_ticks[is_performed])
@@ -388,7 +409,10 @@ class SyMuPeLocal(SyMuPe):
             # Create a list of tempos
             tempos, tempo_ticks, tempo_times = context.tempos or (None, None, None)
             if tempos is None:
-                if not additional_params["decode_recompute_tempos"] or additional_params["onset_tempos"]:
+                if (
+                    not additional_params["decode_recompute_tempos"]
+                    or additional_params["onset_tempos"]
+                ):
                     tempos = np.array([tempo_values[score_ticks == score_onsets[0]].mean()])
                 else:
                     tempos = np.array([context.initial_tempo or self.default_tempo])
@@ -405,7 +429,9 @@ class SyMuPeLocal(SyMuPe):
                 if score_ticks[0] > 0:
                     onset_pairs = np.array([(0, 0, 1)])
                 else:
-                    onset_pairs = np.array([(-time_division, -time_division / tempo * tempo_scale, 1)])
+                    onset_pairs = np.array(
+                        [(-time_division, -time_division / tempo * tempo_scale, 1)]
+                    )
             prev_onset_tick, prev_onset_time, prev_num = onset_pairs[-1]
 
             _offset, num_tokens = 0, len(score_ticks)
@@ -423,9 +449,14 @@ class SyMuPeLocal(SyMuPe):
                 num_perf = is_performed_onset.sum()
 
                 _tempo = tempo
-                if not additional_params["decode_recompute_tempos"] or additional_params["onset_tempos"]:
+                if (
+                    not additional_params["decode_recompute_tempos"]
+                    or additional_params["onset_tempos"]
+                ):
                     if repeated_onset:
-                        tempo = (tempo * prev_num + tempo_values[_offset:][onset_mask].sum()) / (prev_num + num)
+                        tempo = (tempo * prev_num + tempo_values[_offset:][onset_mask].sum()) / (
+                            prev_num + num
+                        )
                     else:
                         tempo = tempo_values[_offset:][onset_mask].mean()
 
@@ -451,8 +482,11 @@ class SyMuPeLocal(SyMuPe):
 
                     _onset_perf_times_mean = onset_time + _rel_onset_devs_mean * time_shift
 
-                    onset_time = (_onset_perf_times_mean * prev_num + onset_perf_times[is_performed_onset].sum())
-                    onset_time /= (prev_num + num_perf)
+                    onset_time = (
+                        _onset_perf_times_mean * prev_num
+                        + onset_perf_times[is_performed_onset].sum()
+                    )
+                    onset_time /= prev_num + num_perf
                 else:
                     onset_time = onset_perf_times[is_performed_onset].mean()
 
@@ -464,20 +498,29 @@ class SyMuPeLocal(SyMuPe):
                 onset_pair = onset_pairs[-1]
 
                 # Process performed durations to compute note offset time
-                onset_score_time_durations = score_durations[_offset:][onset_mask] / tempo * tempo_scale
-                onset_perf_time_durations = note_rel_perf_durations[_offset:][onset_mask] * onset_score_time_durations
+                onset_score_time_durations = (
+                    score_durations[_offset:][onset_mask] / tempo * tempo_scale
+                )
+                onset_perf_time_durations = (
+                    note_rel_perf_durations[_offset:][onset_mask] * onset_score_time_durations
+                )
 
                 # Save note attributes
                 perf_times[_offset:][onset_mask] = onset_perf_times
                 perf_durations[_offset:][onset_mask] = onset_perf_time_durations
 
                 # Compute next tempo
-                if additional_params["decode_recompute_tempos"] and not additional_params["onset_tempos"]:
+                if (
+                    additional_params["decode_recompute_tempos"]
+                    and not additional_params["onset_tempos"]
+                ):
                     if onset_time < 2 * additional_params["tempo_min_onset_dist"]:
                         tempo = context.initial_tempo  # not enough history, use initial tempo
                     else:
                         # Cut onsets in a local window
-                        pairs_in_window = self.filter_onsets_in_window(onset_time, onset_pairs[:-1, :2])
+                        pairs_in_window = self.filter_onsets_in_window(
+                            onset_time, onset_pairs[:-1, :2]
+                        )
 
                         # Compute local tempo
                         tempo = self.compute_local_tempo(
@@ -503,7 +546,7 @@ class SyMuPeLocal(SyMuPe):
             "note_off_ticks": None,
             "note_on_times": note_on_times,
             "note_off_times": note_off_times,
-            "tempos": (tempos, tempo_ticks, tempo_times)
+            "tempos": (tempos, tempo_ticks, tempo_times),
         }
 
         def extend_context(prev_data, new_data):
@@ -516,7 +559,7 @@ class SyMuPeLocal(SyMuPe):
             note_on_ticks=None,
             note_on_times=extend_context(context.note_on_times, note_on_times),
             initial_tempo=context.initial_tempo,
-            onset_pairs=onset_pairs
+            onset_pairs=onset_pairs,
         )
 
         return position_data, new_context
@@ -530,26 +573,34 @@ class SyMuPeLocal(SyMuPe):
         """
         onset_dev_quant = (self.config.additional_params["num_onset_devs"] - 1) // 10
 
-        rel_onset_devs = np.concatenate([
-            # 20% from 0 to 1/20
-            np.linspace(0, 1 / 20, onset_dev_quant + 1),
-            # 20% from 1/20 to 1/10
-            np.linspace(1 / 20, 1 / 10, onset_dev_quant + 1)[1:],
-            # 20% from 1/10 to 1/6
-            np.linspace(1 / 10, 1 / 6, onset_dev_quant + 1)[1:],
-            # 20% from 1/6 to 1/3
-            (2 ** (np.arange(onset_dev_quant + 1) / onset_dev_quant) * 1 / 6)[1:],
-            # 10% from 1/3 to 1/2
-            (2 ** (np.log(3 / 2) / np.log(2) * np.arange(onset_dev_quant // 2 + 1) / onset_dev_quant * 2) * 1 / 3)[1:],
-            # 5% from 1/2 to 3/4
-            (2 ** (np.log(3 / 2) / np.log(2) * np.arange(onset_dev_quant // 4 + 1) / onset_dev_quant * 4) * 1 / 2)[1:],
-            # 2.5% from 3/4 to 1
-            (2 ** (np.log(4 / 3) / np.log(2) * np.arange(onset_dev_quant // 8 + 1) / onset_dev_quant * 8) * 3 / 4)[1:],
-            # 2.5% from 1 to 2
-            (2 ** (np.arange(onset_dev_quant // 8 + 1) / onset_dev_quant * 8))[1:]
-        ])
+        def exp_segment(a, b, scale):
+            steps = np.arange(onset_dev_quant // scale + 1) / onset_dev_quant * scale
+            return (2 ** (np.log(b) / np.log(2) * steps) * a)[1:]
+
+        rel_onset_devs = np.concatenate(
+            [
+                # 20% from 0 to 1/20
+                np.linspace(0, 1 / 20, onset_dev_quant + 1),
+                # 20% from 1/20 to 1/10
+                np.linspace(1 / 20, 1 / 10, onset_dev_quant + 1)[1:],
+                # 20% from 1/10 to 1/6
+                np.linspace(1 / 10, 1 / 6, onset_dev_quant + 1)[1:],
+                # 20% from 1/6 to 1/3
+                exp_segment(1 / 6, 2, 1),
+                # 10% from 1/3 to 1/2
+                exp_segment(1 / 3, 3 / 2, 2),
+                # 5% from 1/2 to 3/4
+                exp_segment(1 / 2, 3 / 2, 4),
+                # 2.5% from 3/4 to 1
+                exp_segment(3 / 4, 4 / 3, 8),
+                # 2.5% from 1 to 2
+                exp_segment(1, 2, 8),
+            ]
+        )
         rel_onset_devs = np.round(rel_onset_devs, 4)
-        rel_onset_devs = np.sort(np.concatenate([-rel_onset_devs[1:], rel_onset_devs]))  # add negative deviations
+        rel_onset_devs = np.sort(
+            np.concatenate([-rel_onset_devs[1:], rel_onset_devs])
+        )  # add negative deviations
 
         return rel_onset_devs
 
@@ -562,18 +613,20 @@ class SyMuPeLocal(SyMuPe):
         """
         perf_dur_quant = (self.config.additional_params["num_perf_durations"] - 1) // 5
 
-        rel_performed_durations = np.concatenate([
-            # 20% from 1/16 to 1/4
-            np.log2(np.linspace(2, 16, perf_dur_quant)) / 16,
-            # 60% from 1/4 to 1
-            np.linspace(1 / 4, 1., 3 * perf_dur_quant + 1)[1:],
-            # 10% from 1 to 2^(1/2)
-            (2 ** (np.arange(perf_dur_quant // 2 + 1) / perf_dur_quant))[1:],
-            # 5% from 2^(1/2) to 2
-            (2 ** (2 * np.arange(perf_dur_quant // 4 + 1) / perf_dur_quant) * np.sqrt(2))[1:],
-            # 5% from 2 to 4
-            (2 ** (4 * np.arange(perf_dur_quant // 4 + 1) / perf_dur_quant) * 2)[1:],
-        ])
+        rel_performed_durations = np.concatenate(
+            [
+                # 20% from 1/16 to 1/4
+                np.log2(np.linspace(2, 16, perf_dur_quant)) / 16,
+                # 60% from 1/4 to 1
+                np.linspace(1 / 4, 1.0, 3 * perf_dur_quant + 1)[1:],
+                # 10% from 1 to 2^(1/2)
+                (2 ** (np.arange(perf_dur_quant // 2 + 1) / perf_dur_quant))[1:],
+                # 5% from 2^(1/2) to 2
+                (2 ** (2 * np.arange(perf_dur_quant // 4 + 1) / perf_dur_quant) * np.sqrt(2))[1:],
+                # 5% from 2 to 4
+                (2 ** (4 * np.arange(perf_dur_quant // 4 + 1) / perf_dur_quant) * 2)[1:],
+            ]
+        )
         rel_performed_durations = np.round(rel_performed_durations, 4)
 
         return rel_performed_durations
@@ -593,19 +646,31 @@ class SyMuPeLocal(SyMuPe):
         if len(candidate_pairs) == 0:
             candidate_pairs = onset_pairs[time_diffs >= 0]
 
-        pairs_in_window = candidate_pairs[onset_time - candidate_pairs[:, 1] <= additional_params["tempo_window"]]
+        pairs_in_window = candidate_pairs[
+            onset_time - candidate_pairs[:, 1] <= additional_params["tempo_window"]
+        ]
 
-        if len(pairs_in_window) < additional_params["tempo_min_onsets"]:  # collect minimum required number of onsets
-            pairs_in_window = candidate_pairs[-additional_params["tempo_min_onsets"]:]
+        if (
+            len(pairs_in_window) < additional_params["tempo_min_onsets"]
+        ):  # collect minimum required number of onsets
+            pairs_in_window = candidate_pairs[-additional_params["tempo_min_onsets"] :]
             pairs_in_window = pairs_in_window[
-                onset_time - pairs_in_window[:, 1] <= 4 * additional_params["tempo_window"]]
+                onset_time - pairs_in_window[:, 1] <= 4 * additional_params["tempo_window"]
+            ]
 
-        if len(pairs_in_window) == 0:  # if suddenly no pairs found, take all candidates and hope for the best
+        if (
+            len(pairs_in_window) == 0
+        ):  # if suddenly no pairs found, take all candidates and hope for the best
             pairs_in_window = candidate_pairs
 
         return pairs_in_window
 
-    def compute_local_tempo(self, distances: np.ndarray, eps: float = 1e-2, tempo_scale: float | None = None) -> float:
+    def compute_local_tempo(
+        self,
+        distances: np.ndarray,
+        eps: float = 1e-2,
+        tempo_scale: float | None = None,
+    ) -> float:
         r"""
         Compute weighted local tempo from the tick and time distances.
 
@@ -631,10 +696,10 @@ class SyMuPeLocal(SyMuPe):
         return tempo
 
     def compute_onset_tempo(
-            self,
-            onset_pair: np.ndarray,
-            prev_onset_pair: np.ndarray,
-            tempo_scale: float | None = None
+        self,
+        onset_pair: np.ndarray,
+        prev_onset_pair: np.ndarray,
+        tempo_scale: float | None = None,
     ) -> float:
         r"""
         Compute onset tempo from the tick and time distance for current and previous onsets.
@@ -649,7 +714,11 @@ class SyMuPeLocal(SyMuPe):
         if onset_pair[1] <= prev_onset_pair[1]:
             tempo = self.tempos[-1]
         else:
-            tempo = (onset_pair[0] - prev_onset_pair[0]) / (onset_pair[1] - prev_onset_pair[1]) * tempo_scale
+            tempo = (
+                (onset_pair[0] - prev_onset_pair[0])
+                / (onset_pair[1] - prev_onset_pair[1])
+                * tempo_scale
+            )
 
         if self.config.use_tempos:
             tempo = min(self.tempos[-1], max(self.tempos[0], tempo))

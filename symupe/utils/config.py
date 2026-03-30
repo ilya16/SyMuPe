@@ -1,4 +1,4 @@
-""" A general purpose Config with IO. That's it. """
+"""A general purpose Config with IO. That's it."""
 
 import json
 from dataclasses import dataclass, asdict

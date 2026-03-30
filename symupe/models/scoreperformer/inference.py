@@ -1,4 +1,5 @@
-""" ScorePerformer's inference modules. """
+"""ScorePerformer's inference modules."""
+
 from __future__ import annotations
 
 import copy
@@ -8,11 +9,18 @@ import numpy as np
 import torch
 
 from symupe.data.collators import MixedLMScorePerformanceCollator
-from symupe.data.datasets import ScorePerformanceDataset, ScorePerformanceSampleMeta
-from symupe.data.helpers import TokenSequenceAugmentations
+from symupe.data.datasets import (
+    ScorePerformanceDataset,
+    ScorePerformanceSampleMeta,
+    TokenSequenceAugmentations,
+)
 from symupe.data.tokenizers import TokSequence, TokSequenceContext, SyMuPeLocal
 from symupe.data.tokenizers.constants import SOS_TOKEN, EOS_TOKEN
-from symupe.modules.transformer import AttentionIntermediates, TransformerLayerIntermediates, TransformerIntermediates
+from symupe.modules.transformer import (
+    AttentionIntermediates,
+    TransformerLayerIntermediates,
+    TransformerIntermediates,
+)
 from symupe.modules.tuple_transformer import TupleTransformerCache
 from .model import ScorePerformer
 
@@ -31,11 +39,11 @@ class PerformanceData:
 
 class ScorePerformerGenerator:
     def __init__(
-            self,
-            model: ScorePerformer,
-            dataset: ScorePerformanceDataset,
-            collator: MixedLMScorePerformanceCollator,
-            device: str | torch.device | None = None
+        self,
+        model: ScorePerformer,
+        dataset: ScorePerformanceDataset,
+        collator: MixedLMScorePerformanceCollator,
+        device: str | torch.device | None = None,
     ):
         self.model = model
         assert model.perf_decoder is not None
@@ -51,18 +59,22 @@ class ScorePerformerGenerator:
         self.eos_token_id = self.tokenizer[0, EOS_TOKEN]
 
         num_dims = len(self.tokenizer.sizes)
-        mask_token_dims = range(num_dims) if self.collator.mask_token_dims is None else self.collator.mask_token_dims
+        mask_token_dims = (
+            range(num_dims)
+            if self.collator.mask_token_dims is None
+            else self.collator.mask_token_dims
+        )
         self.mask_token_dims = torch.tensor(list(mask_token_dims))
 
     def reset(self) -> None:
         self.data = PerformanceData()
 
     def prepare_performance(
-            self,
-            perf_idx: int,
-            score_embeddings: torch.Tensor | None = None,
-            perf_embeddings: torch.Tensor | None = None,
-            overlay_bars: float = 0.5
+        self,
+        perf_idx: int,
+        score_embeddings: torch.Tensor | None = None,
+        perf_embeddings: torch.Tensor | None = None,
+        overlay_bars: float = 0.5,
     ) -> PerformanceData:
         # get performance sequence (and notes) from dataset
         perf_seq = copy.deepcopy(self.dataset.performances[perf_idx])
@@ -86,9 +98,13 @@ class ScorePerformerGenerator:
 
         # compute performance embeddings if not provided
         compute_embeddings = self.model.perf_encoder is not None and perf_embeddings is None
-        compute_embeddings = compute_embeddings or (self.model.score_encoder is not None and score_embeddings is None)
+        compute_embeddings = compute_embeddings or (
+            self.model.score_encoder is not None and score_embeddings is None
+        )
         if compute_embeddings:
-            score_embeddings, perf_embeddings, _ = self.encode_embeddings(perf_idx, overlay_bars=overlay_bars)
+            score_embeddings, perf_embeddings, _ = self.encode_embeddings(
+                perf_idx, overlay_bars=overlay_bars
+            )
 
         self.data.perf_embeddings = perf_embeddings
         self.data.score_embeddings = score_embeddings
@@ -100,19 +116,19 @@ class ScorePerformerGenerator:
         return self.data
 
     def generate_performance_notes(
-            self,
-            start_time: float = 0.,
-            time_window: float = 0.2,
-            time_window_overflow: float = 0.1,
-            delta_embedding: torch.Tensor | None = None,
-            max_seq_len: int = 512,
-            group_onset_notes: bool = True,
-            sort_messages: bool = False,
-            temperature: float = 1.,
-            top_k: float | int = -1,
-            top_p: float = 0.8,
-            disable_tqdm: bool = True,
-            disable_cache: bool = False
+        self,
+        start_time: float = 0.0,
+        time_window: float = 0.2,
+        time_window_overflow: float = 0.1,
+        delta_embedding: torch.Tensor | None = None,
+        max_seq_len: int = 512,
+        group_onset_notes: bool = True,
+        sort_messages: bool = False,
+        temperature: float = 1.0,
+        top_k: float | int = -1,
+        top_p: float = 0.8,
+        disable_tqdm: bool = True,
+        disable_cache: bool = False,
     ) -> tuple[TokSequence | None, list | np.ndarray]:
         init_seq, gen_seq = self.data.init_seq, self.data.gen_seq
         current_note_idx = len(gen_seq)
@@ -151,7 +167,11 @@ class ScorePerformerGenerator:
 
             if group_onset_notes and cut_idx < len(self.data.init_seq):
                 positions = init_seq.ids[:, 2]
-                change_ids = (positions[cut_idx + 1:] != positions[cut_idx]).any(dim=-1).nonzero(as_tuple=True)[0]
+                change_ids = (
+                    (positions[cut_idx + 1 :] != positions[cut_idx])
+                    .any(dim=-1)
+                    .nonzero(as_tuple=True)[0]
+                )
                 if change_ids.numel() > 0:
                     cut_idx += change_ids[0].item()
 
@@ -171,7 +191,11 @@ class ScorePerformerGenerator:
             tempo_idx = self.tokenizer.vocab_types_idx[tempo_key]
             if isinstance(self.tokenizer, SyMuPeLocal) and tempo_idx not in self.mask_token_dims:
                 # update tempo tokens with current tempos only if tempos are not predicted
-                tempo = seq_context.tempos[0][-1] if seq_context.tempos is not None else seq_context.initial_tempo
+                tempo = (
+                    seq_context.tempos[0][-1]
+                    if seq_context.tempos is not None
+                    else seq_context.initial_tempo
+                )
                 tempo = np.array([tempo])
                 new_seq.ids[:, tempo_idx] = self.tokenizer.encode_tokens(tempo, tempo_key)[0]
                 new_seq.values[:, tempo_idx] = self.tokenizer.normalize_values(tempo, tempo_key)[0]
@@ -182,11 +206,18 @@ class ScorePerformerGenerator:
 
             # cut input sequence if exceeds `max_seq_len`
             if input_len >= max_seq_len:
-                next_bar_idx = torch.where(torch.diff(input_tokens[first_note_idx:last_note_idx, 0]))[0]
+                next_bar_idx = torch.where(
+                    torch.diff(input_seq.ids[first_note_idx:last_note_idx, 0])
+                )[0]
                 shift = 1
                 if len(next_bar_idx) > 0:
-                    fits_context = torch.where(input_len - (next_bar_idx + first_note_idx) < max_seq_len)[0]
-                    if len(fits_context) > 0 and next_bar_idx[fits_context[0]] + 1 + first_note_idx != input_len - 1:
+                    fits_context = torch.where(
+                        input_len - (next_bar_idx + first_note_idx) < max_seq_len
+                    )[0]
+                    if (
+                        len(fits_context) > 0
+                        and next_bar_idx[fits_context[0]] + 1 + first_note_idx != input_len - 1
+                    ):
                         shift = next_bar_idx[fits_context[0]] + 1 + first_note_idx
 
                 input_seq = input_seq[shift:]
@@ -197,11 +228,14 @@ class ScorePerformerGenerator:
                 cache = None
 
             # shift bars to zero before computation
-            input_tokens, input_values = input_seq.ids.clone().detach(), input_seq.values.clone().detach()
+            input_tokens, input_values = (
+                input_seq.ids.clone().detach(),
+                input_seq.values.clone().detach(),
+            )
             input_seq = replace(
                 self.data.perf_seq,
                 ids=input_tokens[first_note_idx:last_note_idx],
-                values=input_values[first_note_idx:last_note_idx]
+                values=input_values[first_note_idx:last_note_idx],
             )
             input_seq, shifts = self.tokenizer.shift_positions(
                 input_seq, shifts=None, shift_to_zero=True, normalized_values=True
@@ -209,27 +243,37 @@ class ScorePerformerGenerator:
 
             # add masked sequence
             masked_input_tokens = input_tokens.clone().detach()
-            masked_input_tokens[first_note_idx:last_note_idx, self.mask_token_dims] = self.collator.mask_token_id
+            masked_input_tokens[first_note_idx:last_note_idx, self.mask_token_dims] = (
+                self.collator.mask_token_id
+            )
 
             masked_input_values = input_values.clone().detach().float()
-            masked_input_values[first_note_idx:last_note_idx, self.mask_token_dims] = self.collator.mask_token_value
+            masked_input_values[first_note_idx:last_note_idx, self.mask_token_dims] = (
+                self.collator.mask_token_value
+            )
 
             # add delta embedding if present
             if has_perf_emb and delta_embedding is not None:
-                perf_embeddings[current_note_idx:current_note_idx + num_new_notes] += delta_embedding
+                perf_embeddings[current_note_idx : current_note_idx + num_new_notes] += (
+                    delta_embedding
+                )
 
             # get score and performance embeddings
             score_embs = None
             if has_score_emb:
-                score_embs = score_embeddings[start_idx:current_note_idx + num_new_notes].unsqueeze(0)
+                score_embs = score_embeddings[start_idx : current_note_idx + num_new_notes]
+                score_embs = score_embs.unsqueeze(0)
             perf_embs = None
             if has_perf_emb:
-                perf_embs = perf_embeddings[start_idx:current_note_idx + num_new_notes].unsqueeze(0)
+                perf_embs = perf_embeddings[start_idx : current_note_idx + num_new_notes]
+                perf_embs = perf_embs.unsqueeze(0)
 
             if cache is not None:
-                if input_tokens.shape[0] - 1 - num_new_notes != cache.token_emb.shape[1] \
-                        or cache.token_emb.shape[1] == 0 \
-                        or len(cache.transformer.layers) == 0:
+                if (
+                    input_tokens.shape[0] - 1 - num_new_notes != cache.token_emb.shape[1]
+                    or cache.token_emb.shape[1] == 0
+                    or len(cache.transformer.layers) == 0
+                ):
                     cache = None
 
             # generate notes
@@ -247,11 +291,13 @@ class ScorePerformerGenerator:
                     top_k=top_k,
                     top_p=top_p,
                     tokenizer=self.tokenizer,
-                    disable_tqdm=disable_tqdm
+                    disable_tqdm=disable_tqdm,
                 )
 
                 # shift back inplace for `input_tokens/values`
-                self.tokenizer.shift_positions(input_seq, shifts=shifts, inverse_shifts=True, normalized_values=True)
+                self.tokenizer.shift_positions(
+                    input_seq, shifts=shifts, inverse_shifts=True, normalized_values=True
+                )
 
                 gen_seq = replace(
                     self.data.perf_seq,
@@ -267,7 +313,11 @@ class ScorePerformerGenerator:
 
             # get token times and stop if needed
             token_times, seq_context = self.tokenizer.tokens_to_midi_messages(
-                gen_seq, context=seq_context, note_attributes=False, note_off_events=False, sort=False
+                gen_seq,
+                context=seq_context,
+                note_attributes=False,
+                note_off_events=False,
+                sort=False,
             )
 
             all_token_times.extend(token_times.tolist())
@@ -302,7 +352,9 @@ class ScorePerformerGenerator:
         # update performance embeddings for the generated notes
         if has_perf_emb and delta_embedding is not None:
             total_len = len(self.data.gen_seq)
-            self.data.perf_embeddings[total_len:total_len + cut_idx] = perf_embeddings[total_len:total_len + cut_idx]
+            self.data.perf_embeddings[total_len : total_len + cut_idx] = perf_embeddings[
+                total_len : total_len + cut_idx
+            ]
 
         # update total generated sequence
         gen_seq = self.tokenizer.normalize_values(gen_seq)
@@ -316,10 +368,7 @@ class ScorePerformerGenerator:
 
         return gen_seq, messages
 
-    def generated_sequence(
-            self,
-            postprocess: bool = True
-    ) -> TokSequence:
+    def generated_sequence(self, postprocess: bool = True) -> TokSequence:
         gen_seq = self.data.gen_seq[1:].numpy()
 
         if postprocess:
@@ -328,16 +377,16 @@ class ScorePerformerGenerator:
         return gen_seq
 
     def predict_number_of_notes(
-            self,
-            start_time: float = 0.,
-            time_window: float = 0.2,
-            max_notes: int = 32,
+        self,
+        start_time: float = 0.0,
+        time_window: float = 0.2,
+        max_notes: int = 32,
     ) -> np.ndarray:
         num_gen_notes = len(self.data.gen_seq) - 1 if self.data.gen_seq is not None else 0
-        future_tokens = self.data.perf_seq.ids[num_gen_notes:num_gen_notes + max_notes]
+        future_tokens = self.data.perf_seq.ids[num_gen_notes : num_gen_notes + max_notes]
         if len(future_tokens) == 0:
-            return 0.
-        future_values = self.data.perf_seq.values[num_gen_notes:num_gen_notes + max_notes]
+            return 0.0
+        future_values = self.data.perf_seq.values[num_gen_notes : num_gen_notes + max_notes]
 
         if self.data.seq_context is not None:  # adjust tempos
             tempo_key = self.tokenizer.performance_tempo_token
@@ -345,23 +394,28 @@ class ScorePerformerGenerator:
             tempo = np.array([self.data.seq_context.tempos[0][-1]])
 
             future_tokens[:, tempo_idx] += (
-                    self.tokenizer.encode_tokens(tempo, tempo_key)[0]
-                    - self.data.perf_seq.ids[num_gen_notes - 1, tempo_idx]
+                self.tokenizer.encode_tokens(tempo, tempo_key)[0]
+                - self.data.perf_seq.ids[num_gen_notes - 1, tempo_idx]
             )
-            future_values[:, tempo_idx] += tempo - self.data.perf_seq.values[num_gen_notes - 1, tempo_idx]
+            future_values[:, tempo_idx] += (
+                tempo - self.data.perf_seq.values[num_gen_notes - 1, tempo_idx]
+            )
 
         times = self.tokenizer.tokens_to_midi_messages(
             replace(self.data.perf_seq, ids=future_tokens, values=future_values),
-            context=self.data.seq_context, note_attributes=False, note_off_events=False, sort=False
+            context=self.data.seq_context,
+            note_attributes=False,
+            note_off_events=False,
+            sort=False,
         )
         return (times <= start_time + time_window).sum()
 
     def encode_embeddings(
-            self,
-            perf_idx: int,
-            compute_latents: bool = False,
-            overlay_bars: float = 0.,
-            augmentations: TokenSequenceAugmentations | None = None
+        self,
+        perf_idx: int,
+        compute_latents: bool = False,
+        overlay_bars: float = 0.0,
+        augmentations: TokenSequenceAugmentations | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
         # get score sequence and its data
         perf = self.dataset.performance_names[perf_idx]
@@ -374,11 +428,17 @@ class ScorePerformerGenerator:
 
         # get initial meta and sample
         from symupe.data.datasets.utils import get_end_bar
+
         start_bar = 0
-        end_bar = get_end_bar(score_indices, start_bar, self.dataset.max_seq_len, self.dataset.max_bar)
+        end_bar = get_end_bar(
+            score_indices, start_bar, self.dataset.max_seq_len, self.dataset.max_bar
+        )
         meta = ScorePerformanceSampleMeta(
-            idx=None, score_idx=score_idx, perf_idx=perf_idx,
-            start_bar=start_bar, end_bar=end_bar,
+            idx=None,
+            score_idx=score_idx,
+            perf_idx=perf_idx,
+            start_bar=start_bar,
+            end_bar=end_bar,
             augmentations=augmentations,
         )
         sample = self.dataset.get(meta=meta)
@@ -405,30 +465,43 @@ class ScorePerformerGenerator:
             inputs["score"][:, first_note_idx:last_note_idx, bar_idx] -= bar_shift_to_zero
             inputs["perf"][:, first_note_idx:last_perf_note_idx, bar_idx] -= bar_shift_to_zero
 
-            bar_value_shift_to_zero = 0.
+            bar_value_shift_to_zero = 0.0
             if inputs["score_values"] is not None:
                 bar_value_shift_to_zero = (
-                        inputs["score_values"][:, first_note_idx, 0]
-                        - 1 / self.tokenizer.config.additional_params["max_bar_embedding"]
+                    inputs["score_values"][:, first_note_idx, 0]
+                    - 1 / self.tokenizer.config.additional_params["max_bar_embedding"]
                 )
-                inputs["score_values"][:, first_note_idx:last_perf_note_idx, bar_idx] -= bar_value_shift_to_zero
+                inputs["score_values"][:, first_note_idx:last_perf_note_idx, bar_idx] -= (
+                    bar_value_shift_to_zero
+                )
             if inputs["perf_values"] is not None:
-                inputs["perf_values"][:, first_note_idx:last_perf_note_idx, bar_idx] -= bar_value_shift_to_zero
+                inputs["perf_values"][:, first_note_idx:last_perf_note_idx, bar_idx] -= (
+                    bar_value_shift_to_zero
+                )
 
             with torch.inference_mode():
                 # get encoder embeddings
                 enc_out = self.model.forward_encoders(
-                    score=inputs["score"], score_values=inputs["score_values"], score_mask=inputs["score_mask"],
-                    perf=inputs["perf"], perf_values=inputs["perf_values"], perf_mask=inputs["perf_mask"],
-                    bars=inputs["bars"], beats=inputs["beats"], onsets=inputs["onsets"],
+                    score=inputs["score"],
+                    score_values=inputs["score_values"],
+                    score_mask=inputs["score_mask"],
+                    perf=inputs["perf"],
+                    perf_values=inputs["perf_values"],
+                    perf_mask=inputs["perf_mask"],
+                    bars=inputs["bars"],
+                    beats=inputs["beats"],
+                    onsets=inputs["onsets"],
                     deadpan_mask=inputs["deadpan_mask"],
-                    compute_loss=False
+                    compute_loss=False,
                 )
 
             # append new note embeddings
             note_cut_idx = 0
             if overlay_bars:
-                note_cut_idx = np.where(sample.score.ids[:, bar_idx] - _bar_0 >= emb_start_bar)[0][0] - first_note_idx
+                note_cut_idx = (
+                    np.where(sample.score.ids[:, bar_idx] - _bar_0 >= emb_start_bar)[0][0]
+                    - first_note_idx
+                )
 
             if enc_out.score_embeddings is not None:
                 score_embeddings.append(enc_out.score_embeddings[0, note_cut_idx:])
@@ -440,11 +513,15 @@ class ScorePerformerGenerator:
 
             # move to the next bars
             if overlay_bars:
-                start_bar = sample.score.ids[int(len(sample.score) * (1 - overlay_bars)), 0] - _bar_0
+                start_bar = (
+                    sample.score.ids[int(len(sample.score) * (1 - overlay_bars)), 0] - _bar_0
+                )
                 emb_start_bar = end_bar + 1
             else:
                 emb_start_bar = start_bar = end_bar + 1
-            end_bar = get_end_bar(score_indices, start_bar, self.dataset.max_seq_len, self.dataset.max_bar)
+            end_bar = get_end_bar(
+                score_indices, start_bar, self.dataset.max_seq_len, self.dataset.max_bar
+            )
 
             # get next sample
             meta.start_bar, meta.end_bar = start_bar, end_bar
@@ -465,20 +542,23 @@ class ScorePerformerGenerator:
             bars, beats, onsets = self.tokenizer.compute_bar_beat_onset_indices(score_seq)
 
             bars, beats, onsets = map(
-                lambda s: torch.from_numpy(np.concatenate([[s[0]], s, [s[-1]]]))[None].to(self.device),
-                (bars, beats, onsets)
+                lambda s: torch.from_numpy(np.concatenate([[s[0]], s, [s[-1]]])).to(self.device),
+                (bars, beats, onsets),
             )
             latents = self.model.perf_encoder.embeddings_to_latents(
-                embeddings=perf_embeddings[None], bars=bars, beats=beats, onsets=onsets
+                embeddings=perf_embeddings[None],
+                bars=bars[None],
+                beats=beats[None],
+                onsets=onsets[None],
             )
 
         return score_embeddings, perf_embeddings, latents
 
     @staticmethod
     def cut_cache(
-            cache: TupleTransformerCache,
-            left_idx: int = 0,
-            right_idx: int | None = None
+        cache: TupleTransformerCache,
+        left_idx: int = 0,
+        right_idx: int | None = None,
     ) -> TupleTransformerCache:
         right_idx = cache.token_emb.shape[-1] if right_idx is None else right_idx
         cache.token_emb = cache.token_emb[:, left_idx:right_idx]
@@ -488,7 +568,7 @@ class ScorePerformerGenerator:
                 TransformerLayerIntermediates(
                     attention=AttentionIntermediates(
                         keys=layer_cache.attention.keys[..., left_idx:right_idx, :],
-                        values=layer_cache.attention.values[..., left_idx:right_idx, :]
+                        values=layer_cache.attention.values[..., left_idx:right_idx, :],
                     ),
                     output=layer_cache.output[..., left_idx:right_idx, :],
                 )
@@ -500,11 +580,11 @@ class ScorePerformerGenerator:
 
 class ScorePerformerInpainter:
     def __init__(
-            self,
-            model: ScorePerformer,
-            dataset: ScorePerformanceDataset,
-            collator: MixedLMScorePerformanceCollator,
-            device: str | torch.device | None = None
+        self,
+        model: ScorePerformer,
+        dataset: ScorePerformanceDataset,
+        collator: MixedLMScorePerformanceCollator,
+        device: str | torch.device | None = None,
     ):
         self.model = model
 
@@ -520,21 +600,25 @@ class ScorePerformerInpainter:
 
     def _init_variables(self):
         num_dims = len(self.tokenizer.vocab_types_idx)
-        mask_dims = range(num_dims) if self.collator.mask_token_dims is None else self.collator.mask_token_dims
+        mask_dims = (
+            range(num_dims)
+            if self.collator.mask_token_dims is None
+            else self.collator.mask_token_dims
+        )
         self.mask_dims = torch.tensor(list(mask_dims))
         self.dims_mask = torch.zeros(num_dims, dtype=torch.bool, device=self.device)
         self.dims_mask[self.mask_dims] = True
 
     def fill_silent_notes(
-            self,
-            perf_idx: int,
-            bar_window: int = 4,
-            temperature: float = 1.,
-            top_k: float | int = 1,
-            top_p: float = 1.,
-            filter_key_ids: dict[str, list] | None = None,
-            disable_tqdm: bool = False,
-            verbose: bool = False
+        self,
+        perf_idx: int,
+        bar_window: int = 4,
+        temperature: float = 1.0,
+        top_k: float | int = 1,
+        top_p: float = 1.0,
+        filter_key_ids: dict[str, list] | None = None,
+        disable_tqdm: bool = False,
+        verbose: bool = False,
     ) -> torch.Tensor:
         # silent note related data
         bar_idx = self.tokenizer.vocab_types_idx["Bar"]
@@ -543,7 +627,7 @@ class ScorePerformerInpainter:
             zero_velocity_id = self.tokenizer[vel_idx, "Velocity_0"]
         except KeyError:
             zero_velocity_id = self.tokenizer.zero_token
-        self.collator.mlm = 0.  # we mask what we need to unmask
+        self.collator.mlm = 0.0  # we mask what we need to unmask
 
         # get score sequence and its data
         perf = self.dataset.performance_names[perf_idx]
@@ -556,11 +640,18 @@ class ScorePerformerInpainter:
 
         # get initial meta and sample
         from symupe.data.datasets.utils import get_end_bar
+
         start_bar = 0
-        end_bar = get_end_bar(score_indices, start_bar, self.dataset.max_seq_len, self.dataset.max_bar)
+        end_bar = get_end_bar(
+            score_indices, start_bar, self.dataset.max_seq_len, self.dataset.max_bar
+        )
         meta = ScorePerformanceSampleMeta(
-            idx=None, score_idx=score_idx, perf_idx=perf_idx,
-            start_bar=start_bar, end_bar=end_bar, bar_shift=0
+            idx=None,
+            score_idx=score_idx,
+            perf_idx=perf_idx,
+            start_bar=start_bar,
+            end_bar=end_bar,
+            bar_shift=0,
         )
         sample = self.dataset.get(meta=meta)
 
@@ -594,10 +685,12 @@ class ScorePerformerInpainter:
             input_seq[silent_mask] = self.collator.mask_token_id
 
             if verbose:
-                print(f"#{step} filling {silent_mask[:, -1].sum().item()} notes in bar range: "
-                      f"[{max(0, input_seq[known_input_len - 1, bar_idx] + 1 - _bar_0)}, "
-                      f"{inputs['score'][..., bar_idx].max().item() - _bar_0}]\n"
-                      f"score_len: {inputs['score'].shape[1]}, input_len: {input_seq.shape[0]}")
+                print(
+                    f"#{step} filling {silent_mask[:, -1].sum().item()} notes in bar range: "
+                    f"[{max(0, input_seq[known_input_len - 1, bar_idx] + 1 - _bar_0)}, "
+                    f"{inputs['score'][..., bar_idx].max().item() - _bar_0}]\n"
+                    f"score_len: {inputs['score'].shape[1]}, input_len: {input_seq.shape[0]}"
+                )
 
             # move bars to 0
             bar_shift_to_zero = inputs["score"][:, first_note_idx, bar_idx] - _bar_0
@@ -619,7 +712,7 @@ class ScorePerformerInpainter:
                     top_p=top_p,
                     filter_key_ids=filter_key_ids,
                     tokenizer=self.tokenizer,
-                    disable_tqdm=disable_tqdm
+                    disable_tqdm=disable_tqdm,
                 )
 
                 # move bars back to absolute values
@@ -634,14 +727,22 @@ class ScorePerformerInpainter:
 
             # shift bars from left side until `bar_window` fit on the right side
             max_gen_bar = torch.unique(total_seq[..., 0] - _bar_0).max()
-            while end_bar < total_bars and end_bar <= meta.end_bar + bar_window and start_bar < max_gen_bar - 1:
+            while (
+                end_bar < total_bars
+                and end_bar <= meta.end_bar + bar_window
+                and start_bar < max_gen_bar - 1
+            ):
                 start_bar += 1
-                end_bar = get_end_bar(score_indices, start_bar, self.dataset.max_seq_len, self.dataset.max_bar)
+                end_bar = get_end_bar(
+                    score_indices, start_bar, self.dataset.max_seq_len, self.dataset.max_bar
+                )
 
             if start_bar - meta.start_bar == 0:  # nothing new
                 break
 
-            new_start_idx += np.where(sample.score.ids[..., bar_idx] - _bar_0 >= start_bar)[0][0].item()
+            new_start_idx += np.where(sample.score.ids[..., bar_idx] - _bar_0 >= start_bar)[0][
+                0
+            ].item()
 
             # get the next sample
             meta.start_bar, meta.end_bar = start_bar, end_bar

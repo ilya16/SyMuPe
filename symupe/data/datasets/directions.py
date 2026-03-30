@@ -1,4 +1,5 @@
-""" Performance direction dataset and utilities. """
+"""Performance direction dataset and utilities."""
+
 from __future__ import annotations
 
 import json
@@ -14,12 +15,12 @@ from .score_performance import ScorePerformanceDataset
 
 
 def build_score_direction_maps(
-        sp_dataset: ScorePerformanceDataset,
-        score_directions_dict: dict[str, list[dict]],
-        direction_keys: list[str] | None = None,
-        bar_stretch: int | None = None,
-        time_division: int = 480,
-        disable_tqdm: bool = True
+    sp_dataset: ScorePerformanceDataset,
+    score_directions_dict: dict[str, list[dict]],
+    direction_keys: list[str] | None = None,
+    bar_stretch: int | None = None,
+    time_division: int = 480,
+    disable_tqdm: bool = True,
 ):
     score_direction_bar_maps, score_direction_note_maps = [], []
     direction_score_bar_maps, direction_score_note_maps = {}, {}
@@ -60,7 +61,8 @@ def build_score_direction_maps(
                     direction_note_maps[key] = np.zeros(len(score_seq))
                 note_map = direction_note_maps[key]
 
-                note_map[np.where(np.logical_and(d["start"] <= score_notes, d["end"] >= score_notes))] = 1
+                ids = np.where(np.logical_and(d["start"] <= score_notes, d["end"] >= score_notes))
+                note_map[ids] = 1
 
             elif d.get("offset", None) is not None:  # note articulation
                 if key not in direction_note_maps:
@@ -89,21 +91,21 @@ def build_score_direction_maps(
     return {
         "score": {
             "bar": score_direction_bar_maps,
-            "note": score_direction_note_maps
+            "note": score_direction_note_maps,
         },
         "direction": {
             "bar": direction_score_bar_maps,
-            "note": direction_score_note_maps
-        }
+            "note": direction_score_note_maps,
+        },
     }
 
 
 def get_all_direction_embeddings(
-        sp_dataset: ScorePerformanceDataset,
-        score_direction_maps: list[dict[str, np.ndarray]],
-        embeddings: np.ndarray | torch.Tensor,
-        performance_ids: np.ndarray | torch.Tensor,
-        key: str
+    sp_dataset: ScorePerformanceDataset,
+    score_direction_maps: list[dict[str, np.ndarray]],
+    embeddings: np.ndarray | torch.Tensor,
+    performance_ids: np.ndarray | torch.Tensor,
+    key: str,
 ):
     direction_embeddings = []
     for score_idx, score in enumerate(sp_dataset.score_names):
@@ -114,17 +116,17 @@ def get_all_direction_embeddings(
         for perf in sp_dataset.metadata[score]:
             perf_idx = sp_dataset.performances._name_to_idx[perf]
             perf_embs = embeddings[performance_ids == perf_idx]
-            perf_dir_embs = perf_embs[dir_map == 1.]
+            perf_dir_embs = perf_embs[dir_map == 1.0]
             direction_embeddings.append(perf_dir_embs)
 
     return torch.cat(direction_embeddings, dim=0)
 
 
 def get_direction_performances_map(
-        sp_dataset: ScorePerformanceDataset,
-        score_direction_maps: list[dict[str, np.ndarray]],
-        key: str,
-        level: str = "bar"
+    sp_dataset: ScorePerformanceDataset,
+    score_direction_maps: list[dict[str, np.ndarray]],
+    key: str,
+    level: str = "bar",
 ):
     dir_perf_map = []
     for score_idx, score in enumerate(sp_dataset.score_names):
@@ -149,7 +151,11 @@ def get_performance_idx_map(sp_dataset: ScorePerformanceDataset, level="bar"):
     for score_idx, score in enumerate(sp_dataset.score_names):
         score_seq = sp_dataset.scores[score_idx]
         for perf in sp_dataset.metadata[score]:
-            num_ids = score_seq.ids[-1, 0] - sp_dataset.tokenizer.zero_token + 1 if level == "bar" else len(score_seq)
+            num_ids = (
+                score_seq.ids[-1, 0] - sp_dataset.tokenizer.zero_token + 1
+                if level == "bar"
+                else len(score_seq)
+            )
             perf_ids.append(np.full(num_ids, sp_dataset.performances._name_to_idx[perf]))
 
     return np.concatenate(perf_ids, axis=0)
@@ -157,27 +163,25 @@ def get_performance_idx_map(sp_dataset: ScorePerformanceDataset, level="bar"):
 
 class DirectionBarEmbeddingDataset(Dataset):
     def __init__(
-            self,
-            sp_dataset: ScorePerformanceDataset,
-            direction_keys: list[str],
-
-            embedding_data_dict: str | Path | None = None,
-            split: str | None = None,
-            embeddings: np.ndarray | torch.Tensor | None = None,
-
-            score_directions_dict: str | Path | dict[str, list[dict]] | None = None,
-            direction_bar_stretch: int | None = None,
-
-            remove_multi_label: bool = False,
-            negative_samples: float = 1.0,
-            num_prev_embeddings: int = 0
+        self,
+        sp_dataset: ScorePerformanceDataset,
+        direction_keys: list[str],
+        embedding_data_dict: str | Path | None = None,
+        split: str | None = None,
+        embeddings: np.ndarray | torch.Tensor | None = None,
+        score_directions_dict: str | Path | dict[str, list[dict]] | None = None,
+        direction_bar_stretch: int | None = None,
+        remove_multi_label: bool = False,
+        negative_samples: float = 1.0,
+        num_prev_embeddings: int = 0,
     ):
         self.sp_dataset = sp_dataset
         self.direction_keys = direction_keys
 
         # embeddings
-        assert embedding_data_dict is not None or embeddings is not None, \
+        assert embedding_data_dict is not None or embeddings is not None, (
             "One of `embedding_data_dict` and `embeddings` should be provided to DirectionEmbeddingDataset"
+        )
 
         if embeddings is None:
             embedding_data_dict = torch.load(embedding_data_dict, map_location="cpu")
@@ -199,7 +203,12 @@ class DirectionBarEmbeddingDataset(Dataset):
 
         # build indices for each direction
         direction_maps = [
-            (key, get_direction_performances_map(sp_dataset, self.score_direction_maps, key, level="bar"))
+            (
+                key,
+                get_direction_performances_map(
+                    sp_dataset, self.score_direction_maps, key, level="bar"
+                ),
+            )
             for key in direction_keys
         ]
 
@@ -215,8 +224,7 @@ class DirectionBarEmbeddingDataset(Dataset):
             for _, dir_map in direction_maps:
                 counts[dir_map] += 1
             direction_maps = [
-                (key, np.logical_and(dir_map, counts == 1.))
-                for key, dir_map in direction_maps
+                (key, np.logical_and(dir_map, counts == 1.0)) for key, dir_map in direction_maps
             ]
 
         self.direction_maps = dict(direction_maps)
@@ -227,13 +235,14 @@ class DirectionBarEmbeddingDataset(Dataset):
 
         # compute number of direction embeddings and dataset length
         direction_numbers = {
-            key: dir_perf_map.sum()
-            for key, dir_perf_map in self.direction_maps.items()
+            key: dir_perf_map.sum() for key, dir_perf_map in self.direction_maps.items()
         }
 
         # limit number of no-direction embeddings
         num_dir_embs = sum([num for key, num in direction_numbers.items() if key is not None])
-        direction_numbers[None] = min(self.direction_maps[None].sum(), int(negative_samples * num_dir_embs))
+        direction_numbers[None] = min(
+            self.direction_maps[None].sum(), int(negative_samples * num_dir_embs)
+        )
 
         self.direction_numbers = direction_numbers
         self._length = sum(self.direction_numbers.values())
@@ -263,7 +272,7 @@ class DirectionBarEmbeddingDataset(Dataset):
                 if start_idx == 0 or self.perf_ids[start_idx - 1] != self.perf_ids[emb_idx]:
                     break
                 start_idx -= 1
-            emb = self.embeddings[start_idx:emb_idx + 1]
+            emb = self.embeddings[start_idx : emb_idx + 1]
         else:
             emb = self.embeddings[emb_idx]
 
@@ -273,7 +282,8 @@ class DirectionBarEmbeddingDataset(Dataset):
         label = self._sample_keys[idx]
 
         if label is None:
-            emb_idx = self._nodir_ids[np.random.randint(0, self.direction_numbers[None])]  # sample arbitrary embedding
+            # sample arbitrary embedding
+            emb_idx = self._nodir_ids[np.random.randint(0, self.direction_numbers[None])]
         else:
             emb_idx = self._sample_ids[idx]
 

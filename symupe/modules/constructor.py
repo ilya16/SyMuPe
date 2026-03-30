@@ -1,4 +1,5 @@
-""" Config-based Module Constructor. """
+"""Config-based Module Constructor."""
+
 from __future__ import annotations
 
 import copy
@@ -17,11 +18,14 @@ class ModuleConfig:
         return getattr(self, key, default)
 
     def update(self, **kwargs):
-        kwargs = {key: kwargs.get(key, MISSING) for key in kwargs if not key.startswith("_")}  # get rid of service keys
+        # get rid of service keys
+        kwargs = {key: kwargs.get(key, MISSING) for key in kwargs if not key.startswith("_")}
         invalid_keys = [key for key in kwargs if key not in self.__dict__]
         if invalid_keys:
-            logger.warning(f"The following params are incompatible with the config {self.__name__}, "
-                           f"so they will be ignored: {invalid_keys}.")
+            logger.warning(
+                f"The following params are incompatible with the config {self.__name__}, "
+                f"so they will be ignored: {invalid_keys}."
+            )
             kwargs = {key: value for key, value in kwargs.items() if key not in invalid_keys}
 
         for key, value in kwargs.items():
@@ -35,7 +39,9 @@ class ModuleConfig:
             if missing:
                 raise RuntimeError(f"The following params are mandatory to set: {missing}")
 
-        return copy.deepcopy(self.__dict__) if make_copy else {k: v for k, v in self.__dict__.items()}
+        return (
+            copy.deepcopy(self.__dict__) if make_copy else {k: v for k, v in self.__dict__.items()}
+        )
 
 
 class Constructor:
@@ -53,10 +59,11 @@ class Constructor:
             return isinstance(param, (torch.nn.Module, torch.nn.Parameter, torch.optim.Optimizer))
 
         module_parameters = {
-            key: value for key, value in parameters.items()
-            if is_module_parameter(value)
+            key: value for key, value in parameters.items() if is_module_parameter(value)
         }
-        parameters = {key: value for key, value in parameters.items() if key not in module_parameters}
+        parameters = {
+            key: value for key, value in parameters.items() if key not in module_parameters
+        }
         config = merge(config or {}, parameters)
         for key, value in module_parameters.items():
             config[key] = value
@@ -73,8 +80,10 @@ class Constructor:
         if "kwargs" not in signature_:
             invalid_keys = [key for key in config if key not in signature_]
             if invalid_keys:
-                logger.warning(f"The following params are incompatible with the {cls.__name__} constructor, "
-                               f"so they will be ignored: {invalid_keys}.")
+                logger.warning(
+                    f"The following params are incompatible with the {cls.__name__} constructor, "
+                    f"so they will be ignored: {invalid_keys}."
+                )
                 config = {key: value for key, value in config.items() if key not in invalid_keys}
 
         missing = [key for key, value in config.items() if value == MISSING]
@@ -118,11 +127,7 @@ class Registry:
     def __init__(self):
         self._objects = {}
 
-    def register(
-            self,
-            name: str,
-            module: Callable[any, any] | None = None
-    ):
+    def register(self, name: str, module: Callable[any, any] | None = None):
         if not isinstance(name, str):
             raise TypeError(f"`name` must be a str, got {name}")
 
@@ -140,7 +145,9 @@ class Registry:
         try:
             return self._objects[key]
         except KeyError:
-            raise KeyError(f"'{key}' not found in registry. Available names: {self.available_names}")
+            raise KeyError(
+                f"'{key}' not found in registry. Available names: {self.available_names}"
+            )
 
     def remove(self, name):
         self._objects.pop(name)

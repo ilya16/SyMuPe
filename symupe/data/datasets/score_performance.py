@@ -1,4 +1,5 @@
-""" Score-Performance token sequence datasets. """
+"""Score-Performance token sequence datasets."""
+
 from __future__ import annotations
 
 import copy
@@ -17,13 +18,14 @@ from torch.utils.data import Dataset
 
 from symupe.utils import prob2bool, load_json, dump_json, tqdm_iterator
 from .base import NoteSegments, DATA_SPLITS, SequenceTask
-from .token_sequence import load_and_process_token_sequence, TokenSequenceDataset, LocalTokenSequenceDataset
-from .utils import get_num_bars, compute_sample_positions, get_end_bar, load_token_sequence
-from ..helpers import (
-    TupleTokenSequenceProcessor,
-    TokenSequenceBarIndexer,
-    TokenSequenceAugmentations
+from .indexers import TokenSequenceBarIndexer
+from .processors import TupleTokenSequenceProcessor, TokenSequenceAugmentations
+from .token_sequence import (
+    load_and_process_token_sequence,
+    TokenSequenceDataset,
+    LocalTokenSequenceDataset,
 )
+from .utils import get_num_bars, compute_sample_positions, get_end_bar, load_token_sequence
 from ..tokenizers import TOKENIZERS, SyMuPe, TokSequence, EncodingType
 
 
@@ -62,55 +64,50 @@ class ScorePerformanceSample:
 
 class ScorePerformanceDataset(Dataset):
     def __init__(
-            self,
-            scores: TokenSequenceDataset,
-            performances: TokenSequenceDataset,
-            metadata: dict[str, list[str]],
-            tokenizer: SyMuPe | dict[str, object],
-            score_token_types: list[str] | None = None,
-            performance_token_types: list[str] | None = None,
-            alignments: dict[str, np.ndarray] | None = None,
-            auxiliary_data: dict[str, object] | None = None,
-            performance_directions: str | Path | list[str] | dict[str, list[str]] | None = None,
-            score_directions_dict: str | Path | dict[str, list[dict]] | None = None,
-
-            max_seq_len: int = 512,
-            max_bar: int = 256,
-            bar_sliding_window: int = 16,
-
-            sample_bars: bool | float = False,
-            sample_note_shift: bool | float = False,
-            max_note_shift_ratio: float = 0.2,
-            force_max_seq_len: bool | float = False,
-
-            fit_to_max_bar: bool = False,
-            shift_bar_to_zero: bool = False,
-            sample_bar_shift: bool | float = False,
-
-            context_prev_bars: int = 0,
-            context_next_bars: int = 0,
-
-            add_sos_eos: bool = False,
-
-            sample: bool = False,
-            seed: int = 23,
-
-            augment_performance: bool | float = False,
-            pitch_shift_range: tuple[int, int] = (-3, 3),
-            velocity_shift_range: tuple[int, int] = (-4, 4),
-            tempo_stretch_range: tuple[float, float] = (-0.1, 0.1),
-
-            noisy_performance: bool = False,
-            noise_strength: float = 0.5,
-            noisy_random_bars: bool | float = 0.5,
-
-            deadpan_performance: bool | float = False,
-
-            quantize_values: bool | float = False,
-            clip_values: bool = False,
-            normalize_values: bool = False,
-
-            **kwargs
+        self,
+        scores: TokenSequenceDataset,
+        performances: TokenSequenceDataset,
+        metadata: dict[str, list[str]],
+        tokenizer: SyMuPe | dict[str, object],
+        score_token_types: list[str] | None = None,
+        performance_token_types: list[str] | None = None,
+        alignments: dict[str, np.ndarray] | None = None,
+        auxiliary_data: dict[str, object] | None = None,
+        performance_directions: str | Path | list[str] | dict[str, list[str]] | None = None,
+        score_directions_dict: str | Path | dict[str, list[dict]] | None = None,
+        # sequence lengths
+        max_seq_len: int = 512,
+        max_bar: int = 256,
+        bar_sliding_window: int = 16,
+        sample_bars: bool | float = False,
+        sample_note_shift: bool | float = False,
+        max_note_shift_ratio: float = 0.2,
+        force_max_seq_len: bool | float = False,
+        fit_to_max_bar: bool = False,
+        shift_bar_to_zero: bool = False,
+        sample_bar_shift: bool | float = False,
+        # context
+        context_prev_bars: int = 0,
+        context_next_bars: int = 0,
+        # special tokens
+        add_sos_eos: bool = False,
+        # sampling
+        sample: bool = False,
+        seed: int = 23,
+        # augmentations
+        augment_performance: bool | float = False,
+        pitch_shift_range: tuple[int, int] = (-3, 3),
+        velocity_shift_range: tuple[int, int] = (-4, 4),
+        tempo_stretch_range: tuple[float, float] = (-0.1, 0.1),
+        noisy_performance: bool = False,
+        noise_strength: float = 0.5,
+        noisy_random_bars: bool | float = 0.5,
+        deadpan_performance: bool | float = False,
+        # tokens/values
+        quantize_values: bool | float = False,
+        clip_values: bool = False,
+        normalize_values: bool = False,
+        **kwargs,
     ):
         self.metadata = metadata
 
@@ -138,14 +135,16 @@ class ScorePerformanceDataset(Dataset):
         self.encoding = self.tokenizer.__class__.__name__
 
         self.score_token_types = score_token_types or list(self.tokenizer.score_sizes.keys())
-        self.performance_token_types = performance_token_types or list(self.tokenizer.performance_sizes.keys())
+        self.performance_token_types = performance_token_types or list(
+            self.tokenizer.performance_sizes.keys()
+        )
 
         self.score_token_sizes = {
-            key: num for key, num in self.tokenizer.sizes.items()
-            if key in self.score_token_types
+            key: num for key, num in self.tokenizer.sizes.items() if key in self.score_token_types
         }
         self.performance_token_sizes = {
-            key: num for key, num in self.tokenizer.sizes.items()
+            key: num
+            for key, num in self.tokenizer.sizes.items()
             if key in self.performance_token_types
         }
 
@@ -153,7 +152,7 @@ class ScorePerformanceDataset(Dataset):
         self.augment_performance = augment_performance
         self.noisy_performance = noisy_performance
 
-        if self.augment_performance == 0. and not self.noisy_performance:
+        if self.augment_performance == 0.0 and not self.noisy_performance:
             pitch_shift_range = velocity_shift_range = tempo_stretch_range = (0, 0)
 
         self.noise_strength = noise_strength
@@ -186,9 +185,13 @@ class ScorePerformanceDataset(Dataset):
 
         # load or compute number of bars in performances used to build samples
         self.bars = getattr(self, "bars", {})
-        for perf_idx, perf in enumerate(tqdm_iterator(self.performance_names, desc="Precomputing bars...")):
+        for perf_idx, perf in enumerate(
+            tqdm_iterator(self.performance_names, desc="Precomputing bars...")
+        ):
             if perf not in self.bars:
-                self.bars[perf] = get_num_bars(self.performances[perf_idx], tokenizer=self.tokenizer)
+                self.bars[perf] = get_num_bars(
+                    self.performances[perf_idx], tokenizer=self.tokenizer
+                )
         _perf_num_bars = np.array([self.bars[perf] for perf in self.performance_names])
 
         # compute sample positions
@@ -209,8 +212,9 @@ class ScorePerformanceDataset(Dataset):
         self.force_max_seq_len = force_max_seq_len
 
         # bar of the first note
-        assert not (fit_to_max_bar and shift_bar_to_zero), \
+        assert not (fit_to_max_bar and shift_bar_to_zero), (
             "Only one of `fit_to_max_bar`/`fit_to_zero_bar` could be set to True"
+        )
         self.fit_to_max_bar = fit_to_max_bar
         self.shift_bar_to_zero = shift_bar_to_zero
         self.sample_bar_shift = sample_bar_shift
@@ -234,8 +238,9 @@ class ScorePerformanceDataset(Dataset):
 
         performance_direction_sizes = None
         if performance_directions is not None:
-            assert score_directions_dict is not None, \
+            assert score_directions_dict is not None, (
                 "`score_directions_dict` should be provided with `performance_directions`"
+            )
             if isinstance(performance_directions, (list, ListConfig)):
                 performance_directions = {"directions": list(performance_directions)}
             elif isinstance(performance_directions, DictConfig):
@@ -256,6 +261,7 @@ class ScorePerformanceDataset(Dataset):
         self.score_direction_maps = None
         if score_directions_dict is not None:
             from .directions import build_score_direction_maps
+
             performance_directions = [
                 item for group_keys in self.performance_directions.values() for item in group_keys
             ]
@@ -274,17 +280,23 @@ class ScorePerformanceDataset(Dataset):
             score_direction_note_maps = self.score_direction_maps[score_idx]
             total_notes += len(self.scores[score_idx]) * len(self.metadata[score])
             for group_name, group_directions in self.performance_directions.items():
-                directions_nums[group_name][none_key] += len(self.scores[score_idx]) * len(self.metadata[score])
+                directions_nums[group_name][none_key] += len(self.scores[score_idx]) * len(
+                    self.metadata[score]
+                )
                 for i, key in enumerate(group_directions):
                     if key in score_direction_note_maps:
                         num_notes = int(score_direction_note_maps[key].sum())
                     else:
                         num_notes = 0
-                    directions_nums[group_name][(i + 1, key)] += num_notes * len(self.metadata[score])
+                    directions_nums[group_name][(i + 1, key)] += num_notes * len(
+                        self.metadata[score]
+                    )
 
         weights = {}
         for group_name, group_directions in self.performance_directions.items():
-            not_empty = sum(directions_nums[group_name].values()) - directions_nums[group_name][none_key]
+            not_empty = (
+                sum(directions_nums[group_name].values()) - directions_nums[group_name][none_key]
+            )
             directions_nums[group_name][none_key] = (total_notes - not_empty) / total_notes
 
             for i, key in enumerate(group_directions):
@@ -295,7 +307,7 @@ class ScorePerformanceDataset(Dataset):
         return directions_nums, weights
 
     def _get_augmentations(
-            self, meta: ScorePerformanceSampleMeta, is_noisy_perf: bool = False
+        self, meta: ScorePerformanceSampleMeta, is_noisy_perf: bool = False
     ) -> TokenSequenceAugmentations | None:
         if meta is None:
             if self.sample and prob2bool(self.augment_performance) and not is_noisy_perf:
@@ -310,10 +322,10 @@ class ScorePerformanceDataset(Dataset):
             return meta.augmentations
 
     def _augment_sequence(
-            self,
-            seq: TokSequence,
-            augmentations: TokenSequenceAugmentations | None = None,
-            is_perf: bool = True
+        self,
+        seq: TokSequence,
+        augmentations: TokenSequenceAugmentations | None = None,
+        is_perf: bool = True,
     ) -> tuple[TokSequence, np.ndarray]:
         if augmentations is None:
             return seq, np.ones_like(seq.ids[:, 0]).astype(bool)
@@ -330,8 +342,12 @@ class ScorePerformanceDataset(Dataset):
         seq.values = seq.values[mask] if seq.values is not None else None
         return seq, mask
 
-    def get(self, idx: int | None = None, meta: ScorePerformanceSampleMeta | None = None) -> ScorePerformanceSample:
-        assert idx is not None or meta is not None, "one of `idx`/`meta` should be provided as an argument"
+    def get(
+        self, idx: int | None = None, meta: ScorePerformanceSampleMeta | None = None
+    ) -> ScorePerformanceSample:
+        assert idx is not None or meta is not None, (
+            "one of `idx`/`meta` should be provided as an argument"
+        )
 
         # get performance
         if meta is None:
@@ -348,10 +364,14 @@ class ScorePerformanceDataset(Dataset):
 
         score_indices = self._score_indices[score_idx]
         if score_indices is None:
-            score_indices = self._score_indices[score_idx] = self.indexer.compute_bar_indices(score_tok_seq)
+            score_indices = self._score_indices[score_idx] = self.indexer.compute_bar_indices(
+                score_tok_seq
+            )
         perf_indices = self._perf_indices[perf_idx]
         if perf_indices is None:
-            perf_indices = self._perf_indices[perf_idx] = self.indexer.compute_bar_indices(perf_tok_seq)
+            perf_indices = self._perf_indices[perf_idx] = self.indexer.compute_bar_indices(
+                perf_tok_seq
+            )
 
         score_total_bars = score_indices.shape[0] - 1
         perf_total_bars = perf_indices.shape[0] - 1
@@ -360,11 +380,15 @@ class ScorePerformanceDataset(Dataset):
         # compute start bar index
         if meta is None:
             start_bar = self._sample_positions[idx]
-            start_bar = min(start_bar, perf_indices.shape[0] - self.bar_sliding_window // 2)  # bars of silent notes
+            start_bar = min(
+                start_bar, perf_indices.shape[0] - self.bar_sliding_window // 2
+            )  # bars of silent notes
             if self.sample and prob2bool(self.sample_bars):
                 low = max(0, start_bar - self.bar_sliding_window // 2)
-                high = min(min(score_total_bars, perf_total_bars) - self.bar_sliding_window // 4,
-                           start_bar + self.bar_sliding_window // 2)
+                high = min(
+                    min(score_total_bars, perf_total_bars) - self.bar_sliding_window // 4,
+                    start_bar + self.bar_sliding_window // 2,
+                )
                 high = max(low + 1, high)
                 start_bar = np.random.randint(low, high)
         else:
@@ -388,7 +412,10 @@ class ScorePerformanceDataset(Dataset):
 
         # compute start and end indices
         score_start, score_end = score_indices[start_bar], score_indices[end_bar + 1]
-        perf_start, perf_end = perf_indices[start_bar], perf_indices[min(end_bar + 1, perf_total_bars)]
+        perf_start, perf_end = (
+            perf_indices[start_bar],
+            perf_indices[min(end_bar + 1, perf_total_bars)],
+        )
 
         # if bar does not fit or overfits `max_seq_len`
         if score_start == score_end or score_end - score_start > self.max_seq_len:
@@ -402,18 +429,23 @@ class ScorePerformanceDataset(Dataset):
                 max_note_shift = int(self.max_note_shift_ratio * self.max_seq_len)
                 score_next_start = score_indices[min(start_bar + 1, score_total_bars)]
                 if score_next_start > score_start:
-                    start_note_shift = np.random.randint(0, min(score_next_start - score_start, max_note_shift))
+                    start_note_shift = np.random.randint(
+                        0, min(score_next_start - score_start, max_note_shift)
+                    )
 
                 score_prev_end = max(score_indices[max(0, end_bar)], score_start + start_note_shift)
                 if score_prev_end - score_end + 1 < 0:
-                    end_note_shift = np.random.randint(max(-max_note_shift, score_prev_end - score_end + 1), 1)
+                    end_note_shift = np.random.randint(
+                        max(-max_note_shift, score_prev_end - score_end + 1), 1
+                    )
 
             # force `max_seq_len` even if the sequence is shorter (note: for the sequence tail might be no-op)
             if prob2bool(self.force_max_seq_len):
+                _start, _end = score_start + start_note_shift, score_end + end_note_shift
                 end_note_shift += min(
-                    self.max_seq_len - (score_end + end_note_shift - (score_start + start_note_shift)),
-                    score_total_notes - (score_end + end_note_shift),
-                    score_indices[min(start_bar + self.max_bar - 1, score_total_bars)] - score_end
+                    self.max_seq_len - (_end - _start),
+                    score_total_notes - _end,
+                    score_indices[min(start_bar + self.max_bar - 1, score_total_bars)] - score_end,
                 )
         else:
             start_note_shift, end_note_shift = meta.note_shifts
@@ -430,7 +462,11 @@ class ScorePerformanceDataset(Dataset):
             perf_seq = replace(
                 perf_tok_seq,
                 ids=copy.copy(perf_tok_seq.ids[perf_indices]),
-                values=copy.copy(perf_tok_seq.values[perf_indices]) if perf_tok_seq.values is not None else None,
+                values=(
+                    copy.copy(perf_tok_seq.values[perf_indices])
+                    if perf_tok_seq.values is not None
+                    else None
+                ),
             )
         else:
             perf_seq = perf_tok_seq[perf_start:perf_end]
@@ -447,17 +483,20 @@ class ScorePerformanceDataset(Dataset):
         bars, beats, onsets = self.tokenizer.compute_bar_beat_onset_indices(score_tok_seq)
         bars, beats, onsets = map(
             lambda s: s[score_start:score_end] - s[score_start] + self.tokenizer.zero_token,
-            (bars, beats, onsets)
+            (bars, beats, onsets),
         )
 
         # shift bar indices
         shifts, shift_to_zero = None, False
         if meta is None:
-            if self.fit_to_max_bar and score_start != 0:  # do not move for the starting note as it has SOS token
+            # do not move for the starting note as it has SOS token
+            if self.fit_to_max_bar and score_start != 0:
                 # to make bar index distribute in [0, bar_max)
                 if self.sample and prob2bool(self.sample_bar_shift):
                     shifts = {
-                        "Bar": np.random.randint(-min_bar, -min_bar + max(1, self.max_bar - (max_bar - min_bar + 1)))
+                        "Bar": np.random.randint(
+                            -min_bar, -min_bar + max(1, self.max_bar - (max_bar - min_bar + 1))
+                        )
                     }
                 elif max_bar >= self.max_bar:
                     # move in proportion to `score_total_bars`
@@ -468,7 +507,9 @@ class ScorePerformanceDataset(Dataset):
         else:
             shifts = meta.position_shifts
 
-        score_seq, shifts = self.tokenizer.shift_positions(score_seq, shifts=shifts, shift_to_zero=shift_to_zero)
+        score_seq, shifts = self.tokenizer.shift_positions(
+            score_seq, shifts=shifts, shift_to_zero=shift_to_zero
+        )
         perf_seq, shifts = self.tokenizer.shift_positions(perf_seq, shifts=shifts)
 
         # augmentations
@@ -495,7 +536,9 @@ class ScorePerformanceDataset(Dataset):
         if self.noisy_performance:
             noisy_augmentations = self._get_augmentations(meta, is_noisy_perf=True)
             noisy_perf_seq = replace(perf_seq)
-            noisy_perf_seq, _ = self._augment_sequence(noisy_perf_seq, noisy_augmentations, is_perf=True)
+            noisy_perf_seq, _ = self._augment_sequence(
+                noisy_perf_seq, noisy_augmentations, is_perf=True
+            )
             if len(noisy_perf_seq) < len(perf_seq):
                 # pitch overflow, omit by reverting changes for now
                 noisy_perf_seq = replace(perf_seq)
@@ -504,16 +547,23 @@ class ScorePerformanceDataset(Dataset):
                 bar_ids = np.arange(self.max_bar)
                 np.random.shuffle(bar_ids)
                 bar_0 = self.tokenizer.zero_token
-                noisy_perf_seq[:, _bar_index] = bar_ids[noisy_perf_seq[:, _bar_index] - bar_0] + bar_0
+                noisy_perf_seq[:, _bar_index] = (
+                    bar_ids[noisy_perf_seq[:, _bar_index] - bar_0] + bar_0
+                )
 
         # just a random sequence that might be used during MLM
         random_perf = replace(
             perf_seq,
-            ids=np.stack([
-                np.random.randint(low=self.tokenizer.zero_token, high=num, size=(len(perf_seq) + 2,))
-                for i, num in enumerate(self.tokenizer.performance_sizes.values())
-            ], axis=-1),
-            values=None
+            ids=np.stack(
+                [
+                    np.random.randint(
+                        low=self.tokenizer.zero_token, high=num, size=(len(perf_seq) + 2,)
+                    )
+                    for i, num in enumerate(self.tokenizer.performance_sizes.values())
+                ],
+                axis=-1,
+            ),
+            values=None,
         )
 
         # compute values if required
@@ -533,7 +583,12 @@ class ScorePerformanceDataset(Dataset):
             if self.normalize_values:
                 self.tokenizer.normalize_values(seq)
 
-        zeros = np.zeros((score_seq.ids.shape[0], perf_tok_seq.ids.shape[1] - score_seq.ids.shape[1]))
+        zeros = np.zeros(
+            (
+                score_seq.ids.shape[0],
+                perf_tok_seq.ids.shape[1] - score_seq.ids.shape[1],
+            )
+        )
         score_seq.ids = np.concatenate([score_seq.ids, zeros.astype(int)], axis=1)
         if score_seq.values is not None:
             score_seq.values = np.concatenate([score_seq.values, zeros], axis=1)
@@ -544,18 +599,26 @@ class ScorePerformanceDataset(Dataset):
             if score_start == 0:
                 score_seq = self.tokenizer.add_sos_token(score_seq)
                 perf_seq = self.tokenizer.add_sos_token(perf_seq)
-                noisy_perf_seq = self.tokenizer.add_sos_token(noisy_perf_seq) if exists(noisy_perf_seq) else None
+                noisy_perf_seq = (
+                    self.tokenizer.add_sos_token(noisy_perf_seq)
+                    if noisy_perf_seq is not None
+                    else None
+                )
                 bars, beats, onsets = map(
                     lambda s: np.concatenate([[s[0] if len(s) else self.tokenizer.zero_token], s]),
-                    (bars, beats, onsets)
+                    (bars, beats, onsets),
                 )
             if score_end == score_total_notes:
                 score_seq = self.tokenizer.add_eos_token(score_seq)
                 perf_seq = self.tokenizer.add_eos_token(perf_seq)
-                noisy_perf_seq = self.tokenizer.add_eos_token(noisy_perf_seq) if exists(noisy_perf_seq) else None
+                noisy_perf_seq = (
+                    self.tokenizer.add_eos_token(noisy_perf_seq)
+                    if noisy_perf_seq is not None
+                    else None
+                )
                 bars, beats, onsets = map(
                     lambda s: np.concatenate([s, [s[-1] if len(s) else self.tokenizer.zero_token]]),
-                    (bars, beats, onsets)
+                    (bars, beats, onsets),
                 )
 
         # note performance direction labels
@@ -566,10 +629,17 @@ class ScorePerformanceDataset(Dataset):
                 directions[group_name] = {}
                 for i, key in enumerate(group_directions):
                     if key in score_direction_note_maps:
-                        note_map = copy.copy(score_direction_note_maps[key][score_start:score_end])[mask]
+                        note_map = copy.copy(score_direction_note_maps[key][score_start:score_end])
+                        note_map = note_map[mask]
                         if self.add_sos_eos:
-                            note_map = np.concatenate([[0], note_map]) if score_start == 0 else note_map
-                            note_map = np.concatenate([note_map, [0]]) if score_end == score_total_notes else note_map
+                            note_map = (
+                                np.concatenate([[0], note_map]) if score_start == 0 else note_map
+                            )
+                            note_map = (
+                                np.concatenate([note_map, [0]])
+                                if score_end == score_total_notes
+                                else note_map
+                            )
                     else:
                         note_map = np.zeros(len(score_seq))
                     directions[group_name][(i + 1, key)] = note_map.astype(int)  # 0 is for None
@@ -589,7 +659,9 @@ class ScorePerformanceDataset(Dataset):
                 ctx_start_offset = min(ctx_start_offset, len(score_seq) - 1)
 
                 ctx_end_offset = np.where(bars <= bars[-1] - ctx_next_bars)[0]
-                ctx_end_offset = ctx_end_offset[-1] - len(score_seq) + 1 if len(ctx_end_offset) else 0
+                ctx_end_offset = (
+                    ctx_end_offset[-1] - len(score_seq) + 1 if len(ctx_end_offset) else 0
+                )
                 ctx_end_offset = len(score_seq) + ctx_end_offset
                 ctx_end_offset = min(max(ctx_end_offset, ctx_start_offset + 1), len(score_seq))
 
@@ -607,8 +679,8 @@ class ScorePerformanceDataset(Dataset):
             if len(self.performance_token_types) != seq.ids.shape[-1]:
                 self.tokenizer.compress(seq, token_types=self.performance_token_types)
 
-        random_perf.ids = random_perf.ids[:len(perf_seq)]
-        random_perf.values = random_perf.values[:len(perf_seq)]
+        random_perf.ids = random_perf.ids[: len(perf_seq)]
+        random_perf.values = random_perf.values[: len(perf_seq)]
 
         # build sample metadata
         meta = ScorePerformanceSampleMeta(
@@ -626,7 +698,7 @@ class ScorePerformanceDataset(Dataset):
             noisy_augmentations=noisy_augmentations,
             encoding_type=EncodingType.PERFORMANCE,
             is_deadpan=use_deadpan,
-            token_sizes=self.performance_token_sizes
+            token_sizes=self.performance_token_sizes,
         )
 
         return ScorePerformanceSample(
@@ -637,13 +709,13 @@ class ScorePerformanceDataset(Dataset):
             segments=NoteSegments(
                 bar=bars,
                 beat=beats,
-                onset=onsets
+                onset=onsets,
             ),
             task_idx=SequenceTask.list().index(SequenceTask.PERFORMANCE),
             context_offsets=context_offsets,
             directions=directions,
             is_deadpan=use_deadpan,
-            random_perf=random_perf
+            random_perf=random_perf,
         )
 
     def __getitem__(self, idx: int) -> ScorePerformanceSample:
@@ -655,62 +727,58 @@ class ScorePerformanceDataset(Dataset):
 
 class LocalScorePerformanceDataset(ScorePerformanceDataset):
     def __init__(
-            self,
-            root: str,
-            metadata: str = "metadata.json",
-            split: str = "train",
-            extension: str = ".json",
-            tokenizer: str = "config.json",
-            score_token_types: list[str] | None = None,
-            performance_token_types: list[str] | None = None,
-            use_alignments: bool = False,
-            auxiliary_data_keys: list[str] | None = None,
-            save_auxiliary_data: bool = True,
-            performance_directions: str | Path | list[str] | dict[str, list[str]] | None = None,
-            score_directions_dict: str | Path | None = None,
-
-            max_seq_len: int = 512,
-            max_bar: int = 256,
-            bar_sliding_window: int = 16,
-
-            sample_bars: bool | float = False,
-            sample_note_shift: bool | float = False,
-            max_note_shift_ratio: float = 0.2,
-            force_max_seq_len: bool | float = False,
-
-            fit_to_max_bar: bool = False,
-            shift_bar_to_zero: bool = False,
-            sample_bar_shift: bool | float = False,
-
-            context_prev_bars: int = 0,
-            context_next_bars: int = 0,
-
-            add_sos_eos: bool = False,
-
-            sample: bool = False,
-            seed: int = 23,
-
-            augment_performance: bool | float = False,
-            pitch_shift_range: tuple[int, int] = (-3, 3),
-            velocity_shift_range: tuple[int, int] = (-4, 4),
-            tempo_stretch_range: tuple[float, float] = (-0.1, 0.1),
-
-            noisy_performance: bool = False,
-            noise_strength: float = 0.5,
-            noisy_random_bars: bool | float = 0.5,
-
-            deadpan_performance: bool | float = False,
-
-            quantize_values: bool | float = False,
-            clip_values: bool = False,
-            normalize_values: bool = False,
-
-            zero_out_silent_durations: bool = True,
-            delete_silent_notes: bool = False,
-
-            preload: bool = False,
-            cache: bool = True,
-            **kwargs
+        self,
+        root: str,
+        metadata: str = "metadata.json",
+        split: str = "train",
+        extension: str = ".json",
+        tokenizer: str = "config.json",
+        score_token_types: list[str] | None = None,
+        performance_token_types: list[str] | None = None,
+        use_alignments: bool = False,
+        auxiliary_data_keys: list[str] | None = None,
+        save_auxiliary_data: bool = True,
+        performance_directions: str | Path | list[str] | dict[str, list[str]] | None = None,
+        score_directions_dict: str | Path | None = None,
+        # sequence lengths
+        max_seq_len: int = 512,
+        max_bar: int = 256,
+        bar_sliding_window: int = 16,
+        sample_bars: bool | float = False,
+        sample_note_shift: bool | float = False,
+        max_note_shift_ratio: float = 0.2,
+        force_max_seq_len: bool | float = False,
+        fit_to_max_bar: bool = False,
+        shift_bar_to_zero: bool = False,
+        sample_bar_shift: bool | float = False,
+        # context
+        context_prev_bars: int = 0,
+        context_next_bars: int = 0,
+        # special tokens
+        add_sos_eos: bool = False,
+        # sampling
+        sample: bool = False,
+        seed: int = 23,
+        # augmentations
+        augment_performance: bool | float = False,
+        pitch_shift_range: tuple[int, int] = (-3, 3),
+        velocity_shift_range: tuple[int, int] = (-4, 4),
+        tempo_stretch_range: tuple[float, float] = (-0.1, 0.1),
+        noisy_performance: bool = False,
+        noise_strength: float = 0.5,
+        noisy_random_bars: bool | float = 0.5,
+        deadpan_performance: bool | float = False,
+        # tokens/values
+        quantize_values: bool | float = False,
+        clip_values: bool = False,
+        normalize_values: bool = False,
+        # preprocessing
+        zero_out_silent_durations: bool = True,
+        delete_silent_notes: bool = False,
+        # memory cache
+        preload: bool = False,
+        cache: bool = True,
+        **kwargs,
     ):
 
         self.root = root
@@ -738,7 +806,8 @@ class LocalScorePerformanceDataset(ScorePerformanceDataset):
             alignment_file = os.path.join(self.root, "alignments.json")
             if os.path.exists(alignment_file):
                 alignments = {
-                    key: np.array(values) for key, values in load_json(alignment_file).items()
+                    key: np.array(values)
+                    for key, values in load_json(alignment_file).items()
                     if key in self._performance_map
                 }
 
@@ -763,7 +832,7 @@ class LocalScorePerformanceDataset(ScorePerformanceDataset):
         score_load_fn = partial(
             load_and_process_token_sequence,
             load_fn=load_tokens_fn,
-            processing_funcs=seq_proc_funcs
+            processing_funcs=seq_proc_funcs,
         )
         scores = LocalTokenSequenceDataset(
             root=self.root,
@@ -771,13 +840,13 @@ class LocalScorePerformanceDataset(ScorePerformanceDataset):
             extension=extension,
             load_fn=score_load_fn,
             preload=preload,
-            cache=cache
+            cache=cache,
         )
 
         perf_load_fn = partial(
             load_and_process_token_sequence,
             load_fn=load_tokens_fn,
-            processing_funcs=seq_proc_funcs + perf_seq_proc_funcs
+            processing_funcs=seq_proc_funcs + perf_seq_proc_funcs,
         )
         performances = LocalTokenSequenceDataset(
             root=self.root,
@@ -785,7 +854,7 @@ class LocalScorePerformanceDataset(ScorePerformanceDataset):
             extension=extension,
             load_fn=perf_load_fn,
             preload=preload,
-            cache=cache
+            cache=cache,
         )
 
         # load auxiliary data
@@ -832,7 +901,7 @@ class LocalScorePerformanceDataset(ScorePerformanceDataset):
             deadpan_performance=deadpan_performance,
             quantize_values=quantize_values,
             clip_values=clip_values,
-            normalize_values=normalize_values
+            normalize_values=normalize_values,
         )
 
         if save_auxiliary_data:

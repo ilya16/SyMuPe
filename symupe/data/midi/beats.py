@@ -8,7 +8,7 @@ BEATS_IN_BARS = {
     9: 3,
     18: 3,
     12: 4,
-    24: 4
+    24: 4,
 }
 
 
@@ -17,10 +17,10 @@ def get_ticks_per_bar(time_sig: TimeSignature, ticks_per_quarter: int = 480):
 
 
 def get_inter_beat_interval(
-        *,
-        time_sig: TimeSignature | None,
-        ticks_per_bar: int | None = None,
-        ticks_per_quarter: int = 480
+    *,
+    time_sig: TimeSignature | None,
+    ticks_per_bar: int | None = None,
+    ticks_per_quarter: int = 480,
 ):
     if ticks_per_bar is None:
         ticks_per_bar = get_ticks_per_bar(time_sig, ticks_per_quarter=ticks_per_quarter)
@@ -32,13 +32,15 @@ def get_inter_beat_interval(
 
 
 def get_bar_beat_ticks(
-        midi: Score | None = None,
-        *,
-        time_sigs: list[TimeSignature] | None = None,
-        ticks_per_quarter: int | None = None,
-        max_tick: int | None = None
+    midi: Score | None = None,
+    *,
+    time_sigs: list[TimeSignature] | None = None,
+    ticks_per_quarter: int | None = None,
+    max_tick: int | None = None,
 ):
-    assert midi is not None or all(map(lambda x: x is not None, (time_sigs, ticks_per_quarter, max_tick)))
+    assert midi is not None or all(
+        map(lambda x: x is not None, (time_sigs, ticks_per_quarter, max_tick))
+    )
 
     if midi is not None:
         time_sigs = midi.time_signatures
@@ -66,17 +68,21 @@ def get_bar_beat_ticks(
 
 
 def get_performance_beats(
-        score_beats: np.ndarray,
-        position_pairs: np.ndarray,
-        monotonic_times: bool = False,
-        ticks_per_quarter: int = 480
+    score_beats: np.ndarray,
+    position_pairs: np.ndarray,
+    monotonic_times: bool = False,
+    ticks_per_quarter: int = 480,
 ):
     if monotonic_times:
         mono_position_pairs = [position_pairs[0]]
         cur_pair = prev_pair = position_pairs[0]
         for pair in position_pairs[1:]:
             min_shift_time = (pair[0] - cur_pair[0]) / ticks_per_quarter / 10  # tempo 600
-            if pair[0] != prev_pair[0] and pair[1] > prev_pair[1] and pair[1] > cur_pair[1] + min_shift_time:
+            if (
+                pair[0] != prev_pair[0]
+                and pair[1] > prev_pair[1]
+                and pair[1] > cur_pair[1] + min_shift_time
+            ):
                 mono_position_pairs.append(pair)
                 cur_pair = pair
             prev_pair = pair
@@ -117,7 +123,9 @@ def get_performance_beats(
             left_tick, right_tick = onset_ticks[left], onset_ticks[right]
             left_time, right_time = perf_times[left], perf_times[right]
 
-            perf_beat = left_time + (right_time - left_time) * (beat - left_tick) / (right_tick - left_tick)
+            perf_beat = left_time + (right_time - left_time) * (beat - left_tick) / (
+                right_tick - left_tick
+            )
 
         perf_beats.append(perf_beat)
 

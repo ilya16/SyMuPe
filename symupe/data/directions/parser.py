@@ -1,4 +1,5 @@
-""" MusicXML performance direction data parsing. """
+"""MusicXML performance direction data parsing."""
+
 from __future__ import annotations
 
 import partitura as pt
@@ -10,9 +11,9 @@ from .words import extract_direction_with_class, word_regularization
 
 
 def parse_directions(
-        score: pt.score.Score,
-        delete_duplicates: bool = False,
-        ticks_scale: float = 1.
+    score: pt.score.Score,
+    delete_duplicates: bool = False,
+    ticks_scale: float = 1.0,
 ):
     # anacrusis
     xml_shift = 0
@@ -37,7 +38,7 @@ def parse_directions(
                     "type": f"{dkey}/{dtype}",
                     "start": d.start.t,
                     "end": d.end.t if d.end else d.start.t,
-                    "raw_text": d.raw_text
+                    "raw_text": d.raw_text,
                 }
                 part_directions.append(d_dict)
 
@@ -53,7 +54,7 @@ def parse_directions(
                     "type": f"{TEMPO_PREFIX}/{dtype}",
                     "start": d.start.t,
                     "end": d.end.t if d.end else None,
-                    "raw_text": d.raw_text
+                    "raw_text": d.raw_text,
                 }
                 part_directions.append(d_dict)
 
@@ -66,18 +67,24 @@ def parse_directions(
                     "type": f"{TEMPO_PREFIX}/{dtype}",
                     "start": d.start.t,
                     "end": d.end.t if d.end else None,
-                    "raw_text": d.text
+                    "raw_text": d.text,
                 }
                 part_directions.append(d_dict)
 
         # process start/end of tempo directions without an `end`
-        part_directions = list(sorted(part_directions, key=lambda d: (d["start"], d["type"], d["end"])))
+        part_directions = list(
+            sorted(part_directions, key=lambda d: (d["start"], d["type"], d["end"]))
+        )
 
         endless_tempo = None
         prev_tempo = None
         for d_dict in part_directions:
             if "tempo" in d_dict["type"]:
-                if prev_tempo is not None and prev_tempo["end"] is not None and prev_tempo["end"] > d_dict["start"]:
+                if (
+                    prev_tempo is not None
+                    and prev_tempo["end"] is not None
+                    and prev_tempo["end"] > d_dict["start"]
+                ):
                     prev_tempo["end"] = d_dict["start"]
                 prev_tempo = d_dict
 
@@ -99,7 +106,7 @@ def parse_directions(
                     "type": f"{ARTICULATION_PREFIX}/{dtype}",
                     "start": d.start.t,
                     "end": d.end.t if d.end else None,
-                    "raw_text": d.raw_text
+                    "raw_text": d.raw_text,
                 }
                 part_directions.append(d_dict)
 
@@ -144,7 +151,7 @@ def parse_directions(
                     "start": note.start.t,
                     "end": end.t if end is not None else note.start.t,
                     "pitch": note.midi_pitch,
-                    "pitch_main": main_note.midi_pitch if main_note is not None else None
+                    "pitch_main": main_note.midi_pitch if main_note is not None else None,
                 }
                 part_directions.append(d_dict)
             if note.slur_stops:
@@ -153,25 +160,30 @@ def parse_directions(
                     "start": note.start.t,
                     "end": note.end.t,
                     "pitch": note.midi_pitch,
-                    "pitch_main": None
+                    "pitch_main": None,
                 }
                 part_directions.append(d_dict)
 
         # scale xml positions if needed
-        if xml_shift != 0 or ticks_scale != 1.:
+        if xml_shift != 0 or ticks_scale != 1.0:
             for d_dict in part_directions:
                 d_dict["start"] = int(ticks_scale * (d_dict["start"] + xml_shift))
                 if d_dict["end"]:
                     d_dict["end"] = int(ticks_scale * (d_dict["end"] + xml_shift))
 
         # sort directions
-        part_directions = list(sorted(part_directions, key=lambda d: (d["start"], d["type"], d["end"])))
+        part_directions = list(
+            sorted(part_directions, key=lambda d: (d["start"], d["type"], d["end"]))
+        )
 
         if delete_duplicates:
             i = 0
             while i < len(part_directions) - 1:
                 d_dict, next_d_dict = part_directions[i], part_directions[i + 1]
-                if d_dict["type"] == next_d_dict["type"] and d_dict["start"] == next_d_dict["start"]:
+                if (
+                    d_dict["type"] == next_d_dict["type"]
+                    and d_dict["start"] == next_d_dict["start"]
+                ):
                     del part_directions[i + 1]
                     continue
                 i += 1

@@ -3,6 +3,7 @@ Callbacks to use with the Trainer class and customize the training loop.
 
 Adapted from: https://github.com/huggingface/transformers/blob/main/src/transformers/trainer_callback.py
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -33,38 +34,51 @@ class TrainerState:
     """
 
     epoch: float | None = field(
-        default=0, metadata={"help": "The epoch the training is at "
-                                     "(the decimal part is percentage of the current epoch completed)."}
+        default=0,
+        metadata={
+            "help": "The epoch the training is at "
+            "(the decimal part is percentage of the current epoch completed)."
+        },
     )
     global_step: int = field(
-        default=0, metadata={"help": "The number of training steps completed."}
+        default=0,
+        metadata={"help": "The number of training steps completed."},
     )
     max_steps: int = field(
-        default=0, metadata={"help": "The maximum number of training steps to be completed."}
+        default=0,
+        metadata={"help": "The maximum number of training steps to be completed."},
     )
     num_train_epochs: int = field(
-        default=0, metadata={"help": "The number of training epochs to run."}
+        default=0,
+        metadata={"help": "The number of training epochs to run."},
     )
     epoch_step: int = field(
-        default=0, metadata={"help": "The number of training/evaluation epoch steps completed."}
+        default=0,
+        metadata={"help": "The number of training/evaluation epoch steps completed."},
     )
     log_history: list[dict[str, float]] = field(
-        default=None, metadata={"help": "The list of logs done since the beginning of training."}
+        default=None,
+        metadata={"help": "The list of logs done since the beginning of training."},
     )
     best_metric: float | None = field(
-        default=None, metadata={"help": "The current best metric value monitored during the training."}
+        default=None,
+        metadata={"help": "The current best metric value monitored during the training."},
     )
     last_model_checkpoint: str | None = field(
-        default=None, metadata={"help": "The path to the last saved model checkpoint."}
+        default=None,
+        metadata={"help": "The path to the last saved model checkpoint."},
     )
     best_model_checkpoint: str | None = field(
-        default=None, metadata={"help": "The path to the checkpoint related to the best metric."}
+        default=None,
+        metadata={"help": "The path to the checkpoint related to the best metric."},
     )
     is_main_process: bool = field(
-        default=True, metadata={"help": "Whether the current process is the global main process."}
+        default=True,
+        metadata={"help": "Whether the current process is the global main process."},
     )
     is_local_main_process: bool = field(
-        default=True, metadata={"help": "Whether the current process is the local main process."}
+        default=True,
+        metadata={"help": "Whether the current process is the local main process."},
     )
 
     def __post_init__(self):
@@ -109,33 +123,57 @@ class TrainerControl:
 
     should_training_stop: bool = field(
         default=False,
-        metadata={"help": ("Whether the training should be interrupted.",
-                           "If `True`, this variable will not be set back to `False`. The training will just stop.")}
+        metadata={
+            "help": (
+                "Whether the training should be interrupted.",
+                "If `True`, this variable will not be set back to `False`. The training will just stop.",
+            )
+        },
     )
     should_epoch_stop: bool = field(
         default=False,
-        metadata={"help": ("Whether the current epoch should be interrupted.",
-                           "If `True`, this variable will be set back to `False` at the beginning of the next epoch.")}
+        metadata={
+            "help": (
+                "Whether the current epoch should be interrupted.",
+                "If `True`, this variable will be set back to `False` at the beginning of the next epoch.",
+            )
+        },
     )
     should_save: bool = field(
         default=False,
-        metadata={"help": ("Whether the model should be saved at this step.",
-                           "If `True`, this variable will be set back to `False` at the beginning of the next step.")}
+        metadata={
+            "help": (
+                "Whether the model should be saved at this step.",
+                "If `True`, this variable will be set back to `False` at the beginning of the next step.",
+            )
+        },
     )
     should_evaluate: bool = field(
         default=False,
-        metadata={"help": ("Whether the the model should be evaluated at this step.",
-                           "If `True`, this variable will not be set back to `False`. The training will just stop.")}
+        metadata={
+            "help": (
+                "Whether the the model should be evaluated at this step.",
+                "If `True`, this variable will not be set back to `False`. The training will just stop.",
+            )
+        },
     )
     should_log: bool = field(
         default=False,
-        metadata={"help": ("Whether the logs should be reported at this step.",
-                           "If `True`, this variable will be set back to `False` at the beginning of the next step.")}
+        metadata={
+            "help": (
+                "Whether the logs should be reported at this step.",
+                "If `True`, this variable will be set back to `False` at the beginning of the next step.",
+            )
+        },
     )
     is_train: bool = field(
         default=False,
-        metadata={"help": ("Whether the Trainer is in training mode or not.",
-                           "Used to distinguish evaluation epochs inside training epochs.")}
+        metadata={
+            "help": (
+                "Whether the Trainer is in training mode or not.",
+                "Used to distinguish evaluation epochs inside training epochs.",
+            )
+        },
     )
 
     def _new_training(self):
@@ -195,69 +233,91 @@ class TrainerCallback(Constructor):
 
     """
 
-    def on_init_end(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_init_end(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         """
         Event called at the end of the initialization of the [`Trainer`].
         """
         pass
 
-    def on_train_begin(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_train_begin(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         """
         Event called at the beginning of training.
         """
         pass
 
-    def on_train_end(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_train_end(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         """
         Event called at the end of training.
         """
         pass
 
-    def on_epoch_begin(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_epoch_begin(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         """
         Event called at the beginning of an epoch.
         """
         pass
 
-    def on_epoch_end(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_epoch_end(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         """
         Event called at the end of an epoch.
         """
         pass
 
-    def on_step_begin(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_step_begin(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         """
         Event called at the beginning of a training step. If using gradient accumulation, one training step might take
         several inputs.
         """
         pass
 
-    def on_substep_end(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_substep_end(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         """
         Event called at the end of an substep during gradient accumulation.
         """
         pass
 
-    def on_step_end(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_step_end(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         """
         Event called at the end of a training step. If using gradient accumulation, one training step might take
         several inputs.
         """
         pass
 
-    def on_evaluate(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, metrics, **kwargs):
+    def on_evaluate(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, metrics, **kwargs
+    ):
         """
         Event called after an evaluation phase.
         """
         pass
 
-    def on_save(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_save(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         """
         Event called after a checkpoint save.
         """
         pass
 
-    def on_log(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, logs, **kwargs):
+    def on_log(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, logs, **kwargs
+    ):
         """
         Event called after logging the last logs.
         """
@@ -265,7 +325,7 @@ class TrainerCallback(Constructor):
 
 
 class CallbackHandler(TrainerCallback):
-    """ Internal class that just calls the list of callbacks in order. """
+    """Internal class that just calls the list of callbacks in order."""
 
     def __init__(self, callbacks, model, optimizer):
         self.callbacks = []
@@ -323,44 +383,66 @@ class CallbackHandler(TrainerCallback):
     def callback_list(self):
         return "\n".join(cb.__class__.__name__ for cb in self.callbacks)
 
-    def on_init_end(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_init_end(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         return self.call_event("on_init_end", config, state, control, **kwargs)
 
-    def on_train_begin(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_train_begin(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         control.should_training_stop = False
         return self.call_event("on_train_begin", config, state, control, **kwargs)
 
-    def on_train_end(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_train_end(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         return self.call_event("on_train_end", config, state, control, **kwargs)
 
-    def on_epoch_begin(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_epoch_begin(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         control.should_epoch_stop = False
         return self.call_event("on_epoch_begin", config, state, control, **kwargs)
 
-    def on_epoch_end(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_epoch_end(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         return self.call_event("on_epoch_end", config, state, control, **kwargs)
 
-    def on_step_begin(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_step_begin(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         control.should_log = False
         control.should_evaluate = False
         control.should_save = False
         return self.call_event("on_step_begin", config, state, control, **kwargs)
 
-    def on_substep_end(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_substep_end(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         return self.call_event("on_substep_end", config, state, control, **kwargs)
 
-    def on_step_end(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_step_end(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         return self.call_event("on_step_end", config, state, control, **kwargs)
 
-    def on_evaluate(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, metrics, **kwargs):
+    def on_evaluate(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, metrics, **kwargs
+    ):
         control.should_evaluate = False
         return self.call_event("on_evaluate", config, state, control, metrics=metrics, **kwargs)
 
-    def on_save(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_save(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         control.should_save = False
         return self.call_event("on_save", config, state, control, **kwargs)
 
-    def on_log(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, logs, **kwargs):
+    def on_log(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, logs, **kwargs
+    ):
         control.should_log = False
         return self.call_event("on_log", config, state, control, logs=logs, **kwargs)
 
@@ -401,23 +483,31 @@ class DefaultFlowCallback(TrainerCallback):
     A [`TrainerCallback`] that handles the default flow of the training loop for logs, evaluation and checkpoints.
     """
 
-    def on_step_end(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_step_end(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         # Log
         if state.global_step == 1 and config.log_first_step:
             control.should_log = True
-        if config.log_strategy == IntervalStrategy.STEPS and state.global_step % config.log_steps == 0:
+        if (
+            config.log_strategy == IntervalStrategy.STEPS
+            and state.global_step % config.log_steps == 0
+        ):
             control.should_log = True
 
         if control.is_train:
             # Evaluate
-            if config.eval_strategy == IntervalStrategy.STEPS and state.global_step % config.eval_steps == 0:
+            if (
+                config.eval_strategy == IntervalStrategy.STEPS
+                and state.global_step % config.eval_steps == 0
+            ):
                 control.should_evaluate = True
 
             # Save
             if (
-                    config.save_strategy == IntervalStrategy.STEPS
-                    and config.save_steps > 0
-                    and state.global_step % config.save_steps == 0
+                config.save_strategy == IntervalStrategy.STEPS
+                and config.save_steps > 0
+                and state.global_step % config.save_steps == 0
             ):
                 control.should_save = True
 
@@ -431,7 +521,9 @@ class DefaultFlowCallback(TrainerCallback):
 
         return control
 
-    def on_epoch_end(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_epoch_end(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         # Log
         if config.log_strategy == IntervalStrategy.EPOCH:
             control.should_log = True
@@ -467,7 +559,9 @@ class ProgressCallback(TrainerCallback):
         if config.eval_first_step and state.global_step == 0:
             control.should_evaluate = True
 
-    def on_epoch_begin(self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_epoch_begin(
+        self, config: TrainerConfig, state: TrainerState, control: TrainerControl, **kwargs
+    ):
         if state.is_local_main_process:
             if control.is_train:
                 self.training_bar = tqdm(total=kwargs.get("steps_in_epoch", None))
@@ -485,7 +579,7 @@ class ProgressCallback(TrainerCallback):
 
                 if control.is_train:
                     lr = kwargs.get("lr", None)
-                    desc += f"" if lr is None else f", lr: {lr:.3g}"
+                    desc += "" if lr is None else f", lr: {lr:.3g}"
 
                     grad_norm = kwargs.get("grad_norm", None)
                     desc += f", gn: {grad_norm}" if grad_norm is None else f", gn: {grad_norm:.3f}"
@@ -572,19 +666,6 @@ class TrackerCallback(TrainerCallback):
 
     def __init__(self, accelerator: Accelerator):
         self.accelerator = accelerator
-
-    # def on_train_begin(self, config, state, control, **kwargs):
-    #     self.accelerator.log({"trainer_config": config.to_json_string()})
-    #
-    #     exp_config = kwargs.get("exp_config", None)
-    #     if exp_config is not None:
-    #         def to_json_string(cfg):
-    #             return json.dumps(OmegaConf.to_container(cfg, resolve=True), indent=2)
-    #
-    #         self.accelerator.log({
-    #             "data_config": to_json_string(exp_config.data),
-    #             "model_config": to_json_string(exp_config.model),
-    #         })
 
     def on_log(self, args, state, control, logs=None, **kwargs):
         self.accelerator.log(logs, step=state.global_step)

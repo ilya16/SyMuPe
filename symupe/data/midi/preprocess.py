@@ -8,21 +8,21 @@ from ..midi import utils as midi_utl
 
 
 def preprocess_midi(
-        midi: Score,
-        to_single_track: bool = True,
-        sort_events: bool = True,
-        clean_duplicates: bool = True,
-        cut_overlapped_notes: bool = False,
-        clean_short_notes: bool = False,
-        filter_extra_events: bool = False,
-        pitch_range: tuple[int, int] | None = (21, 108),
-        min_tick_shift: int | None = None,
-        min_tick_duration: int | None = None,
-        min_time_shift: float | None = None,
-        min_time_duration: float | None = None,
-        max_silence: float | None = None,
-        downsample_ticks_per_quarter: int | None = None,
-        target_ticks_per_quarter: int | None = None
+    midi: Score,
+    to_single_track: bool = True,
+    sort_events: bool = True,
+    clean_duplicates: bool = True,
+    cut_overlapped_notes: bool = False,
+    clean_short_notes: bool = False,
+    filter_extra_events: bool = False,
+    pitch_range: tuple[int, int] | None = (21, 108),
+    min_tick_shift: int | None = None,
+    min_tick_duration: int | None = None,
+    min_time_shift: float | None = None,
+    min_time_duration: float | None = None,
+    max_silence: float | None = None,
+    downsample_ticks_per_quarter: int | None = None,
+    target_ticks_per_quarter: int | None = None,
 ):
     if len(midi.tracks) == 0:
         return midi
@@ -56,7 +56,9 @@ def preprocess_midi(
         target_ticks_per_quarter = target_ticks_per_quarter or midi.ticks_per_quarter
 
     if target_ticks_per_quarter is not None:
-        midi = midi_utl.resample_midi(midi, ticks_per_quarter=target_ticks_per_quarter, min_duration=min_duration)
+        midi = midi_utl.resample_midi(
+            midi, ticks_per_quarter=target_ticks_per_quarter, min_duration=min_duration
+        )
 
     for track in midi.tracks:
         if clean_duplicates:
@@ -81,8 +83,8 @@ def preprocess_midi(
         midi = midi_utl.clip_silence(midi, max_silence=max_silence)
 
     if filter_extra_events:
-        midi = midi_utl.filter_extra_midi_events(midi, sort=sort_events, use_sustain_boundaries=True)
+        midi = midi_utl.filter_extra_midi_events(
+            midi, sort=sort_events, use_sustain_boundaries=True
+        )
 
     return midi
-
-

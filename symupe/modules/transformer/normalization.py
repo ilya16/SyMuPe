@@ -1,4 +1,5 @@
-""" Transformer Normalization layers. """
+"""Transformer Normalization layers."""
+
 from __future__ import annotations
 
 import torch
@@ -54,27 +55,23 @@ class AdaptiveLayerNorm(nn.Module):
 
 
 class RMSNorm(nn.Module):
-    def __init__(
-        self,
-        dim,
-        unit_offset = True
-    ):
+    def __init__(self, dim: int, unit_offset: bool = True):
         super().__init__()
         self.unit_offset = unit_offset
-        self.scale = dim ** 0.5
+        self.scale = dim**0.5
 
         self.gamma = nn.Parameter(torch.zeros(dim))
-        nn.init.constant_(self.gamma, 1. - float(unit_offset))
+        nn.init.constant_(self.gamma, 1.0 - float(unit_offset))
 
     def forward(self, x) -> torch.Tensor:
         gamma = self.gamma + float(self.unit_offset)
-        return F.normalize(x, dim = -1) * self.scale * gamma
+        return F.normalize(x, dim=-1) * self.scale * gamma
 
 
 class AdaptiveRMSNorm(nn.Module):
     def __init__(self, dim: int, condition_dim: int):
         super().__init__()
-        self.scale = dim ** 0.5
+        self.scale = dim**0.5
 
         self.gamma = nn.Linear(condition_dim, dim)
         nn.init.zeros_(self.gamma.weight)
@@ -82,6 +79,6 @@ class AdaptiveRMSNorm(nn.Module):
     def forward(self, x, condition: torch.Tensor) -> torch.Tensor:
         condition = condition.unsqueeze(1) if condition.ndim == 2 else condition
 
-        normed = F.normalize(x, dim = -1)
+        normed = F.normalize(x, dim=-1)
         gamma = self.gamma(condition)
-        return normed * self.scale * (gamma + 1.)
+        return normed * self.scale * (gamma + 1.0)

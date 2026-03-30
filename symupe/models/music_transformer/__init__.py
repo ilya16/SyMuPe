@@ -1,12 +1,16 @@
 from .evaluator import (
     MusicTransformerEvaluator,
     CFMMusicTransformerEvaluator,
-    FMMusicTransformerEvaluator
+    FMMusicTransformerEvaluator,
 )
 from .model import (
-    MusicTransformerConfig, MusicTransformer,
-    CFMMusicTransformerConfig, CFMMusicTransformer,
-    DFMMusicTransformerConfig, DFMMusicTransformer,
-    FMMusicTransformerConfig, FMMusicTransformer
+    MusicTransformerConfig,
+    MusicTransformer,
+    CFMMusicTransformerConfig,
+    CFMMusicTransformer,
+    DFMMusicTransformerConfig,
+    DFMMusicTransformer,
+    FMMusicTransformerConfig,
+    FMMusicTransformer,
 )
 from .inference import MusicTransformerGenerator, CFMMusicTransformerGenerator

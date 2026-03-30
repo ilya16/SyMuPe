@@ -1,4 +1,5 @@
-""" Score-Performance data collators. """
+"""Score-Performance data collators."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -9,12 +10,7 @@ import torch
 
 from symupe.utils import asdict
 from .base import SeqInputs, SeqSegments
-from .sequence import (
-    SequenceCollator,
-    LMSequenceCollator,
-    MixedLMSequenceCollator,
-    MaskLevel
-)
+from .sequence import SequenceCollator, LMSequenceCollator, MixedLMSequenceCollator, MaskLevel
 from ..datasets.score_performance import ScorePerformanceSample
 
 
@@ -32,22 +28,22 @@ class ScorePerformanceInputs:
 
 class ScorePerformanceCollator(SequenceCollator):
     def __init__(
-            self,
-            pad_token_id: int = 0,
-            pad_to_multiple_of: int = 1
+        self,
+        pad_token_id: int = 0,
+        pad_to_multiple_of: int = 1,
     ):
         super().__init__(pad_token_id, pad_to_multiple_of)
 
     def get_max_lengths(self, batch: Sequence[ScorePerformanceSample], inference: bool = False):
-        lens_perf = np.array(list(map(lambda sample: len(sample.perf), batch))).T
-        lens_score = np.array(list(map(lambda sample: len(sample.score), batch))).T
+        lens_perf = self.get_lengths(batch, "perf")
+        lens_score = self.get_lengths(batch, "score")
         max_lens = {
             "performance": self.pad_len(np.max(lens_perf)),
-            "score": self.pad_len(np.max(lens_score))
+            "score": self.pad_len(np.max(lens_score)),
         }
 
         if all((sample.noisy_perf is not None for sample in batch)):
-            lens_noisy_perf = np.array(list(map(lambda sample: len(sample.noisy_perf), batch))).T
+            lens_noisy_perf = self.get_lengths(batch, "noisy_perf")
             max_lens["noisy_perf"] = self.pad_len(np.max(lens_noisy_perf))
 
         return max_lens
@@ -58,35 +54,49 @@ class ScorePerformanceCollator(SequenceCollator):
         sample, b = batch[0], len(batch)
         return ScorePerformanceInputs(
             scores=self._init_seq_data(
-                b, max_lens["score"],
-                compound_factor=sample.score.ids.shape[-1]
+                b, max_lens["score"], compound_factor=sample.score.ids.shape[-1]
             ),
             performances=self._init_seq_data(
-                b, max_lens["performance"],
-                compound_factor=sample.perf.ids.shape[-1]
+                b, max_lens["performance"], compound_factor=sample.perf.ids.shape[-1]
             ),
-            noisy_performances=self._init_seq_data(
-                b, max_lens["noisy_perf"],
-                compound_factor=sample.noisy_perf.ids.shape[-1]
-            ) if "noisy_perf" in max_lens else None,
-            segments=SeqSegments(
-                bar=torch.zeros(b, max_lens["score"], dtype=torch.long),
-                beat=torch.zeros(b, max_lens["score"], dtype=torch.long),
-                onset=torch.zeros(b, max_lens["score"], dtype=torch.long)
-            ) if sample.segments is not None else None,
-            directions=torch.zeros(
-                b, max_lens["score"], len(sample.directions), dtype=torch.long
-            ) if sample.directions is not None else None,
+            noisy_performances=(
+                self._init_seq_data(
+                    b, max_lens["noisy_perf"], compound_factor=sample.noisy_perf.ids.shape[-1]
+                )
+                if "noisy_perf" in max_lens
+                else None
+            ),
+            segments=(
+                SeqSegments(
+                    bar=torch.zeros(b, max_lens["score"], dtype=torch.long),
+                    beat=torch.zeros(b, max_lens["score"], dtype=torch.long),
+                    onset=torch.zeros(b, max_lens["score"], dtype=torch.long),
+                )
+                if sample.segments is not None
+                else None
+            ),
+            directions=(
+                torch.zeros(b, max_lens["score"], len(sample.directions), dtype=torch.long)
+                if sample.directions is not None
+                else None
+            ),
             task_ids=torch.zeros(b, dtype=torch.long),
             deadpan_mask=torch.zeros(b, dtype=torch.bool),
-            random_performances=self._init_seq_data(
-                b, max_lens["performance"],
-                compound_factor=sample.perf.ids.shape[-1]
-            ) if sample.random_perf is not None else None
+            random_performances=(
+                self._init_seq_data(
+                    b, max_lens["performance"], compound_factor=sample.perf.ids.shape[-1]
+                )
+                if sample.random_perf is not None
+                else None
+            ),
         )
 
     def process_sample(
-            self, i: int, sample: ScorePerformanceSample, data: ScorePerformanceInputs, inference: bool = False
+        self,
+        i: int,
+        sample: ScorePerformanceSample,
+        data: ScorePerformanceInputs,
+        inference: bool = False,
     ):
         # process score
         self._process_sequence(i, seq=sample.score, seq_data=data.scores)
@@ -113,13 +123,20 @@ class ScorePerformanceCollator(SequenceCollator):
             seq_len = len(sample.score)
             for j, (group_name, group_directions) in enumerate(sample.directions.items()):
                 for (label, key), direction_map in group_directions.items():
-                    mask = direction_map != 0.
+                    mask = direction_map != 0.0
                     if np.any(mask):
-                        data.directions[i, :seq_len, j][mask] = label * torch.from_numpy(direction_map[mask])
+                        data.directions[i, :seq_len, j][mask] = label * torch.from_numpy(
+                            direction_map[mask]
+                        )
 
         data.deadpan_mask[i] = sample.is_deadpan
 
-    def __call__(self, batch: Sequence[ScorePerformanceSample], inference: bool = False, return_dict: bool = True):
+    def __call__(
+        self,
+        batch: Sequence[ScorePerformanceSample],
+        inference: bool = False,
+        return_dict: bool = True,
+    ):
         data = self.init_data(batch, inference=inference)
         for i, sample in enumerate(batch):
             self.process_sample(i, sample, data)
@@ -135,21 +152,20 @@ class LMScorePerformanceInputs(ScorePerformanceInputs):
 
 class LMScorePerformanceCollator(ScorePerformanceCollator, LMSequenceCollator):
     def __init__(
-            self,
-            pad_token_id: int = 0,
-            pad_to_multiple_of: int = 1,
-
-            mlm: bool = False,
-            mask_level: str | MaskLevel | dict[str | MaskLevel, float] = MaskLevel.NOTE,
-            mask_compound: bool = True,
-            mask_prob: float = 0.15,
-            replace_prob: float = 0.9,
-            random_token_prob: float = 0.,
-            copy_sequence_prob: float = 0.,
-            mask_token_id: int = 1,
-            mask_ignore_token_ids: list[int] | None = None,
-            mask_token_dims: list[list[int]] | list[int] | None = None,
-            label_pad_token_id: int = -100
+        self,
+        pad_token_id: int = 0,
+        pad_to_multiple_of: int = 1,
+        mlm: bool = False,
+        mask_level: str | MaskLevel | dict[str | MaskLevel, float] = MaskLevel.NOTE,
+        mask_compound: bool = True,
+        mask_prob: float = 0.15,
+        replace_prob: float = 0.9,
+        random_token_prob: float = 0.0,
+        copy_sequence_prob: float = 0.0,
+        mask_token_id: int = 1,
+        mask_ignore_token_ids: list[int] | None = None,
+        mask_token_dims: list[list[int]] | list[int] | None = None,
+        label_pad_token_id: int = -100,
     ):
         LMSequenceCollator.__init__(
             self,
@@ -165,10 +181,15 @@ class LMScorePerformanceCollator(ScorePerformanceCollator, LMSequenceCollator):
             mask_token_id=mask_token_id,
             mask_ignore_token_ids=mask_ignore_token_ids,
             mask_token_dims=mask_token_dims,
-            label_pad_token_id=label_pad_token_id
+            label_pad_token_id=label_pad_token_id,
         )
 
-    def __call__(self, batch: Sequence[ScorePerformanceSample], inference: bool = False, return_dict: bool = True):
+    def __call__(
+        self,
+        batch: Sequence[ScorePerformanceSample],
+        inference: bool = False,
+        return_dict: bool = True,
+    ):
         data = super().__call__(batch, inference=inference, return_dict=False)
 
         labels = self.mask_and_compute_labels(
@@ -176,7 +197,7 @@ class LMScorePerformanceCollator(ScorePerformanceCollator, LMSequenceCollator):
             random_sequences=data.random_performances,
             segments=data.segments,
             task_ids=data.task_ids,
-            num_tokens=batch[0].meta.token_sizes
+            num_tokens=batch[0].meta.token_sizes,
         )
 
         data = LMScorePerformanceInputs(
@@ -186,7 +207,7 @@ class LMScorePerformanceCollator(ScorePerformanceCollator, LMSequenceCollator):
             segments=data.segments,
             directions=data.directions,
             deadpan_mask=data.deadpan_mask,
-            labels=labels
+            labels=labels,
         )
 
         return asdict(data) if return_dict else data
@@ -199,14 +220,13 @@ class MixedLMScorePerformanceInputs(LMScorePerformanceInputs):
 
 class MixedLMScorePerformanceCollator(ScorePerformanceCollator, MixedLMSequenceCollator):
     def __init__(
-            self,
-            pad_token_id: int = 0,
-            pad_to_multiple_of: int = 1,
-
-            mask_token_id: int = 1,
-            mask_ignore_token_ids: list[int] | None = None,
-            mask_token_dims: list[int] | None = None,
-            label_pad_token_id: int = -100
+        self,
+        pad_token_id: int = 0,
+        pad_to_multiple_of: int = 1,
+        mask_token_id: int = 1,
+        mask_ignore_token_ids: list[int] | None = None,
+        mask_token_dims: list[int] | None = None,
+        label_pad_token_id: int = -100,
     ):
         MixedLMSequenceCollator.__init__(
             self,
@@ -215,10 +235,15 @@ class MixedLMScorePerformanceCollator(ScorePerformanceCollator, MixedLMSequenceC
             mask_token_id=mask_token_id,
             mask_ignore_token_ids=mask_ignore_token_ids,
             mask_token_dims=mask_token_dims,
-            label_pad_token_id=label_pad_token_id
+            label_pad_token_id=label_pad_token_id,
         )
 
-    def __call__(self, batch: Sequence[ScorePerformanceSample], inference: bool = False, return_dict: bool = True):
+    def __call__(
+        self,
+        batch: Sequence[ScorePerformanceSample],
+        inference: bool = False,
+        return_dict: bool = True,
+    ):
         data = super().__call__(batch, inference=inference, return_dict=False)
 
         masked_performances, labels = self.mask_and_compute_labels(sequences=data.performances)
@@ -231,7 +256,7 @@ class MixedLMScorePerformanceCollator(ScorePerformanceCollator, MixedLMSequenceC
             directions=data.directions,
             deadpan_mask=data.deadpan_mask,
             masked_performances=masked_performances,
-            labels=labels
+            labels=labels,
         )
 
         return asdict(data) if return_dict else data

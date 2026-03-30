@@ -1,4 +1,5 @@
-""" Trainer utility functions. """
+"""Trainer utility functions."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -30,7 +31,9 @@ class Accumulator:
 
     @property
     def mean_values(self):
-        return {key: self._sums[key] / self._counts[key] for key in self._sums if self._counts[key] > 0}
+        return {
+            key: self._sums[key] / self._counts[key] for key in self._sums if self._counts[key] > 0
+        }
 
     def items(self):
         return self.mean_values.items()

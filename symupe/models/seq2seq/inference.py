@@ -1,4 +1,5 @@
-""" MusicTransformer's inference modules. """
+"""MusicTransformer's inference modules."""
+
 from __future__ import annotations
 
 import copy
@@ -10,9 +11,13 @@ from tqdm.auto import tqdm
 from symupe.data.datasets import SequenceDataset, SequenceTask
 from symupe.data.datasets.base import TASK_SEQUENCE_SORTING, TASK_TO_ENCODINGS
 from symupe.data.tokenizers import (
-    TokSequence, TokSequenceContext,
-    SequenceType, EncodingType, SortingType, ENCODING_SORTING,
-    SyMuPe, SyMuPeTransformer
+    TokSequence,
+    TokSequenceContext,
+    SequenceType,
+    EncodingType,
+    SortingType,
+    ENCODING_SORTING,
+    SyMuPe,
 )
 from symupe.data.tokenizers.constants import SOS_TOKEN, EOS_TOKEN, MASK_TOKEN, SPECIAL_TOKENS_VALUE
 from .model import Seq2SeqMusicTransformer
@@ -41,22 +46,21 @@ class Seq2SeqData:
 
 class Seq2SeqMusicTransformerGenerator(Generator):
     def __init__(
-            self,
-            model: Seq2SeqMusicTransformer,
-            tokenizer: SyMuPe,
-            dataset: SequenceDataset | None = None,
-            used_token_types: list[str] | None = None,
-            mask_token_dims: dict[str, list[int]] | list[int] | None = None,
-            used_context_token_types: list[str] | None = None,
-            used_score_token_types: list[str] | None = None,
-
-            device: str | torch.device | None = None
+        self,
+        model: Seq2SeqMusicTransformer,
+        tokenizer: SyMuPe,
+        dataset: SequenceDataset | None = None,
+        used_token_types: list[str] | None = None,
+        mask_token_dims: dict[str, list[int]] | list[int] | None = None,
+        used_context_token_types: list[str] | None = None,
+        used_score_token_types: list[str] | None = None,
+        device: str | torch.device | None = None,
     ):
         super().__init__(
             model=model,
             tokenizer=tokenizer,
             dataset=dataset,
-            device=device
+            device=device,
         )
 
         self.context_dim = self.model.unwrapped_transformer.context_embedding_dim
@@ -77,13 +81,13 @@ class Seq2SeqMusicTransformerGenerator(Generator):
         self.data = Seq2SeqData()
 
     def prepare_sequence(
-            self,
-            seq_idx: int | None = None,
-            seq: TokSequence | None = None,
-            score_seq: TokSequence | None = None,
-            task: SequenceTask | str | None = None,
-            context_len: int = 0,
-            add_sos_eos: bool = False
+        self,
+        seq_idx: int | None = None,
+        seq: TokSequence | None = None,
+        score_seq: TokSequence | None = None,
+        task: SequenceTask | str | None = None,
+        context_len: int = 0,
+        add_sos_eos: bool = False,
     ) -> Seq2SeqData:
         assert seq_idx is not None or seq is not None, "One of `seq_idx` or `seq` must be provided."
 
@@ -108,10 +112,16 @@ class Seq2SeqMusicTransformerGenerator(Generator):
 
         def sort_sequence(tok_sequence, encoding_type):
             sort_by_time = False
-            if task in TASK_SEQUENCE_SORTING[SortingType.TIME] or encoding_type in ENCODING_SORTING[SortingType.TIME]:
+            if (
+                task in TASK_SEQUENCE_SORTING[SortingType.TIME]
+                or encoding_type in ENCODING_SORTING[SortingType.TIME]
+            ):
                 sort_by_time = True
 
-            is_sort_by_time = seq_type in (SequenceType.TIME_PERFORMANCE, SequenceType.TIME_PERFORMANCE_SUSTAIN)
+            is_sort_by_time = seq_type in (
+                SequenceType.TIME_PERFORMANCE,
+                SequenceType.TIME_PERFORMANCE_SUSTAIN,
+            )
             if is_sort_by_time != sort_by_time:
                 tok_sequence = self.tokenizer.sort_tokens(tok_sequence, by_time=sort_by_time)
 
@@ -126,7 +136,9 @@ class Seq2SeqMusicTransformerGenerator(Generator):
         # prepare condition token sequence
         cond_seq = None
         if self.used_context_token_types is not None:
-            cond_seq = self.tokenizer.compress(replace(seq), token_types=self.used_context_token_types)
+            cond_seq = self.tokenizer.compress(
+                replace(seq), token_types=self.used_context_token_types
+            )
             cond_seq.ids[context_len:] = self.mask_token_id
             cond_seq.values[context_len:] = self.mask_token_value
             cond_seq = cond_seq.torch(device=self.device)
@@ -139,7 +151,9 @@ class Seq2SeqMusicTransformerGenerator(Generator):
 
         # prepare context token sequence
         if score_seq is not None and self.used_score_token_types is not None:
-            score_seq = self.tokenizer.compress(replace(score_seq), token_types=self.used_score_token_types)
+            score_seq = self.tokenizer.compress(
+                replace(score_seq), token_types=self.used_score_token_types
+            )
             score_seq = self.tokenizer.normalize_values(self.tokenizer.clip_values(score_seq))
             score_seq = score_seq.torch(device=self.device)
 
@@ -177,12 +191,14 @@ class Seq2SeqMusicTransformerGenerator(Generator):
 
         # save initial and prepare generated sequence
         self.data.init_seq = init_seq
-        self.data.gen_seq = self.data.init_seq[:int(add_sos_eos) + context_len]
+        self.data.gen_seq = self.data.init_seq[: int(add_sos_eos) + context_len]
         self.data.context_len = context_len
 
         # prepare condition embeddings
         if self.context_dim > 0:
-            self.data.cond_embeddings = torch.zeros((len(init_seq), self.context_dim), device=self.device)
+            self.data.cond_embeddings = torch.zeros(
+                (len(init_seq), self.context_dim), device=self.device
+            )
 
         if self.tokenizer.has_token_types(init_seq, ["Bar", "Position"]):
             self.data.onset_token_dims = [init_seq.vocab["Bar"], init_seq.vocab["Position"]]
@@ -192,16 +208,16 @@ class Seq2SeqMusicTransformerGenerator(Generator):
         return self.data
 
     def generate_batch(
-            self,
-            num_sequences: int = 1,
-            max_new_notes: int = 16,
-            max_seq_len: int = 512,
-            cond_control: torch.Tensor | None = None,
-            cond_seq_control: dict[str, float] | None = None,
-            interpolated: bool = False,
-            group_onset_notes: bool = True,
-            disable_tqdm: bool = True,
-            **model_kwargs
+        self,
+        num_sequences: int = 1,
+        max_new_notes: int = 16,
+        max_seq_len: int = 512,
+        cond_control: torch.Tensor | None = None,
+        cond_seq_control: dict[str, float] | None = None,
+        interpolated: bool = False,
+        group_onset_notes: bool = True,
+        disable_tqdm: bool = True,
+        **model_kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         init_seq, gen_seq = self.data.init_seq, self.data.gen_seq
 
@@ -210,9 +226,6 @@ class Seq2SeqMusicTransformerGenerator(Generator):
         gen_values = gen_values.expand(num_sequences, -1, -1)
 
         current_note_idx = gen_tokens.shape[1]
-
-        has_condition = self.data.cond_embeddings is not None
-        cond_embeddings = self.data.cond_embeddings.clone().detach() if has_condition else None
 
         has_condition_seq = self.data.cond_seq is not None
         cond_seq = replace(self.data.cond_seq) if has_condition_seq else None
@@ -233,10 +246,10 @@ class Seq2SeqMusicTransformerGenerator(Generator):
         has_sos = known_input_len > 0 and input_tokens[0, 0, 0] == self.sos_token_id
         first_note_idx = int(has_sos)
 
-        # move context control to device if present
-        cond_control = cond_control.to(self.device) if has_condition and cond_control is not None else None
-
-        all_gen_tokens, all_gen_values = gen_tokens[:, first_note_idx:], gen_values[:, first_note_idx:]
+        all_gen_tokens, all_gen_values = (
+            gen_tokens[:, first_note_idx:],
+            gen_values[:, first_note_idx:],
+        )
 
         # generate all notes till the end
         if not disable_tqdm:
@@ -255,7 +268,11 @@ class Seq2SeqMusicTransformerGenerator(Generator):
                     positions = torch.cumsum(init_seq.values[:, odims], dim=-1)
 
                 if positions is not None:
-                    change_ids = (positions[cut_idx + 1:] != positions[cut_idx]).any(dim=-1).nonzero(as_tuple=True)[0]
+                    change_ids = (
+                        (positions[cut_idx + 1 :] != positions[cut_idx])
+                        .any(dim=-1)
+                        .nonzero(as_tuple=True)[0]
+                    )
                     if change_ids.numel() > 0:
                         cut_idx += change_ids[0].item()
 
@@ -271,8 +288,12 @@ class Seq2SeqMusicTransformerGenerator(Generator):
                 self.data.reached_eos = True
                 break
 
-            input_tokens = torch.cat([input_tokens, new_seq.ids[None].expand(num_sequences, -1, -1)], dim=1)
-            input_values = torch.cat([input_values, new_seq.values[None].expand(num_sequences, -1, -1)], dim=1)
+            input_tokens = torch.cat(
+                [input_tokens, new_seq.ids[None].expand(num_sequences, -1, -1)], dim=1
+            )
+            input_values = torch.cat(
+                [input_values, new_seq.values[None].expand(num_sequences, -1, -1)], dim=1
+            )
             input_len = input_tokens.shape[1]
             last_note_idx = input_len - int(has_eos)
 
@@ -285,26 +306,11 @@ class Seq2SeqMusicTransformerGenerator(Generator):
                 known_input_len -= shift
                 last_note_idx -= shift
                 start_idx += shift
-                # has_sos, first_note_idx = False, 0
-
-            # shift positions to zero before computation
-            # input_note_seq = replace(
-            #     self.data.seq,
-            #     ids=input_tokens[0, first_note_idx:last_note_idx],
-            #     values=input_values[0, first_note_idx:last_note_idx]
-            # )  # notes only, used for position shifting
-            # input_note_seq, shifts = self.tokenizer.shift_positions(
-            #     input_note_seq, shifts=None, shift_to_zero=True, normalized_values=True
-            # )
 
             # add context control if present
             note_slice = slice(start_idx, current_note_idx + num_new_notes)
             new_note_slice = slice(current_note_idx, current_note_idx + num_new_notes)
             context = None
-            # if has_condition:
-            #     if cond_control is not None:
-            #         cond_embeddings[new_note_slice] = cond_control
-            #     context = cond_embeddings[note_slice][None]
 
             context_tokens, context_values = None, None
             if has_condition_seq:
@@ -318,14 +324,22 @@ class Seq2SeqMusicTransformerGenerator(Generator):
                     cond_seq = self.tokenizer.normalize_values(cond_seq)
 
                 input_cond_seq = cond_seq[note_slice]
-                context_tokens = input_cond_seq.ids.clone().detach()[None].expand(num_sequences, -1, -1)
-                context_values = input_cond_seq.values.clone().detach()[None].expand(num_sequences, -1, -1)
+                context_tokens = (
+                    input_cond_seq.ids.clone().detach()[None].expand(num_sequences, -1, -1)
+                )
+                context_values = (
+                    input_cond_seq.values.clone().detach()[None].expand(num_sequences, -1, -1)
+                )
 
             score_tokens, score_values = None, None
             if has_score_seq:
                 input_score_seq = score_seq[note_slice]
-                score_tokens = input_score_seq.ids.clone().detach()[None].expand(num_sequences, -1, -1)
-                score_values = input_score_seq.values.clone().detach()[None].expand(num_sequences, -1, -1)
+                score_tokens = (
+                    input_score_seq.ids.clone().detach()[None].expand(num_sequences, -1, -1)
+                )
+                score_values = (
+                    input_score_seq.values.clone().detach()[None].expand(num_sequences, -1, -1)
+                )
 
             # generate next notes
             gen_tokens, gen_values = self.model.generate(
@@ -338,36 +352,28 @@ class Seq2SeqMusicTransformerGenerator(Generator):
                 dec_context_values=context_values,
                 dec_score_tokens=score_tokens,
                 dec_score_values=score_values,
-                context_tokens_dropout=1. if cond_seq_control is None else 0.,
+                context_tokens_dropout=1.0 if cond_seq_control is None else 0.0,
                 disable_tqdm=disable_tqdm,
                 context_len=known_input_len,
                 type_ids=torch.ones_like(input_tokens[..., 0]) if interpolated else None,
                 tokenizer=self.tokenizer,
                 force_known_tokens=True,
-                **model_kwargs
+                **model_kwargs,
             )
-
-            # shift back inplace for `input_tokens/values`
-            # self.tokenizer.shift_positions(input_note_seq, shifts=shifts, inverse_shifts=True, normalized_values=True)
-
-            # gen_seq = replace(
-            #     self.data.seq,
-            #     ids=gen_tokens[:, known_input_len:last_note_idx],
-            #     values=gen_values[known_input_len:last_note_idx],
-            # )
-            # gen_seq = self.tokenizer.denormalize_values(gen_seq)
-            # gen_seq = self.tokenizer.clip_values(gen_seq)
-            # self.tokenizer.shift_positions(gen_seq, shifts=shifts, inverse_shifts=True)
 
             # cut generated sequence
             gen_tokens = gen_tokens[:, known_input_len:last_note_idx][:, -num_new_notes:]
             gen_values = gen_values[:, known_input_len:last_note_idx][:, -num_new_notes:]
 
-            all_gen_tokens = gen_tokens.clone().detach() if all_gen_tokens is None else torch.cat(
-                [all_gen_tokens, gen_tokens], dim=1
+            all_gen_tokens = (
+                gen_tokens.clone().detach()
+                if all_gen_tokens is None
+                else torch.cat([all_gen_tokens, gen_tokens], dim=1)
             )
-            all_gen_values = gen_values.clone().detach() if all_gen_values is None else torch.cat(
-                [all_gen_values, gen_values], dim=1
+            all_gen_values = (
+                gen_values.clone().detach()
+                if all_gen_values is None
+                else torch.cat([all_gen_values, gen_values], dim=1)
             )
 
             # add generated notes
@@ -379,19 +385,18 @@ class Seq2SeqMusicTransformerGenerator(Generator):
             if not disable_tqdm:
                 pbar.update(num_new_notes)
 
-        self.data.reached_eos = (
-                self.data.reached_eos
-                and len(self.data.gen_seq[0]) - int(self.data.has_sos_eos) == len(self.data.source_seq)
+        self.data.reached_eos = self.data.reached_eos and (
+            len(self.data.gen_seq[0]) - int(self.data.has_sos_eos) == len(self.data.source_seq)
         )
 
         return all_gen_tokens, all_gen_values
 
     def generated_sequence(
-            self,
-            postprocess: bool = True,
-            encoding: EncodingType | str | None = None
+        self,
+        postprocess: bool = True,
+        encoding: EncodingType | str | None = None,
     ) -> TokSequence:
-        gen_seq = self.data.gen_seq[int(self.data.has_sos_eos):].numpy()
+        gen_seq = self.data.gen_seq[int(self.data.has_sos_eos) :].numpy()
 
         if postprocess:
             gen_seq = self.tokenizer.denormalize_values(gen_seq)
