@@ -9,6 +9,7 @@ Available models:
     - Seq2SeqDFMMusicTransformer
     - Seq2SeqFMMusicTransformer
 """
+
 from __future__ import annotations
 
 from abc import abstractmethod
@@ -26,16 +27,20 @@ from symupe.data.tokenizers.constants import SPECIAL_TOKENS_VALUE
 from symupe.modules.classes import LanguageModelingMode, ModelWrapper
 from symupe.modules.constructor import ModuleConfig
 from symupe.modules.tuple_transformer import (
-    TupleTransformerConfig, TupleTransformerOutput, TupleTransformer, TupleTransformerCache,
+    TupleTransformerConfig,
+    TupleTransformerOutput,
+    TupleTransformer,
+    TupleTransformerCache,
     TupleTransformerARWrapper,
-    TupleTransformerDFMWrapper, DFMIntermediates,
-    TupleTransformerFMWrapper, TupleTransformerFMOutput, FMIntermediates
+    TupleTransformerDFMWrapper,
+    DFMIntermediates,
+    TupleTransformerFMWrapper,
+    TupleTransformerFMOutput,
+    FMIntermediates,
 )
 from symupe.utils import asdict
 from ..base import Model
 
-
-# Seq2SeqMusicTransformer model
 
 @dataclass
 class Seq2SeqMusicTransformerConfig(ModuleConfig):
@@ -62,19 +67,19 @@ class Seq2SeqMusicTransformerOutput:
 
 class _Seq2SeqMusicTransformer(Model):
     def __init__(
-            self,
-            num_tokens: dict[str, int],
-            dim: int,
-            encoder: DictConfig | TupleTransformerConfig,
-            decoder: DictConfig | TupleTransformerConfig,
-            context_num_tokens: dict[str, int] | None = None,
-            score_num_tokens: dict[str, int] | None = None,
-            tie_token_emb: bool = False,
-            context_with_memory: bool = False,
-            tokenizer: SyMuPe | None = None,
-            token_keys: list[str] | None = None,
-            value_keys: list[str] | None = None,
-            wrapper_kwargs: dict | None = None
+        self,
+        num_tokens: dict[str, int],
+        dim: int,
+        encoder: DictConfig | TupleTransformerConfig,
+        decoder: DictConfig | TupleTransformerConfig,
+        context_num_tokens: dict[str, int] | None = None,
+        score_num_tokens: dict[str, int] | None = None,
+        tie_token_emb: bool = False,
+        context_with_memory: bool = False,
+        tokenizer: SyMuPe | None = None,
+        token_keys: list[str] | None = None,
+        value_keys: list[str] | None = None,
+        wrapper_kwargs: dict | None = None,
     ):
         super().__init__()
 
@@ -82,7 +87,7 @@ class _Seq2SeqMusicTransformer(Model):
             encoder,
             dim=encoder.get("dim", dim),
             num_tokens=num_tokens,
-            lm_head=None
+            lm_head=None,
         )
 
         self.decoder = TupleTransformer.init(
@@ -93,7 +98,7 @@ class _Seq2SeqMusicTransformer(Model):
             context_num_tokens=context_num_tokens,
             score_num_tokens=score_num_tokens,
             token_keys=token_keys,
-            value_keys=value_keys
+            value_keys=value_keys,
         )
 
         if tie_token_emb:
@@ -129,10 +134,10 @@ class _Seq2SeqMusicTransformer(Model):
         return self.unwrapped_decoder
 
     def _build_context(
-            self,
-            enc_out: TupleTransformerOutput,
-            enc_mask: torch.Tensor | None = None,
-            dec_context: torch.Tensor | None = None
+        self,
+        enc_out: TupleTransformerOutput,
+        enc_mask: torch.Tensor | None = None,
+        dec_context: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         context, context_mask = enc_out.hidden_state, enc_mask
 
@@ -155,16 +160,16 @@ class _Seq2SeqMusicTransformer(Model):
 
     @abstractmethod
     def forward(self, *args, **kwargs):
-        ...
+        raise NotImplementedError
 
     @abstractmethod
     def generate(self, *args, **kwargs):
-        ...
+        raise NotImplementedError
 
     def prepare_inputs(
-            self,
-            inputs: dict | Seq2SeqInputs,
-            ema_model: nn.Module | None = None
+        self,
+        inputs: dict | Seq2SeqInputs,
+        ema_model: nn.Module | None = None,
     ) -> dict[str, torch.Tensor]:
         if isinstance(inputs, Seq2SeqInputs):
             inputs = asdict(inputs)
@@ -175,7 +180,7 @@ class _Seq2SeqMusicTransformer(Model):
             "enc_mask": inputs["input_sequences"]["mask"],
             "dec_tokens": inputs["output_sequences"]["tokens"],
             "dec_values": inputs["output_sequences"]["values"],
-            "dec_mask": inputs["output_sequences"]["mask"]
+            "dec_mask": inputs["output_sequences"]["mask"],
         }
 
         if inputs["context_sequences"] is not None:
@@ -209,8 +214,8 @@ class _Seq2SeqMusicTransformer(Model):
 
     @staticmethod
     def inject_data_config(
-            config: DictConfig | Seq2SeqMusicTransformerConfig | None,
-            dataset: SequenceDataset | None
+        config: DictConfig | Seq2SeqMusicTransformerConfig | None,
+        dataset: SequenceDataset | None,
     ) -> DictConfig | ModuleConfig | None:
         assert isinstance(dataset, SequenceDataset)
 
@@ -225,7 +230,8 @@ class _Seq2SeqMusicTransformer(Model):
             if config.get(module) is not None:
                 token_emb_cfg = config[module]["token_embeddings"]
                 token_emb_cfg["token_values"] = {
-                    name: value.tolist() for name, value in dataset.tokenizer.token_values(
+                    name: value.tolist()
+                    for name, value in dataset.tokenizer.token_values(
                         normalize=dataset.normalize_values
                     ).items()
                 }
@@ -236,7 +242,8 @@ class _Seq2SeqMusicTransformer(Model):
                     assert "_token_types_" in token_pos_emb_cfg
 
                     token_pos_emb_cfg["token_dims"] = {
-                        key: idx for idx, key in enumerate(dataset.token_sizes.keys())
+                        key: idx
+                        for idx, key in enumerate(dataset.token_sizes.keys())
                         if key in token_pos_emb_cfg["_token_types_"]
                     }
                     del token_pos_emb_cfg["_token_types_"]
@@ -249,7 +256,7 @@ class _Seq2SeqMusicTransformer(Model):
 
     @staticmethod
     def cleanup_config(
-            config: DictConfig | Seq2SeqMusicTransformerConfig | None,
+        config: DictConfig | Seq2SeqMusicTransformerConfig | None,
     ) -> DictConfig | ModuleConfig | None:
         for key in ["encoder", "decoder"]:
             if config.get(key) is not None:
@@ -260,19 +267,19 @@ class _Seq2SeqMusicTransformer(Model):
 
 class Seq2SeqMusicTransformer(_Seq2SeqMusicTransformer):
     def __init__(
-            self,
-            num_tokens: dict[str, int],
-            dim: int,
-            encoder: DictConfig | TupleTransformerConfig,
-            decoder: DictConfig | TupleTransformerConfig,
-            context_num_tokens: dict[str, int] | None = None,
-            score_num_tokens: dict[str, int] | None = None,
-            tie_token_emb: bool = False,
-            context_with_memory: bool = False,
-            tokenizer: SyMuPe | None = None,
-            token_keys: list[str] | None = None,
-            value_keys: list[str] | None = None,
-            wrapper_kwargs: dict | None = None
+        self,
+        num_tokens: dict[str, int],
+        dim: int,
+        encoder: DictConfig | TupleTransformerConfig,
+        decoder: DictConfig | TupleTransformerConfig,
+        context_num_tokens: dict[str, int] | None = None,
+        score_num_tokens: dict[str, int] | None = None,
+        tie_token_emb: bool = False,
+        context_with_memory: bool = False,
+        tokenizer: SyMuPe | None = None,
+        token_keys: list[str] | None = None,
+        value_keys: list[str] | None = None,
+        wrapper_kwargs: dict | None = None,
     ):
         super().__init__(
             num_tokens=num_tokens,
@@ -286,46 +293,45 @@ class Seq2SeqMusicTransformer(_Seq2SeqMusicTransformer):
             tokenizer=tokenizer,
             token_keys=token_keys,
             value_keys=value_keys,
-            wrapper_kwargs=wrapper_kwargs
+            wrapper_kwargs=wrapper_kwargs,
         )
 
         self.prepare_for_clm()
 
     def prepare_for_clm(self) -> Seq2SeqMusicTransformer:
         if isinstance(self.decoder, TupleTransformer):
-            self.decoder = TupleTransformerARWrapper(self.decoder, token_keys=self.token_keys, **self.wrapper_kwargs)
+            self.decoder = TupleTransformerARWrapper(
+                self.decoder, token_keys=self.token_keys, **self.wrapper_kwargs
+            )
         self.mode = LanguageModelingMode.CLM
         return self
 
     def forward(
-            self,
-            enc_tokens: torch.Tensor,
-            dec_tokens: torch.Tensor | None,
-            enc_values: torch.Tensor | None = None,
-            dec_values: torch.Tensor | None = None,
-            enc_mask: torch.Tensor | None = None,
-            dec_mask: torch.Tensor | None = None,
-
-            labels: torch.Tensor | None = None,
-            targets: torch.Tensor | None = None,
-            full_labels: torch.Tensor | None = None,
-
-            dec_context: torch.Tensor | None = None,
-            dec_context_tokens: torch.Tensor | None = None,
-            dec_context_values: torch.Tensor | None = None,
-            dec_score_tokens: torch.Tensor | None = None,
-            dec_score_values: torch.Tensor | None = None,
-
-            dec_type_ids: torch.Tensor | None = None,
-            task_ids: torch.Tensor | None = None,
-            task_tokens: torch.Tensor | None = None
+        self,
+        enc_tokens: torch.Tensor,
+        dec_tokens: torch.Tensor | None,
+        enc_values: torch.Tensor | None = None,
+        dec_values: torch.Tensor | None = None,
+        enc_mask: torch.Tensor | None = None,
+        dec_mask: torch.Tensor | None = None,
+        labels: torch.Tensor | None = None,
+        targets: torch.Tensor | None = None,
+        full_labels: torch.Tensor | None = None,
+        dec_context: torch.Tensor | None = None,
+        dec_context_tokens: torch.Tensor | None = None,
+        dec_context_values: torch.Tensor | None = None,
+        dec_score_tokens: torch.Tensor | None = None,
+        dec_score_values: torch.Tensor | None = None,
+        dec_type_ids: torch.Tensor | None = None,
+        task_ids: torch.Tensor | None = None,
+        task_tokens: torch.Tensor | None = None,
     ) -> Seq2SeqMusicTransformerOutput:
         enc_out = self.encoder(
             tokens=enc_tokens,
             values=enc_values,
             mask=enc_mask,
             task_ids=task_ids,
-            task_tokens=task_tokens
+            task_tokens=task_tokens,
         )
         context, context_mask = self._build_context(enc_out, enc_mask, dec_context=dec_context)
 
@@ -344,7 +350,7 @@ class Seq2SeqMusicTransformer(_Seq2SeqMusicTransformer):
             full_labels=full_labels,
             type_ids=dec_type_ids,
             task_ids=task_ids,
-            task_tokens=task_tokens
+            task_tokens=task_tokens,
         )
         loss, losses = dec_out.loss, dec_out.losses
 
@@ -352,35 +358,35 @@ class Seq2SeqMusicTransformer(_Seq2SeqMusicTransformer):
             encoder=enc_out,
             decoder=dec_out,
             loss=loss,
-            losses=losses
+            losses=losses,
         )
 
     @torch.inference_mode()
     def generate(
-            self,
-            enc_tokens: torch.Tensor,
-            dec_tokens: torch.Tensor | None,
-            enc_values: torch.Tensor | None,
-            dec_values: torch.Tensor | None,
-            tokenizer: SyMuPe,
-
-            dec_context: torch.Tensor | None = None,
-            dec_context_tokens: torch.Tensor | None = None,
-            dec_context_values: torch.Tensor | None = None,
-            dec_score_tokens: torch.Tensor | None = None,
-            dec_score_values: torch.Tensor | None = None,
-
-            task_ids: torch.Tensor | None = None,
-            task_tokens: torch.Tensor | None = None,
-            seq_len: int | None = None,
-            temperature: float = 1.,
-            top_k: float | int = -1,
-            top_p: float = 0.8,
-            disable_tqdm: bool = False,
-            return_cache: bool = False,
-            force_known_tokens: bool = False,
-            **kwargs
-    ) -> tuple[torch.Tensor, torch.Tensor] | tuple[torch.Tensor, torch.Tensor, TupleTransformerCache]:
+        self,
+        enc_tokens: torch.Tensor,
+        dec_tokens: torch.Tensor | None,
+        enc_values: torch.Tensor | None,
+        dec_values: torch.Tensor | None,
+        tokenizer: SyMuPe,
+        dec_context: torch.Tensor | None = None,
+        dec_context_tokens: torch.Tensor | None = None,
+        dec_context_values: torch.Tensor | None = None,
+        dec_score_tokens: torch.Tensor | None = None,
+        dec_score_values: torch.Tensor | None = None,
+        task_ids: torch.Tensor | None = None,
+        task_tokens: torch.Tensor | None = None,
+        seq_len: int | None = None,
+        temperature: float = 1.0,
+        top_k: float | int = -1,
+        top_p: float = 0.8,
+        disable_tqdm: bool = False,
+        return_cache: bool = False,
+        force_known_tokens: bool = False,
+        **kwargs,
+    ) -> (
+        tuple[torch.Tensor, torch.Tensor] | tuple[torch.Tensor, torch.Tensor, TupleTransformerCache]
+    ):
         self.prepare_for_clm()
 
         num_dims = len(enc_tokens.shape)
@@ -388,40 +394,45 @@ class Seq2SeqMusicTransformer(_Seq2SeqMusicTransformer):
             enc_tokens = enc_tokens[None]
             enc_values = enc_values[None] if enc_values is not None else None
 
-        enc_out = self.encoder(
-            tokens=enc_tokens,
-            values=enc_values
-        )
+        enc_out = self.encoder(tokens=enc_tokens, values=enc_values)
         context, _ = self._build_context(enc_out, enc_mask=None, dec_context=dec_context)
 
         return self.decoder.generate(
-            dec_tokens, values=dec_values,
+            dec_tokens,
+            values=dec_values,
             known_tokens=enc_tokens if force_known_tokens else None,
             known_values=enc_values if force_known_tokens else None,
             context=context,
-            context_tokens=dec_context_tokens, context_values=dec_context_values,
-            score_tokens=dec_score_tokens, score_values=dec_score_values,
-            task_ids=task_ids, task_tokens=task_tokens,
-            seq_len=seq_len or enc_tokens.shape[1] - 1, tokenizer=tokenizer,
-            temperature=temperature, top_k=top_k, top_p=top_p,
-            disable_tqdm=disable_tqdm, return_cache=return_cache,
-            **kwargs
+            context_tokens=dec_context_tokens,
+            context_values=dec_context_values,
+            score_tokens=dec_score_tokens,
+            score_values=dec_score_values,
+            task_ids=task_ids,
+            task_tokens=task_tokens,
+            seq_len=seq_len or enc_tokens.shape[1] - 1,
+            tokenizer=tokenizer,
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+            disable_tqdm=disable_tqdm,
+            return_cache=return_cache,
+            **kwargs,
         )
 
 
 class Seq2SeqDFMMusicTransformer(_Seq2SeqMusicTransformer):
     def __init__(
-            self,
-            num_tokens: dict[str, int],
-            dim: int,
-            encoder: DictConfig | TupleTransformerConfig,
-            decoder: DictConfig | TupleTransformerConfig,
-            context_num_tokens: dict[str, int] | None = None,
-            score_num_tokens: dict[str, int] | None = None,
-            tie_token_emb: bool = False,
-            context_with_memory: bool = False,
-            tokenizer: SyMuPe | None = None,
-            wrapper_kwargs: dict | None = None
+        self,
+        num_tokens: dict[str, int],
+        dim: int,
+        encoder: DictConfig | TupleTransformerConfig,
+        decoder: DictConfig | TupleTransformerConfig,
+        context_num_tokens: dict[str, int] | None = None,
+        score_num_tokens: dict[str, int] | None = None,
+        tie_token_emb: bool = False,
+        context_with_memory: bool = False,
+        tokenizer: SyMuPe | None = None,
+        wrapper_kwargs: dict | None = None,
     ):
         super().__init__(
             num_tokens=num_tokens,
@@ -433,7 +444,7 @@ class Seq2SeqDFMMusicTransformer(_Seq2SeqMusicTransformer):
             tie_token_emb=tie_token_emb,
             context_with_memory=context_with_memory,
             tokenizer=tokenizer,
-            wrapper_kwargs=wrapper_kwargs
+            wrapper_kwargs=wrapper_kwargs,
         )
 
         self.prepare_for_dfm()
@@ -447,32 +458,30 @@ class Seq2SeqDFMMusicTransformer(_Seq2SeqMusicTransformer):
         return self
 
     def forward(
-            self,
-            enc_tokens: torch.Tensor,
-            dec_tokens: torch.Tensor | None,
-            enc_values: torch.Tensor | None = None,
-            dec_values: torch.Tensor | None = None,
-            enc_mask: torch.Tensor | None = None,
-            dec_mask: torch.Tensor | None = None,
-
-            dec_context: torch.Tensor | None = None,
-            dec_context_tokens: torch.Tensor | None = None,
-            dec_context_values: torch.Tensor | None = None,
-            dec_score_tokens: torch.Tensor | None = None,
-            dec_score_values: torch.Tensor | None = None,
-
-            labels: torch.Tensor | None = None,
-            targets: torch.Tensor | None = None,
-            full_labels: torch.Tensor | None = None,
-            task_ids: torch.Tensor | None = None,
-            task_tokens: torch.Tensor | None = None
+        self,
+        enc_tokens: torch.Tensor,
+        dec_tokens: torch.Tensor | None,
+        enc_values: torch.Tensor | None = None,
+        dec_values: torch.Tensor | None = None,
+        enc_mask: torch.Tensor | None = None,
+        dec_mask: torch.Tensor | None = None,
+        dec_context: torch.Tensor | None = None,
+        dec_context_tokens: torch.Tensor | None = None,
+        dec_context_values: torch.Tensor | None = None,
+        dec_score_tokens: torch.Tensor | None = None,
+        dec_score_values: torch.Tensor | None = None,
+        labels: torch.Tensor | None = None,
+        targets: torch.Tensor | None = None,
+        full_labels: torch.Tensor | None = None,
+        task_ids: torch.Tensor | None = None,
+        task_tokens: torch.Tensor | None = None,
     ) -> Seq2SeqMusicTransformerOutput:
         enc_out = self.encoder(
             tokens=enc_tokens,
             values=enc_values,
             mask=enc_mask,
             task_ids=task_ids,
-            task_tokens=task_tokens
+            task_tokens=task_tokens,
         )
         context, context_mask = self._build_context(enc_out, enc_mask, dec_context=dec_context)
 
@@ -493,7 +502,7 @@ class Seq2SeqDFMMusicTransformer(_Seq2SeqMusicTransformer):
             targets=targets,
             full_labels=full_labels,
             task_ids=task_ids,
-            task_tokens=task_tokens
+            task_tokens=task_tokens,
         )
         loss, losses = dec_out.loss, dec_out.losses
 
@@ -501,32 +510,32 @@ class Seq2SeqDFMMusicTransformer(_Seq2SeqMusicTransformer):
             encoder=enc_out,
             decoder=dec_out,
             loss=loss,
-            losses=losses
+            losses=losses,
         )
 
     @torch.inference_mode()
     def generate(
-            self,
-            enc_tokens: torch.Tensor,
-            dec_tokens: torch.Tensor | None,
-            enc_values: torch.Tensor | None,
-            dec_values: torch.Tensor | None,
-            tokenizer: SyMuPe,
-            dec_context: torch.Tensor | None = None,
-            dec_context_tokens: torch.Tensor | None = None,
-            dec_context_values: torch.Tensor | None = None,
-            dec_score_tokens: torch.Tensor | None = None,
-            dec_score_values: torch.Tensor | None = None,
-            task_ids: torch.Tensor | None = None,
-            task_tokens: torch.Tensor | None = None,
-            seq_len: int | None = None,
-            steps: int = 4,
-            step_factor: float = 1.,
-            method: str | None = None,
-            disable_tqdm: bool = False,
-            return_cache: bool = False,
-            force_known_tokens: bool = False,
-            **kwargs
+        self,
+        enc_tokens: torch.Tensor,
+        dec_tokens: torch.Tensor | None,
+        enc_values: torch.Tensor | None,
+        dec_values: torch.Tensor | None,
+        tokenizer: SyMuPe,
+        dec_context: torch.Tensor | None = None,
+        dec_context_tokens: torch.Tensor | None = None,
+        dec_context_values: torch.Tensor | None = None,
+        dec_score_tokens: torch.Tensor | None = None,
+        dec_score_values: torch.Tensor | None = None,
+        task_ids: torch.Tensor | None = None,
+        task_tokens: torch.Tensor | None = None,
+        seq_len: int | None = None,
+        steps: int = 4,
+        step_factor: float = 1.0,
+        method: str | None = None,
+        disable_tqdm: bool = False,
+        return_cache: bool = False,
+        force_known_tokens: bool = False,
+        **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor, DFMIntermediates]:
         self.prepare_for_dfm()
 
@@ -535,24 +544,29 @@ class Seq2SeqDFMMusicTransformer(_Seq2SeqMusicTransformer):
             enc_tokens = enc_tokens[None]
             enc_values = enc_values[None] if enc_values is not None else None
 
-        enc_out = self.encoder(
-            tokens=enc_tokens,
-            values=enc_values
-        )
+        enc_out = self.encoder(tokens=enc_tokens, values=enc_values)
         context, _ = self._build_context(enc_out, enc_mask=None, dec_context=dec_context)
 
         return self.decoder.generate(
-            dec_tokens, values=dec_values,
+            dec_tokens,
+            values=dec_values,
             known_tokens=enc_tokens if force_known_tokens else None,
             known_values=enc_values if force_known_tokens else None,
             context=context,
-            context_tokens=dec_context_tokens, context_values=dec_context_values,
-            score_tokens=dec_score_tokens, score_values=dec_score_values,
-            task_ids=task_ids, task_tokens=task_tokens,
-            seq_len=seq_len or enc_tokens.shape[1] - 1, tokenizer=tokenizer,
-            steps=steps, step_factor=step_factor, method=method,
-            disable_tqdm=disable_tqdm, return_cache=return_cache,
-            **kwargs
+            context_tokens=dec_context_tokens,
+            context_values=dec_context_values,
+            score_tokens=dec_score_tokens,
+            score_values=dec_score_values,
+            task_ids=task_ids,
+            task_tokens=task_tokens,
+            seq_len=seq_len or enc_tokens.shape[1] - 1,
+            tokenizer=tokenizer,
+            steps=steps,
+            step_factor=step_factor,
+            method=method,
+            disable_tqdm=disable_tqdm,
+            return_cache=return_cache,
+            **kwargs,
         )
 
 
@@ -576,21 +590,21 @@ class Seq2SeqFMMusicTransformerOutput:
 
 class Seq2SeqFMMusicTransformer(_Seq2SeqMusicTransformer):
     def __init__(
-            self,
-            num_tokens: dict[str, int],
-            dim: int,
-            encoder: DictConfig | TupleTransformerConfig,
-            decoder: DictConfig | TupleTransformerConfig,
-            token_keys: list[str],
-            value_keys: list[str],
-            context_num_tokens: dict[str, int] | None = None,
-            score_num_tokens: dict[str, int] | None = None,
-            tie_token_emb: bool = False,
-            context_with_memory: bool = False,
-            value_mean: list[float] | dict[str, int] | None = None,
-            value_std: list[float] | dict[str, int] | None = None,
-            tokenizer: SyMuPe | None = None,
-            wrapper_kwargs: dict | None = None
+        self,
+        num_tokens: dict[str, int],
+        dim: int,
+        encoder: DictConfig | TupleTransformerConfig,
+        decoder: DictConfig | TupleTransformerConfig,
+        token_keys: list[str],
+        value_keys: list[str],
+        context_num_tokens: dict[str, int] | None = None,
+        score_num_tokens: dict[str, int] | None = None,
+        tie_token_emb: bool = False,
+        context_with_memory: bool = False,
+        value_mean: list[float] | dict[str, int] | None = None,
+        value_std: list[float] | dict[str, int] | None = None,
+        tokenizer: SyMuPe | None = None,
+        wrapper_kwargs: dict | None = None,
     ):
         self.token_keys = list(token_keys)
         self.value_keys = list(value_keys)
@@ -601,7 +615,9 @@ class Seq2SeqFMMusicTransformer(_Seq2SeqMusicTransformer):
             assert key in num_tokens
 
         assert decoder.lm_head is not None
-        decoder.lm_head["num_tokens"] = {key: num for key, num in num_tokens.items() if key in self.token_keys}
+        decoder.lm_head["num_tokens"] = {
+            key: num for key, num in num_tokens.items() if key in self.token_keys
+        }
 
         assert decoder.value_head is not None
         decoder.value_head["num_features"] = len(self.value_keys)
@@ -617,16 +633,16 @@ class Seq2SeqFMMusicTransformer(_Seq2SeqMusicTransformer):
             tie_token_emb=tie_token_emb,
             context_with_memory=context_with_memory,
             tokenizer=tokenizer,
-            wrapper_kwargs=wrapper_kwargs
+            wrapper_kwargs=wrapper_kwargs,
         )
 
-        value_mean = value_mean or [0.]
+        value_mean = value_mean or [0.0]
         if isinstance(value_mean, (dict, DictConfig)):
-            value_mean = [value_mean.get(key, 0.) for key in self.value_keys]
+            value_mean = [value_mean.get(key, 0.0) for key in self.value_keys]
 
-        value_std = value_std or [1.]
+        value_std = value_std or [1.0]
         if isinstance(value_std, (dict, DictConfig)):
-            value_std = [value_std.get(key, 1.) for key in self.value_keys]
+            value_std = [value_std.get(key, 1.0) for key in self.value_keys]
 
         self.register_buffer("value_mean", torch.tensor(value_mean))
         self.register_buffer("value_std", torch.tensor(value_std))
@@ -636,10 +652,13 @@ class Seq2SeqFMMusicTransformer(_Seq2SeqMusicTransformer):
     def prepare_for_fm(self) -> Seq2SeqFMMusicTransformer:
         if isinstance(self.decoder, TupleTransformer):
             self.decoder = TupleTransformerFMWrapper(
-                self.decoder, tokenizer=self.tokenizer,
-                token_keys=self.token_keys, value_keys=self.value_keys,
-                value_mean=self.value_mean, value_std=self.value_std,
-                **self.wrapper_kwargs
+                self.decoder,
+                tokenizer=self.tokenizer,
+                token_keys=self.token_keys,
+                value_keys=self.value_keys,
+                value_mean=self.value_mean,
+                value_std=self.value_std,
+                **self.wrapper_kwargs,
             )
         self.mode = LanguageModelingMode.FM
         return self
@@ -653,33 +672,31 @@ class Seq2SeqFMMusicTransformer(_Seq2SeqMusicTransformer):
         return len(self.value_keys)
 
     def forward(
-            self,
-            enc_tokens: torch.Tensor,
-            dec_tokens: torch.Tensor | None,
-            dec_vectors: torch.Tensor,
-            enc_values: torch.Tensor | None = None,
-            dec_values: torch.Tensor | None = None,
-            enc_mask: torch.Tensor | None = None,
-            dec_mask: torch.Tensor | None = None,
-
-            dec_context: torch.Tensor | None = None,
-            dec_context_tokens: torch.Tensor | None = None,
-            dec_context_values: torch.Tensor | None = None,
-            dec_score_tokens: torch.Tensor | None = None,
-            dec_score_values: torch.Tensor | None = None,
-
-            labels: torch.Tensor | None = None,
-            targets: torch.Tensor | None = None,
-            full_labels: torch.Tensor | None = None,
-            task_ids: torch.Tensor | None = None,
-            task_tokens: torch.Tensor | None = None
+        self,
+        enc_tokens: torch.Tensor,
+        dec_tokens: torch.Tensor | None,
+        dec_vectors: torch.Tensor,
+        enc_values: torch.Tensor | None = None,
+        dec_values: torch.Tensor | None = None,
+        enc_mask: torch.Tensor | None = None,
+        dec_mask: torch.Tensor | None = None,
+        dec_context: torch.Tensor | None = None,
+        dec_context_tokens: torch.Tensor | None = None,
+        dec_context_values: torch.Tensor | None = None,
+        dec_score_tokens: torch.Tensor | None = None,
+        dec_score_values: torch.Tensor | None = None,
+        labels: torch.Tensor | None = None,
+        targets: torch.Tensor | None = None,
+        full_labels: torch.Tensor | None = None,
+        task_ids: torch.Tensor | None = None,
+        task_tokens: torch.Tensor | None = None,
     ) -> Seq2SeqFMMusicTransformerOutput:
         enc_out = self.encoder(
             tokens=enc_tokens,
             values=enc_values,
             mask=enc_mask,
             task_ids=task_ids,
-            task_tokens=task_tokens
+            task_tokens=task_tokens,
         )
         context, context_mask = self._build_context(enc_out, enc_mask, dec_context=dec_context)
 
@@ -688,7 +705,7 @@ class Seq2SeqFMMusicTransformer(_Seq2SeqMusicTransformer):
 
         xv_1 = dec_vectors.clone()
         xv_1 = self.normalize_values(xv_1)
-        xv_1[dec_vectors <= SPECIAL_TOKENS_VALUE] = 0.
+        xv_1[dec_vectors <= SPECIAL_TOKENS_VALUE] = 0.0
 
         dec_out = self.decoder(
             tokens=dec_tokens,
@@ -705,7 +722,7 @@ class Seq2SeqFMMusicTransformer(_Seq2SeqMusicTransformer):
             targets=targets,
             full_labels=full_labels,
             task_ids=task_ids,
-            task_tokens=task_tokens
+            task_tokens=task_tokens,
         )
         loss, losses = dec_out.loss, dec_out.losses
 
@@ -715,32 +732,32 @@ class Seq2SeqFMMusicTransformer(_Seq2SeqMusicTransformer):
             pred_tokens=dec_out.pred_tokens,
             pred_values=dec_out.pred_values,
             loss=loss,
-            losses=losses
+            losses=losses,
         )
 
     @torch.inference_mode()
     def generate(
-            self,
-            enc_tokens: torch.Tensor,
-            dec_tokens: torch.Tensor | None,
-            enc_values: torch.Tensor | None,
-            dec_values: torch.Tensor | None,
-            tokenizer: SyMuPe,
-            dec_context: torch.Tensor | None = None,
-            dec_context_tokens: torch.Tensor | None = None,
-            dec_context_values: torch.Tensor | None = None,
-            dec_score_tokens: torch.Tensor | None = None,
-            dec_score_values: torch.Tensor | None = None,
-            task_ids: torch.Tensor | None = None,
-            task_tokens: torch.Tensor | None = None,
-            seq_len: int | None = None,
-            steps: int = 4,
-            step_factor: float = 1.,
-            method: str | None = None,
-            disable_tqdm: bool = False,
-            return_cache: bool = False,
-            force_known_tokens: bool = False,
-            **kwargs
+        self,
+        enc_tokens: torch.Tensor,
+        dec_tokens: torch.Tensor | None,
+        enc_values: torch.Tensor | None,
+        dec_values: torch.Tensor | None,
+        tokenizer: SyMuPe,
+        dec_context: torch.Tensor | None = None,
+        dec_context_tokens: torch.Tensor | None = None,
+        dec_context_values: torch.Tensor | None = None,
+        dec_score_tokens: torch.Tensor | None = None,
+        dec_score_values: torch.Tensor | None = None,
+        task_ids: torch.Tensor | None = None,
+        task_tokens: torch.Tensor | None = None,
+        seq_len: int | None = None,
+        steps: int = 4,
+        step_factor: float = 1.0,
+        method: str | None = None,
+        disable_tqdm: bool = False,
+        return_cache: bool = False,
+        force_known_tokens: bool = False,
+        **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor, FMIntermediates]:
         self.prepare_for_fm()
 
@@ -749,24 +766,29 @@ class Seq2SeqFMMusicTransformer(_Seq2SeqMusicTransformer):
             enc_tokens = enc_tokens[None]
             enc_values = enc_values[None] if enc_values is not None else None
 
-        enc_out = self.encoder(
-            tokens=enc_tokens,
-            values=enc_values
-        )
+        enc_out = self.encoder(tokens=enc_tokens, values=enc_values)
         context, _ = self._build_context(enc_out, enc_mask=None, dec_context=dec_context)
 
         return self.decoder.generate(
-            dec_tokens, values=dec_values,
+            dec_tokens,
+            values=dec_values,
             known_tokens=enc_tokens if force_known_tokens else None,
             known_values=enc_values if force_known_tokens else None,
             context=context,
-            context_tokens=dec_context_tokens, context_values=dec_context_values,
-            score_tokens=dec_score_tokens, score_values=dec_score_values,
-            task_ids=task_ids, task_tokens=task_tokens,
-            seq_len=seq_len or enc_tokens.shape[1] - 1, tokenizer=tokenizer,
-            steps=steps, step_factor=step_factor, method=method,
-            disable_tqdm=disable_tqdm, return_cache=return_cache,
-            **kwargs
+            context_tokens=dec_context_tokens,
+            context_values=dec_context_values,
+            score_tokens=dec_score_tokens,
+            score_values=dec_score_values,
+            task_ids=task_ids,
+            task_tokens=task_tokens,
+            seq_len=seq_len or enc_tokens.shape[1] - 1,
+            tokenizer=tokenizer,
+            steps=steps,
+            step_factor=step_factor,
+            method=method,
+            disable_tqdm=disable_tqdm,
+            return_cache=return_cache,
+            **kwargs,
         )
 
     def normalize_values(self, values: torch.Tensor) -> torch.Tensor:
@@ -776,25 +798,21 @@ class Seq2SeqFMMusicTransformer(_Seq2SeqMusicTransformer):
         return values * self.value_std + self.value_mean
 
     def prepare_inputs(
-            self,
-            inputs: dict | Seq2SeqInputs,
-            ema_model: nn.Module | None = None
+        self,
+        inputs: dict | Seq2SeqInputs,
+        ema_model: nn.Module | None = None,
     ) -> dict[str, torch.Tensor]:
         inputs_dict = super().prepare_inputs(inputs=inputs, ema_model=ema_model)
 
-        inputs_dict["dec_vectors"] = inputs["full_labels"]["values"][..., self.num_token_features:]
+        inputs_dict["dec_vectors"] = inputs["full_labels"]["values"][..., self.num_token_features :]
 
         return inputs_dict
 
     @staticmethod
     def inject_data_config(
-            config: DictConfig | Seq2SeqMusicTransformerConfig | None,
-            dataset: SequenceDataset | None
+        config: DictConfig | Seq2SeqMusicTransformerConfig | None, dataset: SequenceDataset | None
     ) -> DictConfig | ModuleConfig | None:
         config = _Seq2SeqMusicTransformer.inject_data_config(config=config, dataset=dataset)
-
-        # if isinstance(dataset, SequenceDataset):
-        #     config["context_num_tokens"] = dataset.context_token_sizes
 
         config["decoder"]["input_vectors"] = "cat"
 

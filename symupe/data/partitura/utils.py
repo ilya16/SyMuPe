@@ -12,9 +12,9 @@ from symupe.data.midi.preprocess import preprocess_midi
 
 
 def cut_overlapping_partitura_score_notes(
-        score: pt.score.Score,
-        duplicate_max_duration: bool = True,
-        min_shift: float | None = 1 / 32  # in quarter notes
+    score: pt.score.Score,
+    duplicate_max_duration: bool = True,
+    min_shift: float | None = 1 / 32,  # in quarter notes
 ):
     for part in score.parts:
         tpq = part.first_point.quarter
@@ -36,8 +36,13 @@ def cut_overlapping_partitura_score_notes(
             prev_duration = prev_note.duration
             duration = note.duration
 
-            if prev_note.start == note.start:  # `note` and `prev_note` start at the same time
-                duration = max(prev_duration, duration) if duplicate_max_duration else min(prev_duration, duration)
+            if prev_note.start == note.start:
+                # `note` and `prev_note` start at the same time
+                duration = (
+                    max(prev_duration, duration)
+                    if duplicate_max_duration
+                    else min(prev_duration, duration)
+                )
 
                 note.end = note.start + duration
                 for _prev_note in prev_notes:
@@ -45,8 +50,11 @@ def cut_overlapping_partitura_score_notes(
                 prev_pitch_notes[note.midi_pitch].append(note)
                 continue
 
-            if prev_note.end > note.start:  # `note` starts before `prev_note` ended
-                if min_shift is not None and note.start.t - prev_note.start.t < min_tick_shift:  # previous note will be too short
+            if prev_note.end > note.start:
+                # `note` starts before `prev_note` ended
+
+                if min_shift is not None and note.start.t - prev_note.start.t < min_tick_shift:
+                    # previous note will be too short
                     note.end = max(prev_note.end, note.end)  # duplicate notes
                     note.start = prev_note.start
 
@@ -55,7 +63,8 @@ def cut_overlapping_partitura_score_notes(
                     prev_pitch_notes[note.midi_pitch].append(note)
                     continue
 
-                if prev_note.end > note.end:  # `note` is inside `prev_note`, do not cut total duration
+                if prev_note.end > note.end:
+                    # `note` is inside `prev_note`, do not cut total duration
                     note.end = prev_note.end
 
                 for _prev_note in prev_notes:  # cut `prev_note` until `note` start
@@ -85,7 +94,11 @@ def remove_duplicated_partitura_score_notes(score: pt.score.Score):
     return score
 
 
-def expand_partitura_score_grace_notes(score: pt.score.Score, default_duration_ratio=0.125, max_steal_ratio=0.75):
+def expand_partitura_score_grace_notes(
+    score: pt.score.Score,
+    default_duration_ratio=0.125,
+    max_steal_ratio=0.75,
+):
     for part in score.parts:
         tpq = part.first_point.quarter
 
@@ -124,7 +137,8 @@ def expand_partitura_score_grace_notes(score: pt.score.Score, default_duration_r
             if appoggiaturas:
                 # calculate total time to steal
                 total_req_duration = sum(
-                    max(1, round(symbolic_to_numeric_duration(g.symbolic_duration, tpq))) for g in appoggiaturas
+                    max(1, round(symbolic_to_numeric_duration(g.symbolic_duration, tpq)))
+                    for g in appoggiaturas
                 )
 
                 # don't let the main note disappear
@@ -138,7 +152,11 @@ def expand_partitura_score_grace_notes(score: pt.score.Score, default_duration_r
                 current_time = main_start
                 for grace_note in appoggiaturas:
                     grace_duration = max(
-                        1, int(round(symbolic_to_numeric_duration(grace_note.symbolic_duration, tpq)) * scale_factor)
+                        1,
+                        int(
+                            round(symbolic_to_numeric_duration(grace_note.symbolic_duration, tpq))
+                            * scale_factor
+                        ),
                     )
                     new_end = current_time + grace_duration
 
@@ -158,13 +176,15 @@ def expand_partitura_score_grace_notes(score: pt.score.Score, default_duration_r
 
 
 def process_partitura_score_ornaments(
-        score: pt.score.Score,
-        min_notes_in_cluster: int = 3,
-        max_pitch_difference: int = 2
+    score: pt.score.Score,
+    min_notes_in_cluster: int = 3,
+    max_pitch_difference: int = 2,
 ):
     for part in score.parts:
         all_notes = [n for n in part.notes_tied if not isinstance(n, pt.score.GraceNote)]
-        hidden = sorted([n for n in all_notes if not getattr(n, "is_printed", True)], key=lambda x: x.start)
+        hidden = sorted(
+            [n for n in all_notes if not getattr(n, "is_printed", True)], key=lambda x: x.start
+        )
 
         if not hidden:
             continue
@@ -189,7 +209,11 @@ def process_partitura_score_ornaments(
             if not assigned:
                 active_clusters.append([h_note])
 
-        visible = [n for n in all_notes if not getattr(n, "is_cue", False) and getattr(n, "is_printed", True)]
+        visible = [
+            n
+            for n in all_notes
+            if not getattr(n, "is_cue", False) and getattr(n, "is_printed", True)
+        ]
 
         # process each cluster
         removed_visible = set()
@@ -204,10 +228,11 @@ def process_partitura_score_ornaments(
 
             # target visible note placeholders: only if they share a pitch with the cluster
             placeholders = [
-                v for v in visible
+                v
+                for v in visible
                 if v not in removed_visible
-                   and v.midi_pitch in realization_pitches
-                   and (v.start < cluster_end and v.end > cluster_start)
+                and v.midi_pitch in realization_pitches
+                and (v.start < cluster_end and v.end > cluster_start)
             ]
 
             if placeholders:  # this cluster is officially a trill/mordent/ornament realization
@@ -218,7 +243,9 @@ def process_partitura_score_ornaments(
                     h_note.ornaments.append("_ornament_end")
 
                 for v_note in placeholders:
-                    cluster[0].ornaments.extend([text for text in v_note.ornaments if text not in cluster[0].ornaments])
+                    cluster[0].ornaments.extend(
+                        [text for text in v_note.ornaments if text not in cluster[0].ornaments]
+                    )
                     part.remove(v_note)
                     removed_visible.add(v_note)
 
@@ -226,16 +253,16 @@ def process_partitura_score_ornaments(
 
 
 def preprocess_partitura_score(
-        score: pt.score.Score,
-        unfold_repeats: bool = True,
-        unfold_minimal: bool = False,
-        remove_grace_notes: bool = False,
-        expand_grace_notes: bool = True,
-        process_ornaments: bool = True,
-        clean_duplicates: bool = True,
-        cut_overlapped_notes: bool = True,
-        voice_is_staff: bool = True,
-        recursion_depth: int = 10000,
+    score: pt.score.Score,
+    unfold_repeats: bool = True,
+    unfold_minimal: bool = False,
+    remove_grace_notes: bool = False,
+    expand_grace_notes: bool = True,
+    process_ornaments: bool = True,
+    clean_duplicates: bool = True,
+    cut_overlapped_notes: bool = True,
+    voice_is_staff: bool = True,
+    recursion_depth: int = 10000,
 ):
     if unfold_repeats and len(score.parts[0].repeats) > 0:
         sys.setrecursionlimit(recursion_depth)
@@ -245,8 +272,9 @@ def preprocess_partitura_score(
         else:
             score = pt.score.unfold_part_maximal(score)
 
-    assert not remove_grace_notes or not expand_grace_notes, \
+    assert not remove_grace_notes or not expand_grace_notes, (
         "Only one of `remove_grace_notes` or `expand_grace_notes` must be True"
+    )
 
     if remove_grace_notes:
         for part in score.parts:
@@ -277,19 +305,19 @@ def preprocess_partitura_score(
 
 
 def partitura_score_to_midi(
-        score: str | pt.score.Score,
-        midi_path: str,
-        unfold_repeats: bool = True,
-        unfold_minimal: bool = False,
-        remove_grace_notes: bool = False,
-        expand_grace_notes: bool = True,
-        process_ornaments: bool = True,
-        clean_duplicates: bool = True,
-        cut_overlapped_notes: bool = True,
-        downsample_ticks_per_quarter: int | None = None,
-        ticks_per_quarter: int | None = 480,
-        min_shift: float | None = 1 / 24,
-        min_duration: float | None = 1 / 24
+    score: str | pt.score.Score,
+    midi_path: str,
+    unfold_repeats: bool = True,
+    unfold_minimal: bool = False,
+    remove_grace_notes: bool = False,
+    expand_grace_notes: bool = True,
+    process_ornaments: bool = True,
+    clean_duplicates: bool = True,
+    cut_overlapped_notes: bool = True,
+    downsample_ticks_per_quarter: int | None = None,
+    ticks_per_quarter: int | None = 480,
+    min_shift: float | None = 1 / 24,
+    min_duration: float | None = 1 / 24,
 ) -> Score:
     if not isinstance(score, pt.score.Score):
         score = pt.load_score(score)
@@ -305,7 +333,9 @@ def partitura_score_to_midi(
         cut_overlapped_notes=cut_overlapped_notes,
     )
 
-    pt.save_score_midi(score, midi_path, part_voice_assign_mode=5, velocity=80, anacrusis_behavior="pad_bar")
+    pt.save_score_midi(
+        score, midi_path, part_voice_assign_mode=5, velocity=80, anacrusis_behavior="pad_bar"
+    )
     midi = Score(midi_path)
 
     midi = preprocess_midi(
@@ -314,10 +344,14 @@ def partitura_score_to_midi(
         clean_duplicates=True,
         cut_overlapped_notes=True,
         clean_short_notes=True,
-        min_tick_shift=int(ticks_per_quarter * min_shift) if ticks_per_quarter is not None else None,
-        min_tick_duration=int(ticks_per_quarter * min_duration) if ticks_per_quarter is not None else None,
+        min_tick_shift=(
+            int(ticks_per_quarter * min_shift) if ticks_per_quarter is not None else None
+        ),
+        min_tick_duration=(
+            int(ticks_per_quarter * min_duration) if ticks_per_quarter is not None else None
+        ),
         downsample_ticks_per_quarter=downsample_ticks_per_quarter,
-        target_ticks_per_quarter=ticks_per_quarter
+        target_ticks_per_quarter=ticks_per_quarter,
     )
 
     midi.dump_midi(midi_path)
@@ -348,17 +382,21 @@ def load_performance_note_array(midi_path):
         note_soa_s = track_s.notes.numpy()
         num = len(track_t.notes)
 
-        note_arr["onset_sec"][cur:cur + num] = note_soa_s["time"]
-        note_arr["duration_sec"][cur:cur + num] = note_soa_s["duration"]
-        note_arr["onset_tick"][cur:cur + num] = note_soa_t["time"]
-        note_arr["duration_tick"][cur:cur + num] = note_soa_t["duration"]
-        note_arr["pitch"][cur:cur + num] = note_soa_s["pitch"]
-        note_arr["velocity"][cur:cur + num] = note_soa_s["velocity"]
-        note_arr["track"][cur:cur + num] = np.full_like(note_soa_t["time"], fill_value=track_t.program)
+        note_arr["onset_sec"][cur : cur + num] = note_soa_s["time"]
+        note_arr["duration_sec"][cur : cur + num] = note_soa_s["duration"]
+        note_arr["onset_tick"][cur : cur + num] = note_soa_t["time"]
+        note_arr["duration_tick"][cur : cur + num] = note_soa_t["duration"]
+        note_arr["pitch"][cur : cur + num] = note_soa_s["pitch"]
+        note_arr["velocity"][cur : cur + num] = note_soa_s["velocity"]
+        note_arr["track"][cur : cur + num] = np.full_like(
+            note_soa_t["time"], fill_value=track_t.program
+        )
 
         cur += num
 
-    sort_ids = np.lexsort([note_arr["track"], note_arr["duration_sec"], note_arr["pitch"], note_arr["onset_sec"]])
+    sort_ids = np.lexsort(
+        [note_arr["track"], note_arr["duration_sec"], note_arr["pitch"], note_arr["onset_sec"]]
+    )
     note_arr = note_arr[sort_ids]
 
     note_arr["id"] = [f"n{k}" for k in range(len(note_arr))]

@@ -3,6 +3,7 @@ Attention with efficient memory attention support.
 
 Adapted from: https://github.com/lucidrains/x-transformers
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -33,7 +34,9 @@ class AttentionIntermediates:
         if past_cache.scores is not None and self.scores is not None:
             past_scores = past_cache.scores
             if past_cache.scores.shape[-1] != self.scores.shape[-1]:
-                past_scores = F.pad(past_cache.scores, (0, 1), value=-torch.finfo(past_cache.scores.dtype).max)
+                past_scores = F.pad(
+                    past_cache.scores, (0, 1), value=-torch.finfo(past_cache.scores.dtype).max
+                )
 
             self.scores = torch.cat([past_scores, self.scores], dim=-2)
 
@@ -43,18 +46,16 @@ class AttentionIntermediates:
         return self.queries, self.keys, self.values, self.scores
 
 
-# main class
-
 class Attend(nn.Module):
     def __init__(
-            self,
-            *,
-            dropout: float = 0.,
-            causal: bool = False,
-            scale: float | None = None,
-            enable_flash: bool = False,
-            enable_math: bool = True,
-            enable_mem_efficient: bool = True
+        self,
+        *,
+        dropout: float = 0.0,
+        causal: bool = False,
+        scale: float | None = None,
+        enable_flash: bool = False,
+        enable_math: bool = True,
+        enable_mem_efficient: bool = True,
     ):
         super().__init__()
 
@@ -71,7 +72,7 @@ class Attend(nn.Module):
         sdp_kwargs = {
             "enable_flash": enable_flash,
             "enable_math": enable_math,
-            "enable_mem_efficient": enable_mem_efficient
+            "enable_mem_efficient": enable_mem_efficient,
         }
 
         if torch_version >= version.parse("2.3.0"):
@@ -81,23 +82,25 @@ class Attend(nn.Module):
                 enable_flash=SDPBackend.FLASH_ATTENTION,
                 enable_mem_efficient=SDPBackend.EFFICIENT_ATTENTION,
                 enable_math=SDPBackend.MATH,
-                enable_cudnn=SDPBackend.CUDNN_ATTENTION
+                enable_cudnn=SDPBackend.CUDNN_ATTENTION,
             )
 
-            sdpa_backends = [str_to_backend[enable_str] for enable_str, enable in sdp_kwargs.items() if enable]
+            sdpa_backends = [
+                str_to_backend[enable_str] for enable_str, enable in sdp_kwargs.items() if enable
+            ]
 
             self.sdp_context_manager = partial(torch.nn.attention.sdpa_kernel, sdpa_backends)
         else:
             self.sdp_context_manager = partial(torch.backends.cuda.sdp_kernel, **sdp_kwargs)
 
     def efficient_attn(
-            self,
-            q: torch.Tensor,
-            k: torch.Tensor,
-            v: torch.Tensor,
-            mask: torch.Tensor | None = None,
-            attn_bias: torch.Tensor | None = None,
-            offset: int = 0
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        attn_bias: torch.Tensor | None = None,
+        offset: int = 0,
     ) -> tuple[torch.Tensor, AttentionIntermediates]:
         batch, heads, q_len, _ = q.shape
         k_len, device = k.shape[-2], q.device
@@ -105,7 +108,9 @@ class Attend(nn.Module):
         # Recommended for multi-query single-key-value attention by Tri Dao
         # kv shape torch.Size([1, 512, 64]) -> torch.Size([1, 8, 512, 64])
 
-        intermediates = AttentionIntermediates(queries=q.detach(), keys=k.detach(), values=v.detach())
+        intermediates = AttentionIntermediates(
+            queries=q.detach(), keys=k.detach(), values=v.detach()
+        )
 
         if k.ndim == 3:
             k = rearrange(k, "b ... -> b 1 ...").expand(-1, heads, -1, -1)
@@ -125,9 +130,8 @@ class Attend(nn.Module):
             # manually handle causal mask, if another mask was given
 
             if causal:
-                causal_mask = torch.ones(
-                    (q_len, k_len), dtype=torch.bool, device=device
-                ).triu(k_len - q_len + 1 - offset)
+                causal_mask = torch.ones((q_len, k_len), dtype=torch.bool, device=device)
+                causal_mask = causal_mask.triu(k_len - q_len + 1 - offset)
                 mask = mask & ~causal_mask
                 causal = False
 
@@ -146,9 +150,8 @@ class Attend(nn.Module):
             if mask is not None:
                 attn_bias = attn_bias.masked_fill(~mask, mask_value // 2)
             elif causal:
-                causal_mask = torch.ones(
-                    (q_len, k_len), dtype=torch.bool, device=device
-                ).triu(k_len - q_len + 1 - offset)
+                causal_mask = torch.ones((q_len, k_len), dtype=torch.bool, device=device)
+                causal_mask = causal_mask.triu(k_len - q_len + 1 - offset)
                 attn_bias = attn_bias.masked_fill(causal_mask, mask_value // 2)
                 causal = False
 
@@ -161,22 +164,24 @@ class Attend(nn.Module):
 
         with self.sdp_context_manager():
             out = F.scaled_dot_product_attention(
-                q.contiguous(), k.contiguous(), v.contiguous(),
+                q.contiguous(),
+                k.contiguous(),
+                v.contiguous(),
                 attn_mask=mask,
-                dropout_p=self.dropout if self.training else 0.,
-                is_causal=causal and q_len > 1
+                dropout_p=self.dropout if self.training else 0.0,
+                is_causal=causal and q_len > 1,
             )
 
         return out, intermediates
 
     def forward(
-            self,
-            q: torch.Tensor,
-            k: torch.Tensor,
-            v: torch.Tensor,
-            mask: torch.Tensor | None = None,
-            attn_bias: torch.Tensor | None = None,
-            offset: int = 0
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        attn_bias: torch.Tensor | None = None,
+        offset: int = 0,
     ) -> tuple[torch.Tensor, AttentionIntermediates]:
         """
         einstein notation
@@ -187,9 +192,7 @@ class Attend(nn.Module):
         """
 
         if self.efficient and q.shape[0] <= 65535:
-            return self.efficient_attn(
-                q, k, v, mask=mask, attn_bias=attn_bias, offset=offset
-            )
+            return self.efficient_attn(q, k, v, mask=mask, attn_bias=attn_bias, offset=offset)
 
         device = q.device
         scale = self.scale if self.scale is not None else q.shape[-1] ** -0.5
@@ -209,7 +212,9 @@ class Attend(nn.Module):
 
         if self.causal:
             i, j = dots.shape[-2:]
-            causal_mask = torch.ones((i, j), dtype=torch.bool, device=device).triu(j - i + 1 - offset)
+            causal_mask = torch.ones((i, j), dtype=torch.bool, device=device).triu(
+                j - i + 1 - offset
+            )
             dots = dots.masked_fill(causal_mask, mask_value)
 
         attn = dots.softmax(dim=-1)
@@ -220,8 +225,7 @@ class Attend(nn.Module):
         out = einsum(f"b h i j, {kv_einsum_eq} -> b h i d", attn, v)
 
         intermediates = AttentionIntermediates(
-            queries=q.detach(), keys=k.detach(), values=v.detach(),
-            scores=dots.detach()
+            queries=q.detach(), keys=k.detach(), values=v.detach(), scores=dots.detach()
         )
 
         return out, intermediates

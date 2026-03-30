@@ -1,4 +1,4 @@
-""" A minimal training script. """
+"""A minimal training script."""
 
 import argparse
 import os
@@ -13,17 +13,14 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    exp_comps = ExperimentModules(
-        config=args.config_name,
-        config_root=args.config_root
-    )
+    exp_comps = ExperimentModules(config=args.config_name, config_root=args.config_root)
     modules = exp_comps.init_modules()
 
-    trainer = Trainer(
-        **modules,
-        config=exp_comps.config
-    )
+    trainer = Trainer(**modules, config=exp_comps.config)
 
-    copyfile(os.path.join(args.config_root, args.config_name), os.path.join(trainer.config.output_dir, "config.yaml"))
+    copyfile(
+        os.path.join(args.config_root, args.config_name),
+        os.path.join(trainer.config.output_dir, "config.yaml"),
+    )
 
     trainer.train()

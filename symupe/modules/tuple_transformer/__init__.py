@@ -1,33 +1,49 @@
 from .embeddings import (
     TupleTransformerEmbeddingsRegistry,
-    TupleTransformerEmbeddingsConfig, TupleTransformerEmbeddings,
-    MultiSeqTupleTransformerEmbeddingsConfig, MultiSeqTupleTransformerEmbeddings,
-    PositionTupleTransformerEmbeddingsConfig, PositionTupleTransformerEmbeddings
+    TupleTransformerEmbeddingsConfig,
+    TupleTransformerEmbeddings,
+    MultiSeqTupleTransformerEmbeddingsConfig,
+    MultiSeqTupleTransformerEmbeddings,
+    PositionTupleTransformerEmbeddingsConfig,
+    PositionTupleTransformerEmbeddings,
 )
 from .heads import (
     TupleTransformerHeadsRegistry,
     TupleTransformerHeadsConfig,
-    TupleTransformerLMHeadConfig, TupleTransformerLMHead,
-    TupleTransformerTiedLMHeadConfig, TupleTransformerTiedLMHead,
-    TupleTransformerTiedSplitLMHeadConfig, TupleTransformerTiedSplitLMHead,
-    TupleTransformerCausalLMHeadConfig, TupleTransformerCausalLMHead,
-    TupleTransformerSplitValueHeadConfig, TupleTransformerSplitValueHead,
-    TupleTransformerEmbeddingHeadConfig, TupleTransformerEmbeddingHead
+    TupleTransformerLMHeadConfig,
+    TupleTransformerLMHead,
+    TupleTransformerTiedLMHeadConfig,
+    TupleTransformerTiedLMHead,
+    TupleTransformerCausalLMHeadConfig,
+    TupleTransformerCausalLMHead,
+    TupleTransformerSplitValueHeadConfig,
+    TupleTransformerSplitValueHead,
+    TupleTransformerEmbeddingHeadConfig,
+    TupleTransformerEmbeddingHead,
 )
 from .transformer import (
-    TupleTransformerCache, TupleTransformerOutput,
-    TupleTransformerConfig, TupleTransformer
+    TupleTransformerCache,
+    TupleTransformerOutput,
+    TupleTransformerConfig,
+    TupleTransformer,
 )
 from .language_modeling import (
-    TupleTransformerLMOutput, TupleTransformerLMWrapper,
+    TupleTransformerLMOutput,
+    TupleTransformerLMWrapper,
     TupleTransformerARWrapper,
     TupleTransformerMLMWrapper,
-    TupleTransformerMixedLMWrapper
+    TupleTransformerMixedLMWrapper,
 )
 from .flow_matching import (
-    TupleTransformerCFMOutput, TupleTransformerCFMWrapper, CFMIntermediates,
-    TupleTransformerDFMOutput, TupleTransformerDFMWrapper, DFMIntermediates,
-    TupleTransformerFMOutput, TupleTransformerFMWrapper, FMIntermediates
+    TupleTransformerCFMOutput,
+    TupleTransformerCFMWrapper,
+    CFMIntermediates,
+    TupleTransformerDFMOutput,
+    TupleTransformerDFMWrapper,
+    DFMIntermediates,
+    TupleTransformerFMOutput,
+    TupleTransformerFMWrapper,
+    FMIntermediates,
 )
 from ..classes import LanguageModelingMode, ValuePredictionMode
 

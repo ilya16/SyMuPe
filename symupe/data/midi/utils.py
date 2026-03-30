@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 import numpy as np
-from symusic import Score, Note, Track, TextMeta
+from symusic import Score, Note, Track
 from symusic.core import NoteTickList, Tick
 
 from .timing import MIDITimeMapper
@@ -19,20 +19,28 @@ def sort_notes(notes: NoteTickList, order: str = "time") -> tuple[NoteTickList, 
 
     sort_ids = None
     if order == "time":
-        sort_ids = np.lexsort([note_soa["velocity"], note_soa["duration"], note_soa["pitch"], note_soa["time"]])
-        notes = Note.from_numpy(**{key: values[sort_ids] for key, values in note_soa.items()}, ttype=notes[0].ttype)
+        sort_ids = np.lexsort(
+            [note_soa["velocity"], note_soa["duration"], note_soa["pitch"], note_soa["time"]]
+        )
+        notes = Note.from_numpy(
+            **{key: values[sort_ids] for key, values in note_soa.items()}, ttype=notes[0].ttype
+        )
     elif order == "pitch":
-        sort_ids = np.lexsort([note_soa["velocity"], note_soa["duration"], note_soa["time"], note_soa["pitch"]])
-        notes = Note.from_numpy(**{key: values[sort_ids] for key, values in note_soa.items()}, ttype=notes[0].ttype)
+        sort_ids = np.lexsort(
+            [note_soa["velocity"], note_soa["duration"], note_soa["time"], note_soa["pitch"]]
+        )
+        notes = Note.from_numpy(
+            **{key: values[sort_ids] for key, values in note_soa.items()}, ttype=notes[0].ttype
+        )
 
     return notes, sort_ids
 
 
 def cut_overlapping_notes(
-        notes: NoteTickList,
-        duplicate_max_duration: bool = True,
-        min_shift: float | None = None,
-        sort: bool = False
+    notes: NoteTickList,
+    duplicate_max_duration: bool = True,
+    min_shift: float | None = None,
+    sort: bool = False,
 ) -> NoteTickList:
     r"""Find and cut the first of the two overlapping notes, i.e. with the same pitch,
     and the second note starting before the ending of the first note.
@@ -67,7 +75,9 @@ def cut_overlapping_notes(
             continue
 
         elif prev_note.end > note.time:  # `note` starts before `prev_note` ended
-            if min_shift is not None and note.time - prev_note.time < min_shift:  # previous note will be too short
+            if (
+                min_shift is not None and note.time - prev_note.time < min_shift
+            ):  # previous note will be too short
                 note.duration = max(prev_note.end, note.end) - prev_note.time  # duplicate notes
                 note.time = prev_note.time
 
@@ -133,7 +143,10 @@ def remove_duplicated_midi_changes(midi: Score) -> Score:
         while i < len(midi.time_signatures):
             time_sig = midi.time_signatures[i]
 
-            if (time_sig.numerator, time_sig.denominator) == (prev_time_sig.numerator, prev_time_sig.denominator):
+            if (
+                time_sig.numerator == prev_time_sig.numerator
+                and time_sig.denominator == prev_time_sig.denominator
+            ):
                 del midi.time_signatures[i]
                 continue
             elif time_sig.time == prev_time_sig.time:
@@ -163,10 +176,10 @@ def remove_duplicated_midi_changes(midi: Score) -> Score:
 
 
 def remove_short_notes(
-        notes: NoteTickList,
-        time_division: int,
-        max_beat_res: int = 48,
-        min_duration: float | int | None = None
+    notes: NoteTickList,
+    time_division: int,
+    max_beat_res: int = 48,
+    min_duration: float | int | None = None,
 ):
     r"""Find and remove short notes.
 
@@ -201,20 +214,27 @@ def filter_notes_by_pitch_range(notes: NoteTickList, pitch_range: tuple[int, int
 
 
 def filter_extra_midi_events(
-        midi: Score,
-        min_tick: int | None = None,
-        max_tick: int | None = None,
-        sort: bool = False,
-        use_sustain_boundaries: bool = False
+    midi: Score,
+    min_tick: int | None = None,
+    max_tick: int | None = None,
+    sort: bool = False,
+    use_sustain_boundaries: bool = False,
 ):
     if use_sustain_boundaries:
         min_tick, max_tick = compute_global_sustain_control_boundaries(midi)
 
-    min_tick = min_tick if min_tick is not None else min(
-        track.notes.numpy()["time"].min() for track in midi.tracks
+    min_tick = (
+        min_tick
+        if min_tick is not None
+        else min(track.notes.numpy()["time"].min() for track in midi.tracks)
     )
-    max_tick = max_tick if max_tick is not None else max(
-        (track.notes.numpy()["time"] + track.notes.numpy()["duration"]).max() for track in midi.tracks
+    max_tick = (
+        max_tick
+        if max_tick is not None
+        else max(
+            (track.notes.numpy()["time"] + track.notes.numpy()["duration"]).max()
+            for track in midi.tracks
+        )
     )
 
     for track in midi.tracks:
@@ -225,25 +245,29 @@ def filter_extra_midi_events(
 
         track.controls = list(filter(lambda c: min_tick <= c.time <= max_tick, track.controls))
         track.pedals = list(filter(lambda p: min_tick <= p.time <= max_tick, track.pedals))
-        track.pitch_bends = list(filter(lambda p: min_tick <= p.time <= max_tick, track.pitch_bends))
+        track.pitch_bends = list(
+            filter(lambda p: min_tick <= p.time <= max_tick, track.pitch_bends)
+        )
 
     return midi
 
 
 def shift_midi_events(
-        midi: Score,
-        time_shift: float = 0.,
-        offset: float = 0.,
-        note_offset: int = 0,
-        note_indices: np.ndarray | None = None,
-        inplace: bool = True,
-        return_shifted_indices: bool = False
+    midi: Score,
+    time_shift: float = 0.0,
+    offset: float = 0.0,
+    note_offset: int = 0,
+    note_indices: np.ndarray | None = None,
+    inplace: bool = True,
+    return_shifted_indices: bool = False,
 ):
     midi = midi if inplace else midi.copy()
 
     time_mapper = MIDITimeMapper(midi) if isinstance(midi.ttype, Tick) else None
 
-    def process_continuous_events(elements, offset_index: int = 0, indices: np.ndarray | None = None):
+    def process_continuous_events(
+        elements, offset_index: int = 0, indices: np.ndarray | None = None
+    ):
         el_soa = elements.numpy()
         start_ticks = el_soa["time"]
         end_ticks = start_ticks + el_soa["duration"]
@@ -267,7 +291,9 @@ def shift_midi_events(
             mask[indices] = True
 
         shift_ids = []
-        for idx, (el, time, start_t, end_t) in enumerate(zip(elements, start_times, new_start_ticks, new_end_ticks)):
+        for idx, (el, time, start_t, end_t) in enumerate(
+            zip(elements, start_times, new_start_ticks, new_end_ticks)
+        ):
             if idx >= offset_index and time >= offset and mask[idx]:
                 shift_ids.append(idx)
                 el.time = start_t
@@ -296,27 +322,36 @@ def shift_midi_events(
     shifted_indices = defaultdict(list)
     for track_idx, track in enumerate(midi.tracks):
         shifted_indices["note"].append(
-            (track_idx, process_continuous_events(track.notes, offset_index=note_offset, indices=note_indices))
+            (
+                track_idx,
+                process_continuous_events(
+                    track.notes, offset_index=note_offset, indices=note_indices
+                ),
+            )
         )
         if track.pedals:
             shifted_indices["pedal"].append((track_idx, process_continuous_events(track.pedals)))
         if track.controls:
-            shifted_indices["control_change"].append((track_idx, process_instant_events(track.controls)))
+            shifted_indices["control_change"].append(
+                (track_idx, process_instant_events(track.controls))
+            )
         if track.pitch_bends:
-            shifted_indices["pitch_bend"].append((track_idx, process_instant_events(track.pitch_bends)))
+            shifted_indices["pitch_bend"].append(
+                (track_idx, process_instant_events(track.pitch_bends))
+            )
 
     if return_shifted_indices:
         return midi, shifted_indices
     return midi
 
 
-def clip_silence(midi: Score, max_silence: float = 5.) -> Score:
+def clip_silence(midi: Score, max_silence: float = 5.0) -> Score:
     for track in midi.tracks:
         note_soa = track.notes.numpy()
         note_on = note_soa["time"]
         note_off = note_on + note_soa["duration"]
 
-        max_note_off = np.maximum.accumulate(np.concatenate([[0.], note_off[:-1]], axis=0))
+        max_note_off = np.maximum.accumulate(np.concatenate([[0.0], note_off[:-1]], axis=0))
 
         is_silence = note_on > max_note_off
         silences = np.stack([max_note_off[is_silence], note_on[is_silence]], axis=1)
@@ -331,7 +366,7 @@ def clip_silence(midi: Score, max_silence: float = 5.) -> Score:
             midi = clean_controls_in_interval(midi, start=new_right, end=right)
 
             midi = shift_midi_events(midi, time_shift=shift, offset=new_right - 1e-3)
-            silences[i + 1:] += shift
+            silences[i + 1 :] += shift
 
     return midi
 
@@ -380,7 +415,9 @@ def extract_track_pedals(track: Track):
     return sustain_ons, sustain_offs
 
 
-def apply_sustain_control_changes(midi: Score, inplace: bool = True, max_duration: int | float | None = None):
+def apply_sustain_control_changes(
+    midi: Score, inplace: bool = True, max_duration: int | float | None = None
+):
     midi = midi if inplace else midi.copy()
 
     for track in midi.tracks:
@@ -401,7 +438,9 @@ def apply_sustain_control_changes(midi: Score, inplace: bool = True, max_duratio
             note_soa["duration"][note_ids] = sustain_offs[sustain_ids] - note_soa["time"][note_ids]
 
             if max_duration is not None:
-                note_soa["duration"][note_ids] = np.minimum(max_duration, note_soa["duration"][note_ids])
+                note_soa["duration"][note_ids] = np.minimum(
+                    max_duration, note_soa["duration"][note_ids]
+                )
 
             track.notes = Note.from_numpy(**note_soa)
             track.notes = cut_overlapping_notes(track.notes)
@@ -429,11 +468,13 @@ def compute_global_sustain_control_boundaries(midi: Score):
             np.any(
                 np.logical_or(
                     # a note off during a pedal
-                    (note_offs[:, None] >= sustain_ons[None]) & (note_offs[:, None] <= sustain_offs[None]),
+                    (note_offs[:, None] >= sustain_ons[None])
+                    & (note_offs[:, None] <= sustain_offs[None]),
                     # a pedal (on+off) during a note
-                    (note_ons[:, None] <= sustain_ons[None]) & (note_offs[:, None] >= sustain_offs[None])
+                    (note_ons[:, None] <= sustain_ons[None])
+                    & (note_offs[:, None] >= sustain_offs[None]),
                 ),
-                axis=0
+                axis=0,
             )
         )[0]
 
@@ -476,12 +517,12 @@ def clean_controls_in_interval(midi: Score, start: float, end: float, eps: float
                     break
 
         if pedal_start < pedal_end:
-            track.controls = list(filter(
-                lambda c: c.time < pedal_start or c.time > pedal_end, track.controls
-            ))
-            track.pedals = list(filter(
-                lambda p: p.time < pedal_start or p.time > pedal_end, track.pedals
-            ))
+            track.controls = list(
+                filter(lambda c: c.time < pedal_start or c.time > pedal_end, track.controls)
+            )
+            track.pedals = list(
+                filter(lambda p: p.time < pedal_start or p.time > pedal_end, track.pedals)
+            )
 
     return midi
 
@@ -495,13 +536,16 @@ def fix_incorrect_durations(notes: NoteTickList, sort: bool = True):
     for note in notes:
         prev_note = prev_pitch_notes.get(note.pitch, None)
         if prev_note is not None:
-            if note.time == prev_note.time:  # `note` and `prev_note` start at the same time, leave only prev
+            if note.time == prev_note.time:
+                # `note` and `prev_note` start at the same time, leave only prev
                 note.velocity = 0
                 continue
-            elif note.end == prev_note.end:  # `note` and `prev_note` end at the same time, remove prev
+            elif note.end == prev_note.end:
+                # `note` and `prev_note` end at the same time, remove prev
                 prev_note.velocity = 0
 
-            elif note.time < prev_note.end:  # `note` starts before `prev_note` ended, update durations to cut notes
+            elif note.time < prev_note.end:
+                # `note` starts before `prev_note` ended, update durations to cut notes
                 update_notes.append((note, prev_note.end - note.time))
 
         prev_pitch_notes[note.pitch] = note

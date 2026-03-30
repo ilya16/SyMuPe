@@ -1,4 +1,5 @@
-""" Transformer Attention with kv caching support for inference. """
+"""Transformer Attention with kv caching support for inference."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -30,7 +31,7 @@ class AttentionConfig(ModuleConfig):
     heads: int = 8
     head_dim: int = 64
     causal: bool = False
-    dropout: float = 0.
+    dropout: float = 0.0
     one_kv_head: bool = False
 
     context_dim: int | None = None
@@ -49,33 +50,33 @@ class AttentionConfig(ModuleConfig):
 
     rotary_pos_emb: bool = False
     rotary_emb_dim: int | None = None
-    rotary_emb_base: float = 10000.
+    rotary_emb_base: float = 10000.0
 
 
 @AttentionRegistry.register("global")
 class Attention(nn.Module, Constructor):
     def __init__(
-            self,
-            dim: int,
-            heads: int = 8,
-            head_dim: int = 64,
-            causal: bool = False,
-            dropout: float = 0.,
-            one_kv_head: bool = False,
-            context_dim: int | None = None,
-            context_norm: bool = False,
-            context_as_input_prefix: bool = False,
-            context_as_attention_prefix: bool = False,
-            num_mem_kv: int = 0,
-            max_attend: int | None = None,
-            alibi_pos_bias: bool = False,
-            alibi_heads: int | tuple[int, int, int] | None = None,
-            alibi_contextual_heads: int | None = None,
-            alibi_symmetric: bool = True,
-            alibi_learned: bool = False,
-            rotary_pos_emb: bool = False,
-            rotary_emb_dim: int | None = None,
-            rotary_emb_base: float = 10000.
+        self,
+        dim: int,
+        heads: int = 8,
+        head_dim: int = 64,
+        causal: bool = False,
+        dropout: float = 0.0,
+        one_kv_head: bool = False,
+        context_dim: int | None = None,
+        context_norm: bool = False,
+        context_as_input_prefix: bool = False,
+        context_as_attention_prefix: bool = False,
+        num_mem_kv: int = 0,
+        max_attend: int | None = None,
+        alibi_pos_bias: bool = False,
+        alibi_heads: int | tuple[int, int, int] | None = None,
+        alibi_contextual_heads: int | None = None,
+        alibi_symmetric: bool = True,
+        alibi_learned: bool = False,
+        rotary_pos_emb: bool = False,
+        rotary_emb_dim: int | None = None,
+        rotary_emb_base: float = 10000.0,
     ):
         super().__init__()
 
@@ -92,7 +93,7 @@ class Attention(nn.Module, Constructor):
         self.to_q = nn.Linear(dim, q_dim, bias=False)
         self.to_kv = nn.Linear(context_dim, 2 * kv_dim, bias=False)
 
-        self.scale = head_dim ** -0.5
+        self.scale = head_dim**-0.5
 
         # relative positional bias
 
@@ -100,34 +101,37 @@ class Attention(nn.Module, Constructor):
         if alibi_pos_bias:
             alibi_heads = alibi_heads or heads
             _alibi_heads = alibi_heads if isinstance(alibi_heads, int) else sum(alibi_heads)
-            assert _alibi_heads <= heads, "number of ALiBi heads must be less than the total number of heads"
+            assert _alibi_heads <= heads, (
+                "number of ALiBi heads must be less than the total number of heads"
+            )
             alibi_pos_cls = LearnedALiBiPositionalBias if alibi_learned else ALiBiPositionalBias
             self.rel_pos = alibi_pos_cls(
                 heads=alibi_heads,
                 total_heads=heads,
                 contextual_heads=alibi_contextual_heads,
                 symmetric=alibi_symmetric or causal,
-                prefix=context_as_input_prefix or context_as_attention_prefix
+                prefix=context_as_input_prefix or context_as_attention_prefix,
             )
 
         self.rotary_pos_emb = None
         if rotary_pos_emb:
             rotary_emb_dim = min(max(rotary_emb_dim or self.head_dim // 2, 32), self.head_dim)
             self.rotary_pos_emb = RotaryEmbedding(dim=rotary_emb_dim, base=rotary_emb_base)
-            # self.rotary_pos_emb = torch.jit.script(self.rotary_pos_emb)
 
         # attend class - includes core attention algorithm
 
         self.attend = Attend(
             causal=causal,
             dropout=dropout,
-            scale=self.scale
+            scale=self.scale,
         )
 
         # context processing
 
         self.context_norm = LayerNorm(context_dim, bias=False) if context_norm else None
-        self.context_as_input_prefix = context_as_input_prefix  # prepended before the 1st transformer layer
+        self.context_as_input_prefix = (
+            context_as_input_prefix  # prepended before the 1st transformer layer
+        )
         self.context_as_attention_prefix = context_as_attention_prefix
 
         # add memory key / values
@@ -140,24 +144,30 @@ class Attention(nn.Module, Constructor):
         self.to_out = nn.Linear(out_dim, dim, bias=False)
 
     def forward(
-            self,
-            x: torch.Tensor,
-            mask: torch.Tensor | None = None,
-            context: torch.Tensor | None = None,
-            context_mask: torch.Tensor | None = None,
-            input_prefix_len: int = 0,
-            attn_mask: torch.Tensor | None = None,
-            causal: torch.Tensor | None = None,
-            memory: torch.Tensor | None = None,
-            cache: AttentionIntermediates | None = None,
-            shared_cache: AttentionSharedIntermediates | None = None
+        self,
+        x: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        context: torch.Tensor | None = None,
+        context_mask: torch.Tensor | None = None,
+        input_prefix_len: int = 0,
+        attn_mask: torch.Tensor | None = None,
+        causal: torch.Tensor | None = None,
+        memory: torch.Tensor | None = None,
+        cache: AttentionIntermediates | None = None,
+        shared_cache: AttentionSharedIntermediates | None = None,
     ) -> tuple[torch.Tensor, AttentionIntermediates, AttentionSharedIntermediates]:
         b, n = x.shape[:2]
         h, device = self.heads, x.device
-        has_context, has_memory, has_cache = context is not None, memory is not None, cache is not None
+        has_context, has_memory, has_cache = (
+            context is not None,
+            memory is not None,
+            cache is not None,
+        )
         cond_as_prefix = self.context_as_input_prefix or self.context_as_attention_prefix
         cross_attention = has_context and not cond_as_prefix
-        assert not (has_memory and cross_attention), "memory keys are incompatible with cross attention"
+        assert not (has_memory and cross_attention), (
+            "memory keys are incompatible with cross attention"
+        )
 
         if has_context:
             if self.context_norm is not None:
@@ -259,29 +269,40 @@ class Attention(nn.Module, Constructor):
             final_attn_mask = ~input_mask
 
         if attn_mask is not None:
-            assert 2 <= attn_mask.ndim <= 4, \
+            assert 2 <= attn_mask.ndim <= 4, (
                 "attention mask must have greater than 2 dimensions but less than or equal to 4"
+            )
             if attn_mask.ndim == 2:
                 attn_mask = rearrange(attn_mask, "i j -> 1 1 i j")
             elif attn_mask.ndim == 3:
                 attn_mask = rearrange(attn_mask, "h i j -> 1 h i j")
             attn_mask = attn_mask[:, :, -1:] if has_cache else attn_mask
-            final_attn_mask = final_attn_mask | (~attn_mask) if final_attn_mask is not None else ~attn_mask
+            final_attn_mask = (
+                final_attn_mask | (~attn_mask) if final_attn_mask is not None else ~attn_mask
+            )
 
         if causal is not None:
             causal_mask = torch.ones((i, j), dtype=torch.bool, device=device).triu(j - i + 1)
             causal_mask = causal_mask[None, None].repeat(b, 1, 1, 1)
             causal_mask[~causal, :] = False
-            final_attn_mask = final_attn_mask | causal_mask if final_attn_mask is not None else causal_mask
+            final_attn_mask = (
+                final_attn_mask | causal_mask if final_attn_mask is not None else causal_mask
+            )
 
         if self.max_attend is not None:
             range_q = torch.arange(j - i, j, device=device)
             range_k = torch.arange(j, device=device)
             dist = rearrange(range_q, "i -> 1 1 i 1") - rearrange(range_k, "j -> 1 1 1 j")
             max_attend_mask = torch.logical_or(dist < -self.max_attend, dist > self.max_attend)
-            final_attn_mask = final_attn_mask | max_attend_mask if final_attn_mask is not None else max_attend_mask
+            final_attn_mask = (
+                final_attn_mask | max_attend_mask
+                if final_attn_mask is not None
+                else max_attend_mask
+            )
 
-        final_attn_mask = ~final_attn_mask if final_attn_mask is not None else None  # True for attended positions
+        final_attn_mask = (
+            ~final_attn_mask if final_attn_mask is not None else None
+        )  # True for attended positions
 
         # prepare relative positional bias, if needed
 
@@ -292,14 +313,18 @@ class Attention(nn.Module, Constructor):
             else:
                 rel_pos_bias = self.rel_pos.get_bias(i, j, offset=j - i).to(dtype=q.dtype)
 
-            attn_bias = self.rel_pos(i, j, offset=j - i, prefix=prefix_len, bias=rel_pos_bias, q=q, k=k)
+            attn_bias = self.rel_pos(
+                i, j, offset=j - i, prefix=prefix_len, bias=rel_pos_bias, q=q, k=k
+            )
 
         # attention is all we need
 
         out, intermediates = self.attend(
-            q, k, v,
+            q,
+            k,
+            v,
             mask=final_attn_mask,
-            attn_bias=attn_bias
+            attn_bias=attn_bias,
         )
 
         # update cache with tensors without any memory and prefix embeddings
@@ -322,13 +347,15 @@ class Attention(nn.Module, Constructor):
 
         shared_intermediates = AttentionSharedIntermediates(
             rel_pos_bias=rel_pos_bias,
-            rotary_pos_emb=rotary_pos_emb
+            rotary_pos_emb=rotary_pos_emb,
         )
 
         return out, intermediates, shared_intermediates
 
 
-def pad_to_multiple(tensor: torch.Tensor, multiple: int, dim: int = -1, value: float = 0.) -> tuple[bool, torch.Tensor]:
+def pad_to_multiple(
+    tensor: torch.Tensor, multiple: int, dim: int = -1, value: float = 0.0
+) -> tuple[bool, torch.Tensor]:
     assert -2 <= dim <= -1
     seqlen = tensor.shape[dim]
     if seqlen % multiple == 0:
@@ -348,7 +375,7 @@ def look_around(x, backward: int = 1, forward: int = 0, pad_value: float = -1) -
         padded_x = F.pad(x, (0, 0, 0, 0, backward, forward), value=pad_value)
     else:
         padded_x = F.pad(x, (0, 0, backward, forward), value=pad_value)
-    tensors = [padded_x[:, ind:(ind + t), ...] for ind in range(forward + backward + 1)]
+    tensors = [padded_x[:, ind : (ind + t), ...] for ind in range(forward + backward + 1)]
     return torch.cat(tensors, dim=2)
 
 
@@ -363,24 +390,24 @@ class LocalAttentionConfig(AttentionConfig):
 @AttentionRegistry.register("local")
 class LocalAttention(Attention):
     def __init__(
-            self,
-            dim: int = 256,
-            heads: int = 4,
-            head_dim: int | None = 64,
-            causal: bool = False,
-            window_size: int = 256,
-            local_windows: int | None = 1,
-            exact_window: bool = True,
-            dropout: float = 0.0,
-            one_kv_head: bool = False,
-            context_as_input_prefix: bool = False,
-            context_as_attention_prefix: bool = False,
-            num_mem_kv: int = 0,
-            max_attend: int | None = None,
-            alibi_pos_bias: bool = False,
-            alibi_heads: int | None = None,
-            alibi_symmetric: bool = True,
-            alibi_learned: bool = False
+        self,
+        dim: int = 256,
+        heads: int = 4,
+        head_dim: int | None = 64,
+        causal: bool = False,
+        window_size: int = 256,
+        local_windows: int | None = 1,
+        exact_window: bool = True,
+        dropout: float = 0.0,
+        one_kv_head: bool = False,
+        context_as_input_prefix: bool = False,
+        context_as_attention_prefix: bool = False,
+        num_mem_kv: int = 0,
+        max_attend: int | None = None,
+        alibi_pos_bias: bool = False,
+        alibi_heads: int | None = None,
+        alibi_symmetric: bool = True,
+        alibi_learned: bool = False,
     ):
         super().__init__(
             dim=dim,
@@ -396,28 +423,29 @@ class LocalAttention(Attention):
             alibi_pos_bias=alibi_pos_bias,
             alibi_heads=alibi_heads,
             alibi_symmetric=alibi_symmetric,
-            alibi_learned=alibi_learned
+            alibi_learned=alibi_learned,
         )
 
         self.window_size = window_size
         self.exact_window = exact_window
         self.local_windows = 0 if local_windows is None else local_windows
 
-        assert not self.context_as_input_prefix or not self.context_as_attention_prefix, \
+        assert not self.context_as_input_prefix or not self.context_as_attention_prefix, (
             "LocalAttention does not support conditioning as prefix yet"
+        )
 
     def forward(
-            self,
-            x: torch.Tensor,
-            mask: torch.Tensor | None = None,
-            context: torch.Tensor | None = None,
-            context_mask: torch.Tensor | None = None,
-            input_prefix_len: int = 0,
-            attn_mask: torch.Tensor | None = None,
-            causal: torch.Tensor | None = None,
-            memory: torch.Tensor | None = None,
-            cache: AttentionIntermediates | None = None,
-            shared_cache: AttentionSharedIntermediates | None = None
+        self,
+        x: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        context: torch.Tensor | None = None,
+        context_mask: torch.Tensor | None = None,
+        input_prefix_len: int = 0,
+        attn_mask: torch.Tensor | None = None,
+        causal: torch.Tensor | None = None,
+        memory: torch.Tensor | None = None,
+        cache: AttentionIntermediates | None = None,
+        shared_cache: AttentionSharedIntermediates | None = None,
     ) -> tuple[torch.Tensor, AttentionIntermediates, AttentionSharedIntermediates]:
         assert context is None, "LocalAttention does not support contextual attention"
         assert cache is None, "LocalAttention does not fully support caching"
@@ -426,7 +454,7 @@ class LocalAttention(Attention):
         b, n = x.shape[:2]
         h, device = self.heads, x.device
         window_size, local_windows = self.window_size, self.local_windows
-        pad_value = -1.
+        pad_value = -1.0
 
         local_windows = 0 if n <= window_size else local_windows
         offset = window_size * local_windows
@@ -499,10 +527,12 @@ class LocalAttention(Attention):
             batch = mask.shape[0]
             assert (b % batch) == 0
 
-            _, input_mask = pad_to_multiple(mask, window_size, dim=-1, value=0.)
+            _, input_mask = pad_to_multiple(mask, window_size, dim=-1, value=0.0)
 
             input_mask = rearrange(input_mask, "b (w n) -> b w n", w=windows)
-            input_mask = look_around(input_mask, backward=local_windows, forward=local_windows, pad_value=0.)
+            input_mask = look_around(
+                input_mask, backward=local_windows, forward=local_windows, pad_value=0.0
+            )
             input_mask = rearrange(input_mask, "... j -> ... 1 j")
             input_mask = repeat(input_mask, "b ... -> (b h) ...", h=h)
 
@@ -521,7 +551,8 @@ class LocalAttention(Attention):
         # mask out for exact window size for non-causal
 
         if not self.causal and max_attend > 0:
-            window_mask = ((bq_k - max_attend) > bq_t) | (bq_t > (bq_k + max_attend))  # forward + backward
+            # forward + backward
+            window_mask = ((bq_k - max_attend) > bq_t) | (bq_t > (bq_k + max_attend))
             final_attn_mask = final_attn_mask | window_mask
 
         final_attn_mask = ~final_attn_mask
@@ -536,15 +567,22 @@ class LocalAttention(Attention):
                 rel_pos_bias = shared_cache.rel_pos_bias
             else:
                 rel_pos_bias = self.rel_pos.get_bias(i, j, offset=offset).to(dtype=q.dtype)
-            attn_bias = repeat(self.rel_pos(i, j, offset=offset, bias=rel_pos_bias), "h ... -> (b h) w ...", b=b, w=windows)
+            attn_bias = repeat(
+                self.rel_pos(i, j, offset=offset, bias=rel_pos_bias),
+                "h ... -> (b h) w ...",
+                b=b,
+                w=windows,
+            )
 
         # attend
 
         out, intermediates = self.attend(
-            bq, bk, bv,
+            bq,
+            bk,
+            bv,
             mask=final_attn_mask,
             attn_bias=attn_bias,
-            offset=offset
+            offset=offset,
         )
 
         # merge heads

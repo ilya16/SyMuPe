@@ -1,4 +1,5 @@
-""" Optimizers and Learning Rate Schedulers. """
+"""Optimizers and Learning Rate Schedulers."""
+
 from __future__ import annotations
 
 import math
@@ -25,19 +26,21 @@ def group_weight_decayable_params(params):
 class OptimizerParams(VariableModuleConfig):
     params: Iterable[torch.Tensor] | Iterable[dict] = MISSING
     lr: float = MISSING
-    weight_decay: float = 0.
+    weight_decay: float = 0.0
 
 
 class _OptimizerRegistry(Registry):
     def instantiate(self, config: OptimizerParams | DictConfig, **kwargs):
         module = self.get(config._target_)
 
-        if config.weight_decay > 0. and kwargs.pop("group_wd_params", True):
-            wd_params, no_wd_params = group_weight_decayable_params(config.get("params", kwargs.get("params")))
+        if config.weight_decay > 0.0 and kwargs.pop("group_wd_params", True):
+            wd_params, no_wd_params = group_weight_decayable_params(
+                config.get("params", kwargs.get("params"))
+            )
 
             kwargs["params"] = [
                 {"params": wd_params},
-                {"params": no_wd_params, "weight_decay": 0.},
+                {"params": no_wd_params, "weight_decay": 0.0},
             ]
 
         module = module.init(config=config, **kwargs)
@@ -58,7 +61,7 @@ class SGDParams(OptimizerParams):
 
 @OptimizerRegistry.register("sgd")
 class SGD(torch.optim.SGD, Constructor):
-    ...
+    pass
 
 
 @dataclass
@@ -71,7 +74,7 @@ class AdamParams(OptimizerParams):
 
 @OptimizerRegistry.register("adam")
 class Adam(torch.optim.Adam, Constructor):
-    ...
+    pass
 
 
 @dataclass
@@ -85,10 +88,10 @@ class AdamWParams(OptimizerParams):
 
 @OptimizerRegistry.register("adamw")
 class AdamW(torch.optim.AdamW, Constructor):
-    ...
+    pass
 
 
-LRSchedulersRegistry = type("_LRSchedulersRegistry", (Registry, ), {})()
+LRSchedulersRegistry = type("_LRSchedulersRegistry", (Registry,), {})()
 
 
 @dataclass
@@ -117,7 +120,7 @@ class ExponentialLRParams(LRSchedulerParams):
 
 @LRSchedulersRegistry.register("exponential")
 class ExponentialLR(torch.optim.lr_scheduler.ExponentialLR, Constructor):
-    ...
+    pass
 
 
 @dataclass
@@ -127,7 +130,7 @@ class ExponentialLRParams(ExponentialLRParams):
 
 @LRSchedulersRegistry.register("exponential-step")
 class ExponentialStepLR(torch.optim.lr_scheduler.ExponentialLR, Constructor):
-    ...
+    pass
 
 
 @dataclass
@@ -142,20 +145,20 @@ class WarmUpAnnealLRParams(LRSchedulerParams):
 @LRSchedulersRegistry.register("warmup")
 class WarmUpAnnealLR(torch.optim.lr_scheduler.LRScheduler, Constructor):
     def __init__(
-            self,
-            optimizer: torch.optim.Optimizer,
-            warmup_steps: int = 1000,
-            anneal_steps: Sequence[int] | None = None,
-            anneal_rate: float = 0.9,
-            last_epoch: int = -1,
-            verbose: bool = False
+        self,
+        optimizer: torch.optim.Optimizer,
+        warmup_steps: int = 1000,
+        anneal_steps: Sequence[int] | None = None,
+        anneal_rate: float = 0.9,
+        last_epoch: int = -1,
+        verbose: bool = False,
     ):
         self.optimizer = optimizer
 
         self.warmup_steps = warmup_steps
         self.anneal_steps = anneal_steps
         self.anneal_rate = anneal_rate
-        self._scale = warmup_steps ** 0.5 if warmup_steps > 0 else 1.
+        self._scale = warmup_steps**0.5 if warmup_steps > 0 else 1.0
 
         super().__init__(optimizer, last_epoch, verbose)
 
@@ -163,9 +166,9 @@ class WarmUpAnnealLR(torch.optim.lr_scheduler.LRScheduler, Constructor):
         if self.warmup_steps == 0:
             return self._scale
         elif step > self.warmup_steps:
-            return self._scale / (step ** 0.5)
+            return self._scale / (step**0.5)
         else:
-            return self._scale * step / (self.warmup_steps ** 1.5)
+            return self._scale * step / (self.warmup_steps**1.5)
 
     def get_lr(self):
         step = self._step_count
@@ -191,12 +194,12 @@ class CosineAnnealLRParams(LRSchedulerParams):
 @LRSchedulersRegistry.register("cosine")
 class CosineAnnealLR(torch.optim.lr_scheduler.LRScheduler, Constructor):
     def __init__(
-            self,
-            optimizer: torch.optim.Optimizer,
-            total_steps: int,
-            warmup_steps: int = 1000,
-            lr_min_ratio: float = 0.1,
-            cycle_length: float = 1.0
+        self,
+        optimizer: torch.optim.Optimizer,
+        total_steps: int,
+        warmup_steps: int = 1000,
+        lr_min_ratio: float = 0.1,
+        cycle_length: float = 1.0,
     ):
         self.optimizer = optimizer
 
@@ -214,7 +217,9 @@ class CosineAnnealLR(torch.optim.lr_scheduler.LRScheduler, Constructor):
             return step / self.warmup_steps
         elif step <= self.total_steps:
             s = (step - self.warmup_steps) / (self.total_steps - self.warmup_steps)
-            return self.lr_min_ratio + 0.5 * (1 - self.lr_min_ratio) * (1. + math.cos(math.pi * s / self.cycle_length))
+            return self.lr_min_ratio + 0.5 * (1 - self.lr_min_ratio) * (
+                1.0 + math.cos(math.pi * s / self.cycle_length)
+            )
         else:
             return self.lr_min_ratio
 
@@ -229,56 +234,72 @@ class CosineAnnealLR(torch.optim.lr_scheduler.LRScheduler, Constructor):
 class OptimizationConfig(Config):
     optimizer: OptimizerParams | dict[str, object] | DictConfig = field(
         default_factory=lambda: {"_target_": "adamw", "lr": 1e-3},
-        metadata={"help": "Optimizer and its parameters (including the learning rate). "
-                          "Defaults to {\"_target_\": \"adamw\", \"lr\": 1e-3}"}
+        metadata={
+            "help": "Optimizer and its parameters (including the learning rate). "
+            'Defaults to {"_target_": "adamw", "lr": 1e-3}'
+        },
     )
     lr_scheduler: LRSchedulerParams | dict[str, object] | DictConfig | None = field(
-        default=None, metadata={"help": "Learning rate scheduler and tis parameters. Defaults to None"}
+        default=None,
+        metadata={"help": "Learning rate scheduler and tis parameters. Defaults to None"},
     )
     grad_clip: float | None = field(
-        default=None, metadata={"help": "Gradient clipping threshold. Defaults to None"}
+        default=None,
+        metadata={"help": "Gradient clipping threshold. Defaults to None"},
     )
     grad_accum_steps: int | None = field(
-        default=1, metadata={"help": "Gradient accumulation steps. Defaults to 1"}
+        default=1,
+        metadata={"help": "Gradient accumulation steps. Defaults to 1"},
     )
     group_wd_params: bool = field(
-        default=True, metadata={"help": "Remove biases from weight decay regularization. Defaults to True"}
+        default=True,
+        metadata={"help": "Remove biases from weight decay regularization. Defaults to True"},
     )
 
 
 class Optimizer:
-    """ Combined Optimizer and Scheduler. """
+    """Combined Optimizer and Scheduler."""
 
     def __init__(
-            self,
-            accelerator: Accelerator,
-            config: OptimizationConfig,
-            model: torch.nn.Module = None,
-            parameters: list = None,
-            num_train_steps: int | None = None
+        self,
+        accelerator: Accelerator,
+        config: OptimizationConfig,
+        model: torch.nn.Module = None,
+        parameters: list = None,
+        num_train_steps: int | None = None,
     ):
         self.accelerator = accelerator
         self.config = config
 
         self.optimizer = OptimizerRegistry.instantiate(
-            DictConfig(config.optimizer) if isinstance(config.optimizer, dict) else config.optimizer,
+            config=(
+                DictConfig(config.optimizer)
+                if isinstance(config.optimizer, dict)
+                else config.optimizer
+            ),
             params=model.parameters() if model is not None else parameters,
-            group_wd_params=config.group_wd_params
+            group_wd_params=config.group_wd_params,
         )
 
         self.lr_scheduler = None
         if config.lr_scheduler is not None:
             self.lr_scheduler = LRSchedulersRegistry.instantiate(
-                DictConfig(config.lr_scheduler) if isinstance(config.lr_scheduler, dict) else config.lr_scheduler,
+                config=(
+                    DictConfig(config.lr_scheduler)
+                    if isinstance(config.lr_scheduler, dict)
+                    else config.lr_scheduler
+                ),
                 optimizer=self.optimizer,
-                total_steps=num_train_steps
+                total_steps=num_train_steps,
             )
 
             self.is_step_lr_scheduler = isinstance(
                 self.lr_scheduler,
-                (LRSchedulersRegistry.get("warmup"),
-                 LRSchedulersRegistry.get("cosine"),
-                 LRSchedulersRegistry.get("exponential-step"))
+                (
+                    LRSchedulersRegistry.get("warmup"),
+                    LRSchedulersRegistry.get("cosine"),
+                    LRSchedulersRegistry.get("exponential-step"),
+                ),
             )
 
         self.optimizer, self.lr_scheduler = self.accelerator.prepare(
@@ -334,7 +355,7 @@ class Optimizer:
     def state_dict(self):
         return {
             "optimizer": self.optimizer.state_dict(),
-            "lr_scheduler": self.lr_scheduler.state_dict()
+            "lr_scheduler": self.lr_scheduler.state_dict(),
         }
 
     def set_progress(self, iteration, epoch):

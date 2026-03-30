@@ -6,6 +6,7 @@ The tokenizer is based on the OctupleM encoding. It supports:
     - tokenization of performance MIDI sequences using a time-only and a score-aligned encodings;
     - both real-valued features and discrete tokens for each note.
 """
+
 from __future__ import annotations
 
 import warnings
@@ -21,8 +22,12 @@ from ..classes import TokSequence, SequenceType, EncodingType, TokSequenceContex
 from ..constants import (
     TICKS_PER_QUARTER,
     SPECIAL_TOKENS_VALUE,
-    TIME_PERFORMANCE_KEYS, COMPRESSIBLE_TOKENS,
-    BAR_LINE_TOKEN, PEDAL_ON_TOKEN, PEDAL_OFF_TOKEN, TIME_SEGMENT_TOKEN
+    TIME_PERFORMANCE_KEYS,
+    COMPRESSIBLE_TOKENS,
+    BAR_LINE_TOKEN,
+    PEDAL_ON_TOKEN,
+    PEDAL_OFF_TOKEN,
+    TIME_SEGMENT_TOKEN,
 )
 from ...midi.sync import sync_performance_midi
 from ...midi.timing import MIDITimeMapper
@@ -74,9 +79,15 @@ class SyMuPe(SyMuPeBase):
         additional_params["use_pitch_classes"] = additional_params.get("use_pitch_classes", False)
 
         # optional score tokens and their value bins
-        additional_params["use_position_shifts"] = additional_params.get("use_position_shifts", False)
-        additional_params["onset_position_shifts"] = additional_params.get("onset_position_shifts", True)
-        additional_params["negative_position_shifts"] = additional_params.get("negative_position_shifts", False)
+        additional_params["use_position_shifts"] = additional_params.get(
+            "use_position_shifts", False
+        )
+        additional_params["onset_position_shifts"] = additional_params.get(
+            "onset_position_shifts", True
+        )
+        additional_params["negative_position_shifts"] = additional_params.get(
+            "negative_position_shifts", False
+        )
         self.position_shifts = None
 
         additional_params["use_onset_indices"] = additional_params.get("use_onset_indices", False)
@@ -95,13 +106,17 @@ class SyMuPe(SyMuPeBase):
 
         # optional time performance tokens
         additional_params["use_time_tokens"] = additional_params.get("use_time_tokens", False)
-        additional_params["negative_time_shifts"] = additional_params.get("negative_time_shifts", False)
+        additional_params["negative_time_shifts"] = additional_params.get(
+            "negative_time_shifts", False
+        )
         self.time_shifts = additional_params.get("time_shifts", None)
         self.time_durations = additional_params.get("time_durations", None)
 
         # optional time position tokens
         additional_params["use_time_positions"] = additional_params.get("use_time_positions", False)
-        additional_params["time_position_segment"] = additional_params.get("time_position_segment", 5.)
+        additional_params["time_position_segment"] = additional_params.get(
+            "time_position_segment", 5.0
+        )
         additional_params["time_position_step"] = additional_params.get("time_position_step", 0.01)
         self.time_positions = additional_params.get("time_positions", None)
 
@@ -130,20 +145,31 @@ class SyMuPe(SyMuPeBase):
         if num_new_tokens > 0:
             # Add new score tokens if they are present in the encoding
             if tokens.ids is not None:
-                tokens.ids = np.concatenate([
-                    tokens.ids, np.full((len(tokens.ids), num_new_tokens), fill_value=self.ignore_token).astype(int)
-                ], axis=1)
+                tokens.ids = np.concatenate(
+                    [
+                        tokens.ids,
+                        np.full(
+                            (len(tokens.ids), num_new_tokens), fill_value=self.ignore_token
+                        ).astype(int),
+                    ],
+                    axis=1,
+                )
 
             if tokens.values is not None:
-                tokens.values = np.concatenate([
-                    tokens.values,
-                    np.full((len(tokens.values), num_new_tokens), fill_value=self.ignore_value)
-                ], axis=1)
+                tokens.values = np.concatenate(
+                    [
+                        tokens.values,
+                        np.full((len(tokens.values), num_new_tokens), fill_value=self.ignore_value),
+                    ],
+                    axis=1,
+                )
 
             tokens = self.fill_extra_pitch_tokens(tokens=tokens)
             tokens = self.fill_extra_score_tokens(tokens=tokens)
 
-        tokens.vocab = {ttype: idx for ttype, idx in self.vocab_types_idx.items() if idx < len(tokens.ids[0])}
+        tokens.vocab = {
+            ttype: idx for ttype, idx in self.vocab_types_idx.items() if idx < len(tokens.ids[0])
+        }
 
         return tokens
 
@@ -151,19 +177,24 @@ class SyMuPe(SyMuPeBase):
         if self.has_token_types(tokens, "Pitch"):
             return tokens
 
-        assert (self.config.additional_params["use_pitch_classes"]
-                and self.has_token_types(tokens, ["PitchClass", "PitchOctave"]))
+        assert self.config.additional_params["use_pitch_classes"] and self.has_token_types(
+            tokens, ["PitchClass", "PitchOctave"]
+        )
 
         vocab = tokens.vocab or self.vocab_types_idx
 
         if "Pitch" not in vocab:
-            tokens.ids = np.concatenate([
-                tokens.ids, np.full((len(tokens.ids), 1), fill_value=self.ignore_token).astype(int)
-            ], axis=1)
-            tokens.values = np.concatenate([
-                tokens.values,
-                np.full((len(tokens.values), 1), fill_value=self.ignore_value)
-            ], axis=1)
+            tokens.ids = np.concatenate(
+                [
+                    tokens.ids,
+                    np.full((len(tokens.ids), 1), fill_value=self.ignore_token).astype(int),
+                ],
+                axis=1,
+            )
+            tokens.values = np.concatenate(
+                [tokens.values, np.full((len(tokens.values), 1), fill_value=self.ignore_value)],
+                axis=1,
+            )
             vocab["Pitch"] = len(vocab)
 
         pitch_classes = self.get_values(tokens, "PitchClass")
@@ -182,8 +213,9 @@ class SyMuPe(SyMuPeBase):
     def fill_extra_pitch_tokens(self, tokens: TokSequence, force: bool = False) -> TokSequence:
         new_values = {}
 
-        if (self.config.additional_params["use_pitch_classes"]
-                and (force or not self.has_token_types(tokens, ["PitchClass", "PitchOctave"]))):
+        if self.config.additional_params["use_pitch_classes"] and (
+            force or not self.has_token_types(tokens, ["PitchClass", "PitchOctave"])
+        ):
             # Divide pitches into two components
             pitches = self.get_values(tokens, "Pitch")
             pitch_mask = pitches >= 0
@@ -192,7 +224,9 @@ class SyMuPe(SyMuPeBase):
 
         for token_type, values in new_values.items():
             if tokens.ids is not None:
-                tokens.ids[:, self.vocab_types_idx[token_type]] = self.encode_tokens(values, token_type)
+                tokens.ids[:, self.vocab_types_idx[token_type]] = self.encode_tokens(
+                    values, token_type
+                )
             if tokens.values is not None:
                 tokens.values[:, self.vocab_types_idx[token_type]] = values
 
@@ -206,20 +240,26 @@ class SyMuPe(SyMuPeBase):
             return tokens
 
         score_positions = None
-        if (self.config.additional_params["use_position_shifts"]
-                and (force or not self.has_token_types(tokens, "PositionShift"))):
+        if self.config.additional_params["use_position_shifts"] and (
+            force or not self.has_token_types(tokens, "PositionShift")
+        ):
             if score_positions is None:
-                score_positions = self.compute_ticks(tokens, time_division=self.config.max_num_pos_per_beat)["note_on"]
+                score_positions = self.compute_ticks(
+                    tokens, time_division=self.config.max_num_pos_per_beat
+                )["note_on"]
 
             new_values["PositionShift"] = np.maximum(
                 self.compute_position_shifts(score_positions), SPECIAL_TOKENS_VALUE + 1
             )
             new_values["PositionShift"][0] = self.get_values(tokens, "Position")[0]
 
-        if (self.config.additional_params["use_onset_indices"]
-                and (force or not self.has_token_types(tokens, ["NotesInOnset", "PositionInOnset"]))):
+        if self.config.additional_params["use_onset_indices"] and (
+            force or not self.has_token_types(tokens, ["NotesInOnset", "PositionInOnset"])
+        ):
             if score_positions is None:
-                score_positions = self.compute_ticks(tokens, time_division=self.config.max_num_pos_per_beat)["note_on"]
+                score_positions = self.compute_ticks(
+                    tokens, time_division=self.config.max_num_pos_per_beat
+                )["note_on"]
 
             _, notes_in_onset, pos_in_onset = self.compute_onset_values(score_positions)
             new_values["NotesInOnset"] = notes_in_onset
@@ -227,17 +267,19 @@ class SyMuPe(SyMuPeBase):
 
         for token_type, values in new_values.items():
             if tokens.ids is not None:
-                tokens.ids[:, self.vocab_types_idx[token_type]] = self.encode_tokens(values, token_type)
+                tokens.ids[:, self.vocab_types_idx[token_type]] = self.encode_tokens(
+                    values, token_type
+                )
             if tokens.values is not None:
                 tokens.values[:, self.vocab_types_idx[token_type]] = values
 
         return tokens
 
     def _encode_performance(
-            self,
-            midi: Score,
-            score_tokens: TokSequence | None,
-            note_alignment: np.ndarray | None = None
+        self,
+        midi: Score,
+        score_tokens: TokSequence | None,
+        note_alignment: np.ndarray | None = None,
     ) -> TokSequence:
         r"""
         Tokenize a performance MIDI file into :class:`miditok.TokSequence`
@@ -252,7 +294,7 @@ class SyMuPe(SyMuPeBase):
         """
         self._current_midi_metadata = {
             "time_division": midi.ticks_per_quarter,
-            "tempos": midi.tempos
+            "tempos": midi.tempos,
         }
 
         if score_tokens is None:
@@ -282,15 +324,18 @@ class SyMuPe(SyMuPeBase):
         time_mapper = MIDITimeMapper(midi)
         perf_times = time_mapper.t2s(perf_positions * ticks_per_sample)
         perf_offset_times = time_mapper.t2s((perf_positions + perf_durations) * ticks_per_sample)
-        perf_time_shifts = np.diff(np.concatenate([[0.], perf_times]))
+        perf_time_shifts = np.diff(np.concatenate([[0.0], perf_times]))
         perf_time_durations = perf_offset_times - perf_times
 
         # Find the closest tempo for each note
         tempo_soa = midi.tempos.numpy()
         tempo_positions = tempo_soa["time"] / ticks_per_sample
-        perf_tempos = tempo_qpm_to_mspq(tempo_soa["mspq"])[np.minimum(
-            np.searchsorted(tempo_positions, perf_positions, side="right") - 1, tempo_positions.shape[0] - 1
-        )]
+        perf_tempos = tempo_qpm_to_mspq(tempo_soa["mspq"])[
+            np.minimum(
+                np.searchsorted(tempo_positions, perf_positions, side="right") - 1,
+                tempo_positions.shape[0] - 1,
+            )
+        ]
 
         # Construct an array of values
         values = np.full((len(perf_positions), len(self.score_sizes)), fill_value=self.ignore_value)
@@ -302,22 +347,24 @@ class SyMuPe(SyMuPeBase):
         # Compute NoteON, Time Signature, Bar and Beat ticks
         ticks_data = self.compute_ticks(score_tokens, time_division=time_division)
         note_on_ticks = ticks_data["note_on"]
-        beat_ticks = ticks_data["bar"] if self.config.additional_params["bar_tempos"] else ticks_data["beat"]
+        beat_ticks = (
+            ticks_data["bar"] if self.config.additional_params["bar_tempos"] else ticks_data["beat"]
+        )
 
         # Map note ticks to beats
-        note_beats = beat_ticks[np.minimum(
-            np.searchsorted(beat_ticks, note_on_ticks, side="right") - 1, beat_ticks.shape[0] - 1
-        )]
+        note_beats = beat_ticks[
+            np.minimum(
+                np.searchsorted(beat_ticks, note_on_ticks, side="right") - 1,
+                beat_ticks.shape[0] - 1,
+            )
+        ]
 
         # Process tempos and their jumping positions
         # Record beat tempos before applying alignment
         if note_alignment is not None:
             note_beats = note_beats[np.argsort(note_alignment)]
 
-        note_beat_tempo = np.stack([
-            note_beats,
-            perf_tempos
-        ], axis=1)
+        note_beat_tempo = np.stack([note_beats, perf_tempos], axis=1)
         un_beat_tempos, counts = np.unique(note_beat_tempo, return_counts=True, axis=0)
         beat_tempo_data = np.concatenate([un_beat_tempos, counts[:, None]], axis=1)
 
@@ -325,18 +372,34 @@ class SyMuPe(SyMuPeBase):
         while len(beat_tempo_data) > 0:
             beat_tempos_ = beat_tempo_data[beat_tempo_data[:, 0] == beat_tempo_data[0, 0]]
             beat_tempos.append(beat_tempos_[beat_tempos_[:, 2].argmax(), :2])
-            beat_tempo_data = beat_tempo_data[len(beat_tempos_):]
+            beat_tempo_data = beat_tempo_data[len(beat_tempos_) :]
         beat_tempos = np.stack(beat_tempos)
 
         # Apply alignment
         if note_alignment is not None:
-            values, perf_positions, perf_durations, perf_times, perf_time_shifts, perf_time_durations = map(
+            (
+                values,
+                perf_positions,
+                perf_durations,
+                perf_times,
+                perf_time_shifts,
+                perf_time_durations,
+            ) = map(
                 lambda x: x[note_alignment],
-                (values, perf_positions, perf_durations, perf_times, perf_time_shifts, perf_time_durations)
+                (
+                    values,
+                    perf_positions,
+                    perf_durations,
+                    perf_times,
+                    perf_time_shifts,
+                    perf_time_durations,
+                ),
             )
 
         # Put back correct beat tempos
-        values[:, self.vocab_types_idx["Tempo"]] = beat_tempos[np.searchsorted(beat_tempos[:, 0], note_beats)][:, 1]
+        values[:, self.vocab_types_idx["Tempo"]] = beat_tempos[
+            np.searchsorted(beat_tempos[:, 0], note_beats)
+        ][:, 1]
 
         # Copy score values to performance values
         for token_type in self.score_only_tokens:
@@ -366,42 +429,56 @@ class SyMuPe(SyMuPeBase):
                 perf_duration_values = perf_durations
 
             # Append (Rel)OnsetDev and (Rel)PerfDuration values
-            values = np.concatenate([
-                values,
-                onset_dev_values[:, None],
-                perf_duration_values[:, None]
-            ], axis=1)
+            values = np.concatenate(
+                [
+                    values,
+                    onset_dev_values[:, None],
+                    perf_duration_values[:, None],
+                ],
+                axis=1,
+            )
 
         # Append TimeShift/TimeDuration values
         if additional_params["use_time_tokens"]:
             if additional_params["negative_time_shifts"]:
-                perf_time_shifts = np.diff(np.concatenate([[0.], perf_times]))
-                if perf_time_shifts[0] < 0.:
+                perf_time_shifts = np.diff(np.concatenate([[0.0], perf_times]))
+                if perf_time_shifts[0] < 0.0:
                     perf_times -= perf_time_shifts[0]
                     perf_time_shifts -= perf_time_shifts[0]
 
             perf_time_shifts = np.maximum(perf_time_shifts, SPECIAL_TOKENS_VALUE + 1)
 
-            values = np.concatenate([
-                values,
-                perf_time_shifts[:, None],
-                perf_time_durations[:, None]
-            ], axis=1)
+            values = np.concatenate(
+                [
+                    values,
+                    perf_time_shifts[:, None],
+                    perf_time_durations[:, None],
+                ],
+                axis=1,
+            )
 
             # Append TimePosition values
             if additional_params["use_time_positions"]:
-                values = np.concatenate([
-                    values,
-                    np.round(perf_times[:, None] % additional_params["time_position_segment"], 6)
-                ], axis=1)
+                values = np.concatenate(
+                    [
+                        values,
+                        np.round(
+                            perf_times[:, None] % additional_params["time_position_segment"], 6
+                        ),
+                    ],
+                    axis=1,
+                )
 
         # Append TimeDurationSustain and Sustained values
         if self.config.additional_params["use_sustain_tokens"]:
-            values = np.concatenate([
-                values,
-                perf_time_durations[:, None],
-                np.zeros_like(perf_time_durations[:, None])
-            ], axis=1)
+            values = np.concatenate(
+                [
+                    values,
+                    perf_time_durations[:, None],
+                    np.zeros_like(perf_time_durations[:, None]),
+                ],
+                axis=1,
+            )
 
         # Convert values to tokens and build final TokSequence
         tokens = self.encode_tokens(values, clip=True)
@@ -419,8 +496,8 @@ class SyMuPe(SyMuPeBase):
             vocab=self.vocab_types_idx,
             meta={
                 "time_division": midi.ticks_per_quarter,
-                "bars": int(tokens[-1, self.vocab_types_idx["Bar"]] - self.zero_token + 1)
-            }
+                "bars": int(tokens[-1, self.vocab_types_idx["Bar"]] - self.zero_token + 1),
+            },
         )
 
         tokens = self.fill_extra_pitch_tokens(tokens=tokens)
@@ -436,9 +513,10 @@ class SyMuPe(SyMuPeBase):
         :return: the performance token representation, i.e. tracks converted into sequences of tokens
         """
         additional_params = self.config.additional_params
-        assert additional_params["use_time_tokens"], \
-            ("TimeShift and TimeDuration tokens should be present in the tokenizer to compute "
-             "a performance time only tokenization with a score metrical grid")
+        assert additional_params["use_time_tokens"], (
+            "TimeShift and TimeDuration tokens should be present in the tokenizer to compute "
+            "a performance time only tokenization with a score metrical grid"
+        )
 
         # Convert midi events to seconds
         midi = midi.to("second")
@@ -463,12 +541,16 @@ class SyMuPe(SyMuPeBase):
             values[:, self.vocab_types_idx["PitchClass"]] = note_soa["pitch"] % 12
             values[:, self.vocab_types_idx["PitchOctave"]] = note_soa["pitch"] // 12 - 1
 
-        values[:, self.vocab_types_idx["TimeShift"]] = np.diff(np.concatenate([[0.], note_soa["time"]]))
+        values[:, self.vocab_types_idx["TimeShift"]] = np.diff(
+            np.concatenate([[0.0], note_soa["time"]])
+        )
         values[:, self.vocab_types_idx["TimeDuration"]] = note_soa["duration"]
 
         if additional_params["use_time_positions"]:
             time_segment = additional_params["time_position_segment"]
-            values[:, self.vocab_types_idx["TimePosition"]] = np.round(note_soa["time"] % time_segment, 6)
+            values[:, self.vocab_types_idx["TimePosition"]] = np.round(
+                note_soa["time"] % time_segment, 6
+            )
 
         # Append TimeDurationSustain values
         if self.config.additional_params["use_sustain_tokens"]:
@@ -485,9 +567,7 @@ class SyMuPe(SyMuPeBase):
             type=SequenceType.TIME_PERFORMANCE,
             encoding=EncodingType.TIME_PERFORMANCE,
             vocab=self.vocab_types_idx,
-            meta={
-                "time_division": midi.ticks_per_quarter
-            }
+            meta={"time_division": midi.ticks_per_quarter},
         )
 
     def _extract_pedals(self, midi: Score) -> np.ndarray | None:
@@ -508,8 +588,20 @@ class SyMuPe(SyMuPeBase):
         else:
             on_token_id, off_token_id = 1, 0
 
-        pedal_on_values = np.stack((np.full(len(sustain_ons), fill_value=SPECIAL_TOKENS_VALUE - on_token_id), sustain_ons), axis=-1)
-        pedal_off_values = np.stack((np.full(len(sustain_offs), fill_value=SPECIAL_TOKENS_VALUE - off_token_id), sustain_offs), axis=-1)
+        pedal_on_values = np.stack(
+            (
+                np.full(len(sustain_ons), fill_value=SPECIAL_TOKENS_VALUE - on_token_id),
+                sustain_ons,
+            ),
+            axis=-1,
+        )
+        pedal_off_values = np.stack(
+            (
+                np.full(len(sustain_offs), fill_value=SPECIAL_TOKENS_VALUE - off_token_id),
+                sustain_offs,
+            ),
+            axis=-1,
+        )
 
         pedals = np.concatenate((pedal_on_values, pedal_off_values), axis=0)
         pedals = pedals[np.lexsort((pedals[:, 0], pedals[:, 1]))]
@@ -517,10 +609,10 @@ class SyMuPe(SyMuPeBase):
         return pedals
 
     def compress(
-            self,
-            tokens: TokSequence,
-            minimal: bool = False,
-            token_types: list[str] | None = None
+        self,
+        tokens: TokSequence,
+        minimal: bool = False,
+        token_types: list[str] | None = None,
     ) -> TokSequence:
         r"""
         Compress token sequence :class:`miditok.TokSequence` into its minimal representation.
@@ -582,7 +674,10 @@ class SyMuPe(SyMuPeBase):
 
             token_types = list((tokens.vocab or {}).keys())
             if len(token_types) == 0:
-                if seq_type in (SequenceType.TIME_PERFORMANCE, SequenceType.TIME_PERFORMANCE_SUSTAIN):
+                if seq_type in (
+                    SequenceType.TIME_PERFORMANCE,
+                    SequenceType.TIME_PERFORMANCE_SUSTAIN,
+                ):
                     token_types = self.time_performance_sizes.keys()
                 else:
                     token_types = self.score_sizes.keys()
@@ -603,16 +698,19 @@ class SyMuPe(SyMuPeBase):
             tokens.vocab = self.vocab_types_idx
 
             tokens = self.fill_extra_pitch_tokens(tokens=tokens)
-            if seq_type not in (SequenceType.TIME_PERFORMANCE, SequenceType.TIME_PERFORMANCE_SUSTAIN):
+            if seq_type not in (
+                SequenceType.TIME_PERFORMANCE,
+                SequenceType.TIME_PERFORMANCE_SUSTAIN,
+            ):
                 tokens = self.fill_extra_score_tokens(tokens=tokens)
 
         return tokens
 
     def decode_note_positions(
-            self,
-            tokens: TokSequence,
-            context: TokSequenceContext | None = None,
-            time_division: int = TICKS_PER_QUARTER
+        self,
+        tokens: TokSequence,
+        context: TokSequenceContext | None = None,
+        time_division: int = TICKS_PER_QUARTER,
     ) -> tuple[dict[str, any], TokSequenceContext]:
         additional_params = self.config.additional_params
         time_division = time_division or self.time_division
@@ -620,7 +718,9 @@ class SyMuPe(SyMuPeBase):
 
         context = context or TokSequenceContext()
         prev_score_ticks = context.score_ticks if context.score_ticks is not None else np.zeros(1)
-        prev_note_on_times = context.note_on_times if context.note_on_times is not None else np.zeros(1)
+        prev_note_on_times = (
+            context.note_on_times if context.note_on_times is not None else np.zeros(1)
+        )
         prev_tempos, prev_tempo_ticks, prev_tempo_times = context.tempos or (None, None, None)
 
         ticks_data, score_ticks = None, None
@@ -629,10 +729,11 @@ class SyMuPe(SyMuPeBase):
         tempos, tempo_ticks, tempo_times = None, None, None
         pedals = None
 
-        time_duration_token = "TimeDuration" if "TimeDuration" in tokens.vocab else "TimeDurationSustain"
-        has_time_tokens = (
-                additional_params["use_time_tokens"]
-                and self.has_token_types(tokens, ["TimeShift", time_duration_token])
+        time_duration_token = (
+            "TimeDuration" if "TimeDuration" in tokens.vocab else "TimeDurationSustain"
+        )
+        has_time_tokens = additional_params["use_time_tokens"] and self.has_token_types(
+            tokens, ["TimeShift", time_duration_token]
         )
         if has_time_tokens:
             # Note times
@@ -645,14 +746,14 @@ class SyMuPe(SyMuPeBase):
 
             pedals = tokens.pedals
 
-        has_score = (
-                self.has_token_types(tokens, ["Bar", "Position"])
-                or (
-                        additional_params["use_position_shifts"]
-                        and self.has_token_types(tokens, ["PositionShift"])
-                )
+        has_score = self.has_token_types(tokens, ["Bar", "Position"]) or (
+            additional_params["use_position_shifts"]
+            and self.has_token_types(tokens, ["PositionShift"])
         )
-        if has_score and tokens.type not in (SequenceType.TIME_PERFORMANCE, SequenceType.TIME_PERFORMANCE_SUSTAIN):
+        if has_score and tokens.type not in (
+            SequenceType.TIME_PERFORMANCE,
+            SequenceType.TIME_PERFORMANCE_SUSTAIN,
+        ):
             # Compute NoteON, Time Signature, Bar and Beat ticks
             ticks_data = self.compute_ticks(tokens, context=context, time_division=time_division)
 
@@ -661,17 +762,14 @@ class SyMuPe(SyMuPeBase):
 
             decode_from_onsets = additional_params["use_onset_tokens"]
             if decode_from_onsets:
-                assert (
-                        additional_params["use_onset_tokens"]
-                        and self.has_token_types(tokens, [
-                            self.onset_deviation_token, self.performed_duration_token
-                        ])
+                assert additional_params["use_onset_tokens"] and self.has_token_types(
+                    tokens, [self.onset_deviation_token, self.performed_duration_token]
                 )
 
                 # Compute position shifts
                 pos_shifts = self.compute_position_shifts(
                     np.concatenate([prev_score_ticks, score_ticks]), onset_shift=True
-                )[len(prev_score_ticks):]
+                )[len(prev_score_ticks) :]
 
                 # Onset Deviations to ticks
                 if additional_params["rel_onset_dev"]:
@@ -703,9 +801,11 @@ class SyMuPe(SyMuPeBase):
                     prev_tempos=prev_tempos,
                     prev_tempo_ticks=prev_tempo_ticks,
                     prev_tempo_times=prev_tempo_times,
-                    beat_ticks=ticks_data["bar"] if additional_params["bar_tempos"] else ticks_data["beat"],
+                    beat_ticks=(
+                        ticks_data["bar"] if additional_params["bar_tempos"] else ticks_data["beat"]
+                    ),
                     score_ticks=score_ticks,
-                    time_division=time_division
+                    time_division=time_division,
                 )
 
                 # Build new context
@@ -715,13 +815,18 @@ class SyMuPe(SyMuPeBase):
                     tempo_times = np.concatenate([prev_tempo_times, tempo_times[1:]], axis=0)
 
                 # Remove duplicates by ticks and tempos
-                tempos, tempo_ticks, tempo_times = self._filter_equal_tempos(tempos, tempo_ticks, tempo_times)
+                tempos, tempo_ticks, tempo_times = self._filter_equal_tempos(
+                    tempos, tempo_ticks, tempo_times
+                )
 
                 _offset = np.where(note_on_ticks.min() >= tempo_ticks)[0][-1]
                 note_on_times, note_off_times = self._decode_note_times(
-                    note_on_ticks, note_off_ticks,
-                    tempos[_offset:], tempo_ticks[_offset:], tempo_times[_offset:],
-                    time_division=time_division
+                    note_on_ticks,
+                    note_off_ticks,
+                    tempos[_offset:],
+                    tempo_ticks[_offset:],
+                    tempo_times[_offset:],
+                    time_division=time_division,
                 )
 
         position_data = {
@@ -731,7 +836,7 @@ class SyMuPe(SyMuPeBase):
             "note_on_times": note_on_times,
             "note_off_times": note_off_times,
             "tempos": (tempos, tempo_ticks, tempo_times),
-            "pedals": pedals
+            "pedals": pedals,
         }
 
         def extend_context(prev_data, new_data):
@@ -749,14 +854,14 @@ class SyMuPe(SyMuPeBase):
         return position_data, new_context
 
     def _decode_performance(
-            self,
-            tokens: TokSequence,
-            context: TokSequenceContext | None = None,
-            programs: list[tuple[int, bool]] | None = None,
-            time_division: int = TICKS_PER_QUARTER,
-            initial_tempo: int | None = None,
-            sync_midi: bool = True,
-            **kwargs
+        self,
+        tokens: TokSequence,
+        context: TokSequenceContext | None = None,
+        programs: list[tuple[int, bool]] | None = None,
+        time_division: int = TICKS_PER_QUARTER,
+        initial_tempo: int | None = None,
+        sync_midi: bool = True,
+        **kwargs,
     ) -> Score:
         r"""
         Convert performance tokens (:class:`miditok.TokSequence`) into a ``symusic.Score``.
@@ -787,8 +892,14 @@ class SyMuPe(SyMuPeBase):
             tokens=tokens, context=context, time_division=time_division
         )
         ticks_data = position_data["ticks_data"]
-        note_on_ticks, note_off_ticks = position_data["note_on_ticks"], position_data["note_off_ticks"]
-        note_on_times, note_off_times = position_data["note_on_times"], position_data["note_off_times"]
+        note_on_ticks, note_off_ticks = (
+            position_data["note_on_ticks"],
+            position_data["note_off_ticks"],
+        )
+        note_on_times, note_off_times = (
+            position_data["note_on_times"],
+            position_data["note_off_times"],
+        )
         pedals = position_data["pedals"]
 
         midi_is_score = False
@@ -802,7 +913,10 @@ class SyMuPe(SyMuPeBase):
             if additional_params["use_onset_tokens"] and note_on_ticks is not None:
                 midi_times, midi_durations = note_on_ticks, note_off_ticks - note_on_ticks
             else:  # `midi` is score MIDI using which we might synchronize later
-                midi_times, midi_durations = ticks_data["note_on"].round(), ticks_data["duration"].round()
+                midi_times, midi_durations = (
+                    ticks_data["note_on"].round(),
+                    ticks_data["duration"].round(),
+                )
                 midi_is_score = True
 
             # Build Tempo changes
@@ -818,20 +932,32 @@ class SyMuPe(SyMuPeBase):
                 time=time_sig_ticks, numerator=time_sigs[:, 0], denominator=time_sigs[:, 1]
             )
 
-        controls = ControlChange.from_numpy(
-            time=pedals[:, 1],
-            number=np.full_like(pedals[:, 0], fill_value=64.),
-            value=(pedals[:, 0] > 0) * 127.,
-            ttype="second"
-        ) if pedals is not None and len(pedals) > 0 else None
+        controls = (
+            ControlChange.from_numpy(
+                time=pedals[:, 1],
+                number=np.full_like(pedals[:, 0], fill_value=64.0),
+                value=(pedals[:, 0] > 0) * 127.0,
+                ttype="second",
+            )
+            if pedals is not None and len(pedals) > 0
+            else None
+        )
 
         # Process Programs
-        programs = self.get_values(tokens, "Program", from_ids=True) if self.config.use_programs else None
+        programs = (
+            self.get_values(tokens, "Program", from_ids=True) if self.config.use_programs else None
+        )
 
         midi = self._build_score(
-            times=midi_times, durations=midi_durations, pitches=pitches, velocities=velocities,
-            programs=programs, time_signatures=time_signatures, tempos=tempos,
-            time_division=time_division, ttype=ttype
+            times=midi_times,
+            durations=midi_durations,
+            pitches=pitches,
+            velocities=velocities,
+            programs=programs,
+            time_signatures=time_signatures,
+            tempos=tempos,
+            time_division=time_division,
+            ttype=ttype,
         )
 
         if midi_is_score:
@@ -841,16 +967,24 @@ class SyMuPe(SyMuPeBase):
             if onset_pairs is None:
                 # Record performed score note ticks
                 score_ticks = ticks_data["note_on"].round()
-                is_performed = velocities != 0.
+                is_performed = velocities != 0.0
                 performed_ticks, perf_times = score_ticks[is_performed], note_on_times[is_performed]
 
                 # Build onset pairs: a list of tuples (onset_score_tick, onset_perf_time)
-                onset_pairs = self.compute_onset_pairs(score_ticks=performed_ticks, perf_times=perf_times)
+                onset_pairs = self.compute_onset_pairs(
+                    score_ticks=performed_ticks, perf_times=perf_times
+                )
 
             midi_s = self._build_score(
-                times=note_on_times, durations=note_off_times - note_on_times, pitches=pitches, velocities=velocities,
-                programs=programs, time_signatures=None, tempos=None,
-                time_division=time_division, ttype="second"
+                times=note_on_times,
+                durations=note_off_times - note_on_times,
+                pitches=pitches,
+                velocities=velocities,
+                programs=programs,
+                time_signatures=None,
+                tempos=None,
+                time_division=time_division,
+                ttype="second",
             )
 
             # Synchronize created MIDI by beats
@@ -860,7 +994,7 @@ class SyMuPe(SyMuPeBase):
                     perf_midi=midi_s,
                     onset_pairs=onset_pairs[:, :2],
                     bar_sync=False,
-                    inplace=True
+                    inplace=True,
                 )
                 if midi is None:
                     warnings.warn(
@@ -898,11 +1032,14 @@ class SyMuPe(SyMuPeBase):
             else:
                 perf_duration_values = values[:, self.vocab_types_idx["Duration"]]
 
-            values = np.concatenate([
-                values,
-                onset_dev_values[:, None],
-                perf_duration_values[:, None]
-            ], axis=1)
+            values = np.concatenate(
+                [
+                    values,
+                    onset_dev_values[:, None],
+                    perf_duration_values[:, None],
+                ],
+                axis=1,
+            )
 
         if self.config.additional_params["use_time_tokens"]:
             ticks_data = self.compute_ticks(TokSequence(ids=None, values=values))
@@ -911,58 +1048,85 @@ class SyMuPe(SyMuPeBase):
             durations = ticks_data["duration"].astype(float)
             note_off_ticks = note_on_ticks + durations
 
-            tempo_indices = np.concatenate([[0], np.where(np.diff(values[:, self.vocab_types_idx["Tempo"]]))[0] + 1])
+            tempo_indices = np.concatenate(
+                [[0], np.where(np.diff(values[:, self.vocab_types_idx["Tempo"]]))[0] + 1]
+            )
             tempos = values[tempo_indices, self.vocab_types_idx["Tempo"]]
 
             if len(tempos) > 0:
                 # Get beat ticks to tie Tempo change to them
-                beat_ticks = ticks_data["bar"] if self.config.additional_params["bar_tempos"] else ticks_data["beat"]
-                tempo_ticks = note_on_ticks[tempo_indices]  # Note: position at the start of the beat
-                tempo_ticks = beat_ticks[np.minimum(
-                    np.searchsorted(beat_ticks, tempo_ticks, side="right") - 1, beat_ticks.shape[0] - 1
-                )]
+                beat_ticks = (
+                    ticks_data["bar"]
+                    if self.config.additional_params["bar_tempos"]
+                    else ticks_data["beat"]
+                )
+                # Note: position at the start of the beat
+                tempo_ticks = note_on_ticks[tempo_indices]
+                tempo_ticks = beat_ticks[
+                    np.minimum(
+                        np.searchsorted(beat_ticks, tempo_ticks, side="right") - 1,
+                        beat_ticks.shape[0] - 1,
+                    )
+                ]
                 tempo_ticks[0] = 0
             else:
                 tempo_ticks = [0]
 
+            _time_scale = 60 / self.time_division
             tempo_times = np.cumsum(
-                np.concatenate([[0.], np.diff(tempo_ticks) / self.time_division * 60 / tempos[:-1]])
+                np.concatenate([[0.0], np.diff(tempo_ticks) * _time_scale / tempos[:-1]])
             )
 
             tempo_ids = np.searchsorted(tempo_ticks, note_on_ticks, side="right") - 1
-            note_on_times = tempo_times[tempo_ids] + (
-                    note_on_ticks - tempo_ticks[tempo_ids]
-            ) / self.time_division * 60 / tempos[tempo_ids]
+
+            note_on_times = (
+                tempo_times[tempo_ids]
+                + (note_on_ticks - tempo_ticks[tempo_ids]) * _time_scale / tempos[tempo_ids]
+            )
 
             tempo_ids = np.searchsorted(tempo_ticks, note_off_ticks, side="right") - 1
-            note_off_times = tempo_times[tempo_ids] + (
-                    note_off_ticks - tempo_ticks[tempo_ids]
-            ) / self.time_division * 60 / tempos[tempo_ids]
+            note_off_times = (
+                tempo_times[tempo_ids]
+                + (note_off_ticks - tempo_ticks[tempo_ids]) * _time_scale / tempos[tempo_ids]
+            )
 
-            time_shifts = np.diff(np.concatenate([[0.], note_on_times]))
+            time_shifts = np.diff(np.concatenate([[0.0], note_on_times]))
             time_durations = note_off_times - note_on_times
 
             # Append TimeShift/TimeDuration values
-            values = np.concatenate([
-                values,
-                time_shifts[:, None],
-                time_durations[:, None]
-            ], axis=1)
+            values = np.concatenate(
+                [
+                    values,
+                    time_shifts[:, None],
+                    time_durations[:, None],
+                ],
+                axis=1,
+            )
 
             # Append TimePosition values
             if self.config.additional_params["use_time_positions"]:
-                values = np.concatenate([
-                    values,
-                    np.round(note_on_times[:, None] % self.config.additional_params["time_position_segment"], 6)
-                ], axis=1)
+                values = np.concatenate(
+                    [
+                        values,
+                        np.round(
+                            note_on_times[:, None]
+                            % self.config.additional_params["time_position_segment"],
+                            6,
+                        ),
+                    ],
+                    axis=1,
+                )
 
             # Append TimeDurationSustain values
             if self.config.additional_params["use_sustain_tokens"]:
-                values = np.concatenate([
-                    values,
-                    time_durations[:, None],
-                    np.zeros_like(time_durations[:, None])
-                ], axis=1)
+                values = np.concatenate(
+                    [
+                        values,
+                        time_durations[:, None],
+                        np.zeros_like(time_durations[:, None]),
+                    ],
+                    axis=1,
+                )
 
         tokens = self.encode_tokens(values)
 
@@ -972,17 +1136,17 @@ class SyMuPe(SyMuPeBase):
             type=score_tokens.type,
             encoding=EncodingType.PERFORMANCE,
             vocab=self.vocab_types_idx,
-            meta=score_tokens.meta or {}
+            meta=score_tokens.meta or {},
         )
 
     def sort_tokens(
-            self,
-            tokens: TokSequence,
-            by_time: bool = False,
-            sort_ids: np.ndarray | None = None,
-            ordered_shifts: bool = True,
-            subsequence: bool = False,
-            returns_sort_ids: bool = False
+        self,
+        tokens: TokSequence,
+        by_time: bool = False,
+        sort_ids: np.ndarray | None = None,
+        ordered_shifts: bool = True,
+        subsequence: bool = False,
+        returns_sort_ids: bool = False,
     ) -> TokSequence | tuple[TokSequence, np.ndarray]:
         r"""
         Sort token sequence :class:`miditok.TokSequence`.
@@ -1005,23 +1169,37 @@ class SyMuPe(SyMuPeBase):
             time_shifts = self.get_values(tokens, "TimeShift")
             note_times = np.cumsum(time_shifts)
 
-        if additional_params["use_position_shifts"] and self.has_token_types(tokens, "PositionShift"):
+        if additional_params["use_position_shifts"] and self.has_token_types(
+            tokens, "PositionShift"
+        ):
             position_shifts = self.get_values(tokens, "PositionShift")
             note_ticks = np.cumsum(position_shifts)
 
         if sort_ids is None:
             if by_time:
                 assert additional_params["use_time_tokens"] and note_times is not None
-                sort_ids = np.lexsort((
-                    np.where(tokens.ids[:, vocab["Pitch"]] > self.zero_token, tokens.ids[:, vocab["Pitch"]], 0),
-                    note_times
-                ))
+                sort_ids = np.lexsort(
+                    (
+                        np.where(
+                            tokens.ids[:, vocab["Pitch"]] > self.zero_token,
+                            tokens.ids[:, vocab["Pitch"]],
+                            0,
+                        ),
+                        note_times,
+                    )
+                )
             else:
-                sort_ids = np.lexsort((
-                    np.where(tokens.ids[:, vocab["Pitch"]] > self.zero_token, tokens.ids[:, vocab["Pitch"]], 0),
-                    tokens.ids[:, vocab["Position"]],
-                    tokens.ids[:, vocab["Bar"]]
-                ))
+                sort_ids = np.lexsort(
+                    (
+                        np.where(
+                            tokens.ids[:, vocab["Pitch"]] > self.zero_token,
+                            tokens.ids[:, vocab["Pitch"]],
+                            0,
+                        ),
+                        tokens.ids[:, vocab["Position"]],
+                        tokens.ids[:, vocab["Bar"]],
+                    )
+                )
 
         tokens.ids = tokens.ids[sort_ids]
         if tokens.values is not None:
@@ -1033,12 +1211,14 @@ class SyMuPe(SyMuPeBase):
             if note_times is not None:
                 if not self.config.additional_params["negative_time_shifts"]:
                     warnings.warn(
-                        "`config.additional_params[\"negative_time_shifts\"]` is set to False, "
+                        '`config.additional_params["negative_time_shifts"]` is set to False, '
                         "notes performed before the preceding notes will have 0 time shift tokens."
                     )
 
                 new_note_times = note_times[sort_ids]
-                new_time_shifts = np.diff(np.concatenate([[min(0., new_note_times.min())], new_note_times]))
+                new_time_shifts = np.diff(
+                    np.concatenate([[min(0.0, new_note_times.min())], new_note_times])
+                )
 
                 tokens.ids[:, vocab["TimeShift"]] = self.encode_tokens(new_time_shifts, "TimeShift")
                 if tokens.values is not None:
@@ -1054,7 +1234,9 @@ class SyMuPe(SyMuPeBase):
 
             if note_ticks is not None and "PositionShift" in vocab:
                 new_note_ticks = note_ticks[sort_ids]
-                new_pos_shifts = np.diff(np.concatenate([[min(0., new_note_ticks.min())], new_note_ticks]))
+                new_pos_shifts = np.diff(
+                    np.concatenate([[min(0.0, new_note_ticks.min())], new_note_ticks])
+                )
                 new_pos_shifts = np.maximum(new_pos_shifts, SPECIAL_TOKENS_VALUE + 1)
 
                 tokens.ids[:, vocab["PositionShift"]] = self.encode_tokens(
@@ -1100,7 +1282,9 @@ class SyMuPe(SyMuPeBase):
                 if self.rel_onset_deviations is None:
                     self.rel_onset_deviations = self._create_relative_onset_deviations()
                 self.rel_onset_deviations = np.array(self.rel_onset_deviations)
-                self.config.additional_params["rel_onset_deviations"] = self.rel_onset_deviations.tolist()
+                self.config.additional_params["rel_onset_deviations"] = (
+                    self.rel_onset_deviations.tolist()
+                )
                 vocab.append([f"RelOnsetDev_{i}" for i in self.rel_onset_deviations])
             else:  # absolute
                 num_positions = self.config.max_num_pos_per_beat * 2  # up to two quarter notes
@@ -1111,7 +1295,9 @@ class SyMuPe(SyMuPeBase):
                 if self.rel_performed_durations is None:
                     self.rel_performed_durations = self._create_relative_performed_durations()
                 self.rel_performed_durations = np.array(self.rel_performed_durations)
-                self.config.additional_params["rel_performed_durations"] = self.rel_performed_durations.tolist()
+                self.config.additional_params["rel_performed_durations"] = (
+                    self.rel_performed_durations.tolist()
+                )
                 vocab.append([f"RelPerfDuration_{i}" for i in self.rel_performed_durations])
             else:
                 vocab.append(vocab[self.vocab_types_idx["Duration"]])
@@ -1145,8 +1331,6 @@ class SyMuPe(SyMuPeBase):
             if self.config.additional_params["use_sustain_tokens"]:
                 vocab.append([f"TimeDuration_{i:.3f}" for i in self.time_durations])
                 vocab.append(["Sustained_On", "Sustained_Off"])
-                # vocab.append([f"PedalOnTimeShift_{i:.3f}" for i in self.time_shifts])
-                # vocab.append([f"PedalOffTimeShift_{i:.3f}" for i in self.time_shifts])
 
         return vocab
 
@@ -1184,7 +1368,7 @@ class SyMuPe(SyMuPeBase):
                 token_types.extend(["TimePosition"])
 
             if self.config.additional_params["use_sustain_tokens"]:
-                token_types.extend(["TimeDurationSustain", "Sustained"]) # , "PedalOnTimeShift", "PedalOffTimeShift"])
+                token_types.extend(["TimeDurationSustain", "Sustained"])
 
         return token_types
 
@@ -1200,10 +1384,9 @@ class SyMuPe(SyMuPeBase):
 
         if self.config.additional_params["negative_position_shifts"]:
             assert -2 * self.config.max_num_pos_per_beat > SPECIAL_TOKENS_VALUE
-            pos_shifts = np.concatenate([
-                -pos_shifts[pos_shifts <= 2 * self.config.max_num_pos_per_beat],
-                pos_shifts
-            ])
+            pos_shifts = np.concatenate(
+                [-pos_shifts[pos_shifts <= 2 * self.config.max_num_pos_per_beat], pos_shifts]
+            )
             pos_shifts = np.sort(np.unique(pos_shifts))
 
         return pos_shifts
@@ -1217,22 +1400,26 @@ class SyMuPe(SyMuPeBase):
         """
         onset_dev_quant = (self.config.additional_params["num_onset_devs"] - 1) // 8
 
-        rel_onset_devs = np.concatenate([
-            # 25% from 0 to 1/24
-            np.linspace(0.0, 1 / 24, onset_dev_quant + 1),
-            # 25% from 1/24 to 1/8
-            np.linspace(1 / 24, 1 / 8, onset_dev_quant + 1)[1:],
-            # 25% from 1/8 to 1/3
-            np.linspace(1 / 8, 1 / 3, onset_dev_quant + 1)[1:],
-            # 12.5% from 1/3 to 3/5
-            np.linspace(1 / 3, 3 / 5, onset_dev_quant // 2 + 1)[1:],
-            # 6.25% from 3/5 to 1.0
-            np.linspace(3 / 5, 1.0, onset_dev_quant // 4 + 1)[1:],
-            # 6.25% from 1.0 to 4.0
-            (2 ** (8 * np.arange(onset_dev_quant // 4 + 1) / onset_dev_quant))[1:]
-        ])
+        rel_onset_devs = np.concatenate(
+            [
+                # 25% from 0 to 1/24
+                np.linspace(0.0, 1 / 24, onset_dev_quant + 1),
+                # 25% from 1/24 to 1/8
+                np.linspace(1 / 24, 1 / 8, onset_dev_quant + 1)[1:],
+                # 25% from 1/8 to 1/3
+                np.linspace(1 / 8, 1 / 3, onset_dev_quant + 1)[1:],
+                # 12.5% from 1/3 to 3/5
+                np.linspace(1 / 3, 3 / 5, onset_dev_quant // 2 + 1)[1:],
+                # 6.25% from 3/5 to 1.0
+                np.linspace(3 / 5, 1.0, onset_dev_quant // 4 + 1)[1:],
+                # 6.25% from 1.0 to 4.0
+                (2 ** (8 * np.arange(onset_dev_quant // 4 + 1) / onset_dev_quant))[1:],
+            ]
+        )
         rel_onset_devs = np.round(rel_onset_devs, 4)
-        rel_onset_devs = np.sort(np.concatenate([-rel_onset_devs[1:], rel_onset_devs]))  # add negative deviations
+        rel_onset_devs = np.sort(
+            np.concatenate([-rel_onset_devs[1:], rel_onset_devs])
+        )  # add negative deviations
 
         return rel_onset_devs
 
@@ -1245,20 +1432,22 @@ class SyMuPe(SyMuPeBase):
         """
         perf_dur_quant = (self.config.additional_params["num_perf_durations"] - 1) // 4
 
-        rel_performed_durations = np.concatenate([
-            # 25% from 1/10 to 2/5
-            np.linspace(1 / 10, 2 / 5, perf_dur_quant + 1),
-            # 25% from 2/5 to 2/3
-            np.linspace(2 / 5, 2 / 3, perf_dur_quant + 1)[1:],
-            # 25% from 2/3 to 1.0
-            np.linspace(2 / 3, 1.0, perf_dur_quant + 1)[1:],
-            # 12.5% from 1.0 to 5/4
-            np.linspace(1.0, 5 / 4, perf_dur_quant // 2 + 1)[1:],
-            # 6.25% from 5/4 to 3/2
-            np.linspace(5 / 4, 3 / 2, perf_dur_quant // 4 + 1)[1:],
-            # 6.25% from 3/2 to 3.0
-            (2 ** (4 * np.arange(perf_dur_quant // 4 + 1) / perf_dur_quant) * 3 / 2)[1:],
-        ])
+        rel_performed_durations = np.concatenate(
+            [
+                # 25% from 1/10 to 2/5
+                np.linspace(1 / 10, 2 / 5, perf_dur_quant + 1),
+                # 25% from 2/5 to 2/3
+                np.linspace(2 / 5, 2 / 3, perf_dur_quant + 1)[1:],
+                # 25% from 2/3 to 1.0
+                np.linspace(2 / 3, 1.0, perf_dur_quant + 1)[1:],
+                # 12.5% from 1.0 to 5/4
+                np.linspace(1.0, 5 / 4, perf_dur_quant // 2 + 1)[1:],
+                # 6.25% from 5/4 to 3/2
+                np.linspace(5 / 4, 3 / 2, perf_dur_quant // 4 + 1)[1:],
+                # 6.25% from 3/2 to 3.0
+                (2 ** (4 * np.arange(perf_dur_quant // 4 + 1) / perf_dur_quant) * 3 / 2)[1:],
+            ]
+        )
         rel_performed_durations = np.round(rel_performed_durations, 4)
 
         return rel_performed_durations
@@ -1275,10 +1464,15 @@ class SyMuPe(SyMuPeBase):
         if not negative:
             points = [max(0, point) for point in points]
 
-        return np.concatenate([
-            np.arange(start, stop, step)
-            for start, stop, step in zip(points[:-1], points[1:], steps)
-        ]) / 1000.
+        return (
+            np.concatenate(
+                [
+                    np.arange(start, stop, step)
+                    for start, stop, step in zip(points[:-1], points[1:], steps)
+                ]
+            )
+            / 1000.0
+        )
 
     def _create_time_positions(self) -> np.ndarray:
         r"""
@@ -1288,19 +1482,27 @@ class SyMuPe(SyMuPeBase):
         """
         time_segment = self.config.additional_params["time_position_segment"]
         time_step = self.config.additional_params["time_position_step"]
-        return np.round(np.arange(0., time_segment, time_step), 3)
+        return np.round(np.arange(0.0, time_segment, time_step), 3)
 
-    def compute_position_shifts(self, score_positions: np.ndarray, onset_shift: bool | None = None) -> np.ndarray:
+    def compute_position_shifts(
+        self, score_positions: np.ndarray, onset_shift: bool | None = None
+    ) -> np.ndarray:
         r"""Computes absolute position shifts between onsets from score positions.
 
         :param score_positions: score positions in ticks/beats
         :param onset_shift: if provided, overwrites tokenizer setting for onset_shift position shift
         :return: the position shifts
         """
-        onset_shift = self.config.additional_params["onset_position_shifts"] if onset_shift is None else onset_shift
+        onset_shift = (
+            self.config.additional_params["onset_position_shifts"]
+            if onset_shift is None
+            else onset_shift
+        )
         return super().compute_position_shifts(score_positions, onset_shift)
 
-    def compute_onset_values(self, score_positions: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def compute_onset_values(
+        self, score_positions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         r"""Computes number of notes and positions of notes in onsets.
 
         :param score_positions: score positions in ticks/beats
@@ -1310,15 +1512,21 @@ class SyMuPe(SyMuPeBase):
         score_pos_ids = np.arange(len(unique_score_pos)).repeat(score_pos_counts)
 
         notes_in_onset = score_pos_counts[score_pos_ids]
-        notes_in_onset = np.minimum(notes_in_onset, self.config.additional_params["max_notes_in_onset"])
+        notes_in_onset = np.minimum(
+            notes_in_onset, self.config.additional_params["max_notes_in_onset"]
+        )
 
         pos_in_onset = np.repeat(np.cumsum(-score_pos_counts) + score_pos_counts, score_pos_counts)
         pos_in_onset = pos_in_onset + np.arange(len(pos_in_onset))
-        pos_in_onset = np.minimum(pos_in_onset, self.config.additional_params["max_notes_in_onset"] - 1)
+        pos_in_onset = np.minimum(
+            pos_in_onset, self.config.additional_params["max_notes_in_onset"] - 1
+        )
 
         return score_pos_ids, notes_in_onset, pos_in_onset
 
-    def compute_time_bar_beat_onset_indices(self, tokens: TokSequence) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def compute_time_bar_beat_onset_indices(
+        self, tokens: TokSequence
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         r"""
         Compute time bar, beat and onset indices for each note in the sequence
         using 120 BPM as "tempo" and 4/4 as time "signature".
@@ -1327,14 +1535,15 @@ class SyMuPe(SyMuPeBase):
         :return: a dictionary of ticks data
         """
         additional_params = self.config.additional_params
-        assert additional_params["use_time_tokens"], \
-            ("TimeShift and TimeDuration tokens should be present in the tokenizer to decode "
-             "a performance time only tokenization with a score metrical grid")
+        assert additional_params["use_time_tokens"], (
+            "TimeShift and TimeDuration tokens should be present in the tokenizer to decode "
+            "a performance time only tokenization with a score metrical grid"
+        )
 
         time_shifts = self.get_values(tokens, "TimeShift")
         note_times = np.cumsum(time_shifts)
 
-        bars, beats = note_times // 2., note_times // 0.5
+        bars, beats = note_times // 2.0, note_times // 0.5
 
         unique_onsets, onset_notes = np.unique(note_times // 0.01, return_counts=True)
         onsets = np.arange(len(unique_onsets)).repeat(onset_notes)
@@ -1356,36 +1565,39 @@ class SyMuPe(SyMuPeBase):
 
         onset_pairs = np.stack([score_onsets, onset_times], axis=1)
 
-        if score_onsets[0] != 0.:
+        if score_onsets[0] != 0.0:
             onset_pairs = np.concatenate(([[0, 0]], onset_pairs))
 
         return onset_pairs
 
     def shift_positions(
-            self,
-            tokens: TokSequence,
-            shifts: dict[str, int | float] | None = None,
-            inverse_shifts: bool = False,
-            normalized_values: bool = False,
-            shift_to_zero: bool = False
+        self,
+        tokens: TokSequence,
+        shifts: dict[str, int | float] | None = None,
+        inverse_shifts: bool = False,
+        normalized_values: bool = False,
+        shift_to_zero: bool = False,
     ) -> tuple[TokSequence, dict[str, int | float]]:
         assert not shift_to_zero or shifts is None
 
         vocab = tokens.vocab or self.vocab_types_idx
 
         has_bars = (
-                tokens.encoding != EncodingType.TIME_PERFORMANCE
-                and "Bar" in vocab and "Position" in vocab
-                and self.has_token_types(tokens, ["Bar", "Position"])
+            tokens.encoding != EncodingType.TIME_PERFORMANCE
+            and "Bar" in vocab
+            and "Position" in vocab
+            and self.has_token_types(tokens, ["Bar", "Position"])
         )
 
         has_time = (
-                self.config.additional_params["use_time_positions"]
-                and tokens.encoding not in (EncodingType.SCORE, EncodingType.PLAIN_SCORE, EncodingType.REL_PERFORMANCE)
-                and "TimePosition" in vocab and self.has_token_types(tokens, ["TimePosition"])
+            self.config.additional_params["use_time_positions"]
+            and tokens.encoding
+            not in (EncodingType.SCORE, EncodingType.PLAIN_SCORE, EncodingType.REL_PERFORMANCE)
+            and "TimePosition" in vocab
+            and self.has_token_types(tokens, ["TimePosition"])
         )
 
-        shifts = shifts or {"Bar": 0, "Time": 0.}
+        shifts = shifts or {"Bar": 0, "Time": 0.0}
         if shift_to_zero and len(tokens) > 0:  # move the first note to zero time
             if has_bars:
                 shifts["Bar"] = -int(self.get_values(tokens, "Bar", from_ids=True).min())
@@ -1408,27 +1620,37 @@ class SyMuPe(SyMuPeBase):
             tokens.ids[:, bar_index] += bar_shift
             if tokens.values is not None:
                 if normalized_values:
-                    tokens.values[:, bar_index] = self.denormalize_values(tokens.values[:, bar_index], "Bar")
+                    tokens.values[:, bar_index] = self.denormalize_values(
+                        tokens.values[:, bar_index], "Bar"
+                    )
                     tokens.values[:, bar_index] += bar_shift
-                    tokens.values[:, bar_index] = self.normalize_values(tokens.values[:, bar_index], "Bar")
+                    tokens.values[:, bar_index] = self.normalize_values(
+                        tokens.values[:, bar_index], "Bar"
+                    )
                 else:
                     tokens.values[:, bar_index] += bar_shift
 
-        time_shift = shifts.get("Time", 0.)
-        if time_shift != 0. and has_time:
+        time_shift = shifts.get("Time", 0.0)
+        if time_shift != 0.0 and has_time:
             time_shifts = self.get_values(tokens, "TimeShift")
             note_times = np.cumsum(time_shifts)
 
             new_note_times = note_times + time_shift
-            new_time_positions = np.round(new_note_times % self.config.additional_params["time_position_segment"], 6)
+            new_time_positions = np.round(
+                new_note_times % self.config.additional_params["time_position_segment"], 6
+            )
 
-            tokens.ids[:, vocab["TimePosition"]] = self.encode_tokens(new_time_positions, token_type="TimePosition")
+            tokens.ids[:, vocab["TimePosition"]] = self.encode_tokens(
+                new_time_positions, token_type="TimePosition"
+            )
             if tokens.values is not None:
                 tokens.values[:, vocab["TimePosition"]] = new_time_positions
 
         return tokens, shifts
 
-    def add_tempo_tokens(self, tokens: TokSequence, window: tuple[float, float] = (-2, 1)) -> TokSequence:
+    def add_tempo_tokens(
+        self, tokens: TokSequence, window: tuple[float, float] = (-2, 1)
+    ) -> TokSequence:
         vocab = tokens.vocab or self.vocab_types_idx
         if "Tempo" not in vocab or not self.has_token_types(tokens, "TimeShift"):
             return tokens
@@ -1441,7 +1663,9 @@ class SyMuPe(SyMuPeBase):
 
         return tokens
 
-    def compute_local_tempos(self, tokens: TokSequence, window: tuple[float, float] = (-2, 1)) -> np.ndarray:
+    def compute_local_tempos(
+        self, tokens: TokSequence, window: tuple[float, float] = (-2, 1)
+    ) -> np.ndarray:
         position_data, _ = self.decode_note_positions(tokens, time_division=self.time_division)
 
         score_ticks = position_data["ticks_data"]["note_on"]
@@ -1454,11 +1678,13 @@ class SyMuPe(SyMuPeBase):
 
         left_ids = np.maximum(
             0,
-            np.searchsorted(onset_ticks, onset_ticks + window[0] * self.time_division, side="right") - 1
+            np.searchsorted(onset_ticks, onset_ticks + window[0] * self.time_division, side="right")
+            - 1,
         )
         right_ids = np.minimum(
             onset_ticks.shape[-1] - 1,
-            np.searchsorted(onset_ticks, onset_ticks + window[1] * self.time_division, side="right") - 1
+            np.searchsorted(onset_ticks, onset_ticks + window[1] * self.time_division, side="right")
+            - 1,
         )
         left_ids = np.minimum(left_ids, np.maximum(0, right_ids - 1))
         right_ids = np.maximum(right_ids, np.minimum(onset_ticks.shape[-1] - 1, left_ids + 1))
@@ -1473,8 +1699,9 @@ class SyMuPe(SyMuPeBase):
         return tempos
 
     def add_bar_line_tokens(self, tokens: TokSequence, start: bool = True) -> TokSequence:
-        if (tokens.type in (SequenceType.TIME_PERFORMANCE, SequenceType.TIME_PERFORMANCE_SUSTAIN)
-                or BAR_LINE_TOKEN not in self.special_tokens
+        if (
+            tokens.type in (SequenceType.TIME_PERFORMANCE, SequenceType.TIME_PERFORMANCE_SUSTAIN)
+            or BAR_LINE_TOKEN not in self.special_tokens
         ):
             return tokens
 
@@ -1514,9 +1741,13 @@ class SyMuPe(SyMuPeBase):
 
         if note_ticks is not None and np.any(mask):
             note_ticks = note_ticks[mask]
-            new_position_shifts = np.diff(np.concatenate([[min(0., note_ticks.min())], note_ticks]))
+            new_position_shifts = np.diff(
+                np.concatenate([[min(0.0, note_ticks.min())], note_ticks])
+            )
 
-            tokens.ids[:, vocab["PositionShift"]] = self.encode_tokens(new_position_shifts, "PositionShift")
+            tokens.ids[:, vocab["PositionShift"]] = self.encode_tokens(
+                new_position_shifts, "PositionShift"
+            )
             if tokens.values is not None:
                 tokens.values[:, vocab["PositionShift"]] = new_position_shifts
 
@@ -1542,9 +1773,10 @@ class SyMuPe(SyMuPeBase):
             tokens = self.sort_tokens(tokens, by_time=True)
 
         has_bars = (
-                tokens.encoding != EncodingType.TIME_PERFORMANCE
-                and "Bar" in vocab and "Position" in vocab
-                and self.has_token_types(tokens, ["Bar", "Position"])
+            tokens.encoding != EncodingType.TIME_PERFORMANCE
+            and "Bar" in vocab
+            and "Position" in vocab
+            and self.has_token_types(tokens, ["Bar", "Position"])
         )
 
         pedal_pitches, pedal_times = pedals[:, 0], pedals[:, 1]
@@ -1566,20 +1798,14 @@ class SyMuPe(SyMuPeBase):
         note_ids, note_sustain_ids = np.where(note_off_sustain)[0], start_search[note_off_sustain]
 
         if ignore_redundant:
-            # pedal_inside = note_mask[:, None] & np.logical_and(  # a pedal (on+off) during a note
-            #     note_on_times[:, None] <= sustain_ons[None],
-            #     note_off_times[:, None] >= sustain_offs[None]
-            # )
-            # sustain_ids = np.where(np.any(pedal_inside, 0))[0]
-
             start_search = np.searchsorted(sustain_ons, note_on_times, side="left")
             end_search = np.searchsorted(sustain_offs, note_off_times, side="right") - 1
 
-            pedal_inside = (note_mask & (start_search >= 0) & (end_search >= start_search))
+            pedal_inside = note_mask & (start_search >= 0) & (end_search >= start_search)
 
             sustain_mask = np.zeros(len(sustain_ons), dtype=bool)
             for s, e in np.stack([start_search[pedal_inside], end_search[pedal_inside]], -1):
-                sustain_mask[s:e + 1] = True
+                sustain_mask[s : e + 1] = True
             sustain_ids = np.where(sustain_mask)[0]
 
             sustain_ids = np.concatenate([note_sustain_ids, sustain_ids])
@@ -1600,7 +1826,9 @@ class SyMuPe(SyMuPeBase):
                 prev_ids, next_ids = pitch_ids[:-1], pitch_ids[1:]
 
                 overlap_mask = note_on_times[next_ids] < note_off_times[prev_ids]
-                note_off_times[prev_ids] = np.where(overlap_mask, note_on_times[next_ids], note_off_times[prev_ids])
+                note_off_times[prev_ids] = np.where(
+                    overlap_mask, note_on_times[next_ids], note_off_times[prev_ids]
+                )
 
             note_durations = note_off_times - note_on_times
             note_duration_tokens = self.encode_tokens(note_durations, "TimeDurationSustain")
@@ -1611,27 +1839,33 @@ class SyMuPe(SyMuPeBase):
                 tokens.ids[:, vocab["TimeDurationSustain"]] = note_duration_tokens
             else:
                 if tokens.values is not None:
-                    tokens.values = _backend.concatenate([tokens.values, note_durations[:, None]], -1)
+                    tokens.values = _backend.concatenate(
+                        [tokens.values, note_durations[:, None]], -1
+                    )
                 tokens.ids = _backend.concatenate([tokens.ids, note_duration_tokens[:, None]], -1)
                 vocab["TimeDurationSustain"] = len(vocab)
                 tokens.vocab = vocab
 
             sustained = np.zeros_like(note_durations)
-            sustained[note_ids] = 1.
+            sustained[note_ids] = 1.0
 
             if "Sustained" in vocab:
                 if tokens.values is not None:
                     tokens.values[:, vocab["Sustained"]] = sustained
                 tokens.ids[:, vocab["Sustained"]] = self.zero_token + sustained.astype(int)
 
-        new_values = _backend.full((len(pedal_pitches), tokens.ids.shape[1]), fill_value=self.ignore_value)
+        new_values = _backend.full(
+            (len(pedal_pitches), tokens.ids.shape[1]), fill_value=self.ignore_value
+        )
         new_values[:, vocab["Pitch"]] = pedal_pitches
 
         new_tokens = replace(
             tokens,
             ids=self.encode_tokens(new_values),
             values=new_values,
-            interpolated=_backend.zeros_like(new_values[:, 0]) if tokens.interpolated is not None else None
+            interpolated=_backend.zeros_like(new_values[:, 0])
+            if tokens.interpolated is not None
+            else None,
         )
         tokens = tokens + new_tokens
 
@@ -1642,7 +1876,7 @@ class SyMuPe(SyMuPeBase):
         tokens = self.sort_tokens(tokens, sort_ids=sort_ids)
         new_times = times[sort_ids]
 
-        new_time_shifts = _backend.diff(np.concatenate([[0.], new_times]))
+        new_time_shifts = _backend.diff(np.concatenate([[0.0], new_times]))
         tokens.ids[:, vocab["TimeShift"]] = self.encode_tokens(new_time_shifts, "TimeShift")
         if tokens.values is not None:
             tokens.values[:, vocab["TimeShift"]] = new_time_shifts
@@ -1650,16 +1884,21 @@ class SyMuPe(SyMuPeBase):
         if has_bars:
             for token_type in ["Bar", "Position"] + self.time_signature_tokens:
                 type_idx = vocab[token_type]
-                tokens.values[:, type_idx] = backward_fill(tokens.values[:, type_idx], self.ignore_value)
+                tokens.values[:, type_idx] = backward_fill(
+                    tokens.values[:, type_idx], self.ignore_value
+                )
                 if np.any(tokens.values[:, type_idx] == self.ignore_value):
                     mask = tokens.values[:, type_idx] == self.ignore_value
-                    tokens.values[:, type_idx] = forward_fill(tokens.values[:, type_idx], self.ignore_value)
+                    tokens.values[:, type_idx] = forward_fill(
+                        tokens.values[:, type_idx], self.ignore_value
+                    )
                     if token_type == "Position":
                         tokens.values[mask, type_idx] = np.minimum(
-                            tokens.values[:, type_idx].max(),
-                            tokens.values[mask, type_idx] + 1
+                            tokens.values[:, type_idx].max(), tokens.values[mask, type_idx] + 1
                         )
-                tokens.ids[:, type_idx] = self.encode_tokens(tokens.values[:, type_idx], token_type=token_type)
+                tokens.ids[:, type_idx] = self.encode_tokens(
+                    tokens.values[:, type_idx], token_type=token_type
+                )
 
             tokens = self.sort_tokens(tokens)
             tokens = self.fill_extra_score_tokens(tokens, force=True)
@@ -1712,31 +1951,35 @@ class SyMuPe(SyMuPeBase):
             pedals = np.concatenate(pedals)
             pedals = pedals[np.lexsort((-pedals[:, 0], pedals[:, 1]))]
             if pedals[0, 0] == 0:
-                pedals = np.concatenate([np.array([[1, 0.]]), pedals], axis=0)
-            # if pedals[-1, 0] == 1:
-            #     pedals = np.concatenate([pedals, np.array([[0, note_times.max()]])], axis=0)
-            pedals = np.concatenate([pedals[:1], pedals[1:][np.diff(pedals[:, 0]) != 0.]])
+                pedals = np.concatenate([np.array([[1, 0.0]]), pedals], axis=0)
+            pedals = np.concatenate([pedals[:1], pedals[1:][np.diff(pedals[:, 0]) != 0.0]])
             tokens.pedals = pedals
         elif save_pedals:
             tokens.pedals = None
 
         if note_times is not None:
-            new_time_shifts = np.diff(np.concatenate([[0.], note_times]))
+            new_time_shifts = np.diff(np.concatenate([[0.0], note_times]))
 
             tokens.ids[:, vocab["TimeShift"]] = self.encode_tokens(new_time_shifts, "TimeShift")
             if tokens.values is not None:
                 tokens.values[:, vocab["TimeShift"]] = new_time_shifts
 
         if note_ticks is not None and len(note_ticks) > 0:
-            new_position_shifts = np.diff(np.concatenate([[min(0., note_ticks.min())], note_ticks]))
+            new_position_shifts = np.diff(
+                np.concatenate([[min(0.0, note_ticks.min())], note_ticks])
+            )
 
-            tokens.ids[:, vocab["PositionShift"]] = self.encode_tokens(new_position_shifts, "PositionShift")
+            tokens.ids[:, vocab["PositionShift"]] = self.encode_tokens(
+                new_position_shifts, "PositionShift"
+            )
             if tokens.values is not None:
                 tokens.values[:, vocab["PositionShift"]] = new_position_shifts
 
         return tokens
 
-    def add_artificial_pedal_on(self, tokens: TokSequence, position_tokens: bool = False) -> TokSequence:
+    def add_artificial_pedal_on(
+        self, tokens: TokSequence, position_tokens: bool = False
+    ) -> TokSequence:
         if PEDAL_ON_TOKEN not in self.special_tokens and PEDAL_OFF_TOKEN not in self.special_tokens:
             return tokens
 
@@ -1748,39 +1991,47 @@ class SyMuPe(SyMuPeBase):
         pedal_on_ids = _backend.where(tokens.ids[:, vocab["Pitch"]] == pedal_ids[0])[0]
         pedal_off_ids = _backend.where(tokens.ids[:, vocab["Pitch"]] == pedal_ids[1])[0]
         zero_sustain_on = len(pedal_off_ids) > 0 and (
-                len(pedal_on_ids) == 0 or (len(pedal_on_ids) > 0 and pedal_off_ids.min() < pedal_on_ids.min())
+            len(pedal_on_ids) == 0
+            or (len(pedal_on_ids) > 0 and pedal_off_ids.min() < pedal_on_ids.min())
         )
 
         if zero_sustain_on:
             new_pedal = _backend.full((1, tokens.ids.shape[1]), fill_value=self.ignore_value)
             new_pedal[:, vocab["Pitch"]] = SPECIAL_TOKENS_VALUE - pedal_ids[0]
-            new_pedal[:, vocab["TimeShift"]] = 0.
+            new_pedal[:, vocab["TimeShift"]] = 0.0
 
             if position_tokens:
                 for token_type in ["Position", "PositionShift"]:
                     if token_type in vocab:
-                        new_pedal[:, vocab[token_type]] = 0.
+                        new_pedal[:, vocab[token_type]] = 0.0
 
                 if "Bar" in vocab:
                     new_pedal[:, vocab["Bar"]] = tokens.values[0, vocab["Bar"]]
 
-            tokens.ids = _backend.concatenate((self.encode_tokens(new_pedal, vocab=vocab), tokens.ids), 0)
+            tokens.ids = _backend.concatenate(
+                (self.encode_tokens(new_pedal, vocab=vocab), tokens.ids), 0
+            )
 
             if tokens.values is not None:
                 tokens.values = _backend.concatenate([new_pedal, tokens.values])
 
             if tokens.interpolated is not None:
-                tokens.interpolated = _backend.concatenate((_backend.zeros(1), tokens.interpolated), 0)
+                tokens.interpolated = _backend.concatenate(
+                    (_backend.zeros(1), tokens.interpolated), 0
+                )
 
         return tokens
-    
+
     def add_time_position_tokens(
-            self,
-            tokens: TokSequence,
-            wrap: bool = False,
-            segment_tokens: bool = False
+        self,
+        tokens: TokSequence,
+        wrap: bool = False,
+        segment_tokens: bool = False,
     ) -> TokSequence:
-        if not self.config.additional_params["use_time_positions"] or tokens.type == SequenceType.SCORE:
+        if (
+            not self.config.additional_params["use_time_positions"]
+            or tokens.type == SequenceType.SCORE
+        ):
             return tokens
 
         vocab = tokens.vocab or self.vocab_types_idx
@@ -1789,9 +2040,10 @@ class SyMuPe(SyMuPeBase):
         _backend = backend(tokens)
 
         has_bars = (
-                tokens.encoding != EncodingType.TIME_PERFORMANCE
-                and "Bar" in vocab and "Position" in vocab
-                and self.has_token_types(tokens, ["Bar", "Position"])
+            tokens.encoding != EncodingType.TIME_PERFORMANCE
+            and "Bar" in vocab
+            and "Position" in vocab
+            and self.has_token_types(tokens, ["Bar", "Position"])
         )
 
         note_pitches = self.get_values(tokens, "Pitch")
@@ -1807,14 +2059,18 @@ class SyMuPe(SyMuPeBase):
         num_segments = max_segm - min_segm + 1
 
         tokens.values[:, vocab["TimePosition"]] = time_positions
-        tokens.ids[:, vocab["TimePosition"]] = self.encode_tokens(tokens.values[:, vocab["TimePosition"]], "TimePosition")
+        tokens.ids[:, vocab["TimePosition"]] = self.encode_tokens(
+            tokens.values[:, vocab["TimePosition"]], "TimePosition"
+        )
 
         if not segment_tokens or TIME_SEGMENT_TOKEN not in self.special_tokens:
             return tokens
 
         token_id = self[0, TIME_SEGMENT_TOKEN]
 
-        new_values = _backend.full((num_segments, tokens.ids.shape[1]), fill_value=self.ignore_value)
+        new_values = _backend.full(
+            (num_segments, tokens.ids.shape[1]), fill_value=self.ignore_value
+        )
         new_values[:, vocab["Pitch"]] = SPECIAL_TOKENS_VALUE - token_id
         new_times = new_values[:, vocab["TimePosition"]] = _backend.arange(min_segm, max_segm + 1)
 
@@ -1822,7 +2078,9 @@ class SyMuPe(SyMuPeBase):
             tokens,
             ids=self.encode_tokens(new_values),
             values=new_values,
-            interpolated=_backend.zeros_like(new_values[:, 0]) if tokens.interpolated is not None else None
+            interpolated=_backend.zeros_like(new_values[:, 0])
+            if tokens.interpolated is not None
+            else None,
         )
         tokens = tokens + new_tokens
 
@@ -1833,7 +2091,7 @@ class SyMuPe(SyMuPeBase):
         tokens = self.sort_tokens(tokens, sort_ids=sort_ids)
         new_times = times[sort_ids]
 
-        new_time_shifts = _backend.diff(np.concatenate([[0.], new_times]))
+        new_time_shifts = _backend.diff(np.concatenate([[0.0], new_times]))
         tokens.ids[:, vocab["TimeShift"]] = self.encode_tokens(new_time_shifts, "TimeShift")
         if tokens.values is not None:
             tokens.values[:, vocab["TimeShift"]] = new_time_shifts
@@ -1841,16 +2099,21 @@ class SyMuPe(SyMuPeBase):
         if has_bars:
             for token_type in ["Bar", "Position"] + self.time_signature_tokens:
                 type_idx = vocab[token_type]
-                tokens.values[:, type_idx] = backward_fill(tokens.values[:, type_idx], self.ignore_value)
+                tokens.values[:, type_idx] = backward_fill(
+                    tokens.values[:, type_idx], self.ignore_value
+                )
                 if np.any(tokens.values[:, type_idx] == self.ignore_value):
                     mask = tokens.values[:, type_idx] == self.ignore_value
-                    tokens.values[:, type_idx] = forward_fill(tokens.values[:, type_idx], self.ignore_value)
+                    tokens.values[:, type_idx] = forward_fill(
+                        tokens.values[:, type_idx], self.ignore_value
+                    )
                     if token_type == "Position":
                         tokens.values[mask, type_idx] = np.minimum(
-                            tokens.values[:, type_idx].max(),
-                            tokens.values[mask, type_idx] + 1
+                            tokens.values[:, type_idx].max(), tokens.values[mask, type_idx] + 1
                         )
-                tokens.ids[:, type_idx] = self.encode_tokens(tokens.values[:, type_idx], token_type=token_type)
+                tokens.ids[:, type_idx] = self.encode_tokens(
+                    tokens.values[:, type_idx], token_type=token_type
+                )
 
             tokens = self.sort_tokens(tokens)
             tokens = self.fill_extra_score_tokens(tokens, force=True)
@@ -1893,16 +2156,20 @@ class SyMuPe(SyMuPeBase):
             note_ticks = note_ticks[~mask]
 
         if note_times is not None and len(note_times) > 0:
-            new_time_shifts = np.diff(np.concatenate([[0.], note_times]))
+            new_time_shifts = np.diff(np.concatenate([[0.0], note_times]))
 
             tokens.ids[:, vocab["TimeShift"]] = self.encode_tokens(new_time_shifts, "TimeShift")
             if tokens.values is not None:
                 tokens.values[:, vocab["TimeShift"]] = new_time_shifts
 
         if note_ticks is not None and len(note_ticks) > 0:
-            new_position_shifts = np.diff(np.concatenate([[min(0., note_ticks.min())], note_ticks]))
+            new_position_shifts = np.diff(
+                np.concatenate([[min(0.0, note_ticks.min())], note_ticks])
+            )
 
-            tokens.ids[:, vocab["PositionShift"]] = self.encode_tokens(new_position_shifts, "PositionShift")
+            tokens.ids[:, vocab["PositionShift"]] = self.encode_tokens(
+                new_position_shifts, "PositionShift"
+            )
             if tokens.values is not None:
                 tokens.values[:, vocab["PositionShift"]] = new_position_shifts
 
@@ -1925,11 +2192,11 @@ class SyMuPe(SyMuPeBase):
 
         bar, start = -1, 0
         for bar, end in enumerate(np.where(is_bar_end)[0]):
-            tokens.ids[start:end + 1, bar_index] = self.zero_token + bar
-            tokens.values[start:end + 1, bar_index] = bar
+            tokens.ids[start : end + 1, bar_index] = self.zero_token + bar
+            tokens.values[start : end + 1, bar_index] = bar
 
             if not has_max_position:
-                tokens.values[start:end + 1, max_pos_index] = bar_end_pos[bar]
+                tokens.values[start : end + 1, max_pos_index] = bar_end_pos[bar]
 
             start = end + 1
 
@@ -1937,10 +2204,14 @@ class SyMuPe(SyMuPeBase):
             tokens.ids[start:, bar_index] = self.zero_token + bar + 1
             tokens.values[start:, bar_index] = bar + 1
             if not has_max_position:
-                tokens.values[start:, max_pos_index] = 4 * beat_res if len(bar_end_pos) == 0 else bar_end_pos[bar]
+                tokens.values[start:, max_pos_index] = (
+                    4 * beat_res if len(bar_end_pos) == 0 else bar_end_pos[bar]
+                )
 
         if not has_max_position:
-            tokens.ids[:, max_pos_index] = self.encode_tokens(tokens.values[:, max_pos_index], token_type="MaxPosition")
+            tokens.ids[:, max_pos_index] = self.encode_tokens(
+                tokens.values[:, max_pos_index], token_type="MaxPosition"
+            )
 
         if not self.has_token_types(tokens, "BeatDuration"):
             max_positions = tokens.values[:, max_pos_index]
@@ -1950,16 +2221,18 @@ class SyMuPe(SyMuPeBase):
             tokens.values[max_positions % (beat_res / 2) == 0, beat_index] = 1 / 8  # 8th note
             tokens.values[max_positions % beat_res == 0, beat_index] = 1 / 4  # 4th note
 
-            tokens.ids[:, beat_index] = self.encode_tokens(tokens.values[:, beat_index], token_type="BeatDuration")
+            tokens.ids[:, beat_index] = self.encode_tokens(
+                tokens.values[:, beat_index], token_type="BeatDuration"
+            )
 
         return tokens
 
     def _values_to_tokens(
-            self,
-            values: np.ndarray,
-            token_type: str,
-            denormalize: bool = False,
-            clip: bool = False
+        self,
+        values: np.ndarray,
+        token_type: str,
+        denormalize: bool = False,
+        clip: bool = False,
     ) -> np.ndarray:
         r"""
         Encode tokens from values for a given token_type.
@@ -2015,11 +2288,11 @@ class SyMuPe(SyMuPeBase):
         return tokens
 
     def _tokens_to_values(
-            self,
-            tokens: np.ndarray,
-            token_type: str,
-            clip: bool = False,
-            normalize: bool = False
+        self,
+        tokens: np.ndarray,
+        token_type: str,
+        clip: bool = False,
+        normalize: bool = False,
     ) -> np.ndarray:
         r"""
         Decode values from tokens for a given token_type.
@@ -2050,7 +2323,9 @@ class SyMuPe(SyMuPeBase):
         elif token_type == "RelOnsetDev":
             values = self.rel_onset_deviations[tokens]
         elif token_type == "PerfDuration":
-            return super()._tokens_to_values(tokens + self.zero_token, "Duration", normalize=normalize)
+            return super()._tokens_to_values(
+                tokens + self.zero_token, "Duration", normalize=normalize
+            )
         elif token_type == "RelPerfDuration":
             values = self.rel_performed_durations[tokens]
         elif token_type == "TimeShift":
@@ -2062,7 +2337,9 @@ class SyMuPe(SyMuPeBase):
         elif token_type == "TimePosition":
             values = self.time_positions[tokens]
         else:
-            return super()._tokens_to_values(tokens + self.zero_token, token_type, normalize=normalize)
+            return super()._tokens_to_values(
+                tokens + self.zero_token, token_type, normalize=normalize
+            )
 
         values[is_special] = SPECIAL_TOKENS_VALUE - special_tokens  # special tokens
 
@@ -2092,13 +2369,15 @@ class SyMuPe(SyMuPeBase):
         elif token_type == "PerfDuration":
             return super()._clip_values(values, "Duration")
         elif token_type == "RelPerfDuration":
-            values = np.clip(values, self.rel_performed_durations[0], self.rel_performed_durations[-1])
+            values = np.clip(
+                values, self.rel_performed_durations[0], self.rel_performed_durations[-1]
+            )
         elif token_type == "TimeShift":
             values = np.clip(values, self.time_shifts[0], self.time_shifts[-1])
         elif token_type in ("TimeDuration", "TimeDurationSustain"):
             values = np.clip(values, self.time_durations[0], self.time_durations[-1])
         elif token_type == "Sustained":
-            values = np.clip(values, 0., 1.)
+            values = np.clip(values, 0.0, 1.0)
         elif token_type == "TimePosition":
             values = np.clip(values, self.time_positions[0], self.time_positions[-1])
         else:
@@ -2127,9 +2406,15 @@ class SyMuPe(SyMuPeBase):
             return super()._normalize_values(values, "Duration")
         elif token_type == "RelPerfDuration":
             values = values.copy()
-            non_zero = values > 0.
+            non_zero = values > 0.0
             values[non_zero] = -np.log(values[non_zero]) / np.log(self.rel_performed_durations[0])
-        elif token_type in ("TimeShift", "TimeDuration", "TimePosition", "TimeDurationSustain", "Sustained"):
+        elif token_type in (
+            "TimeShift",
+            "TimeDuration",
+            "TimePosition",
+            "TimeDurationSustain",
+            "Sustained",
+        ):
             return values
         else:
             return super()._normalize_values(values, token_type)
@@ -2157,7 +2442,13 @@ class SyMuPe(SyMuPeBase):
             return super()._denormalize_values(values, "Duration")
         elif token_type == "RelPerfDuration":
             values = np.exp(-values * np.log(self.rel_performed_durations[0]))
-        elif token_type in ("TimeShift", "TimeDuration", "TimePosition", "TimeDurationSustain", "Sustained"):
+        elif token_type in (
+            "TimeShift",
+            "TimeDuration",
+            "TimePosition",
+            "TimeDurationSustain",
+            "Sustained",
+        ):
             return values
         else:
             return super()._denormalize_values(values, token_type)
@@ -2167,10 +2458,7 @@ class SyMuPe(SyMuPeBase):
 
     @property
     def time_performance_sizes(self) -> dict[str, int]:
-        return {
-            key: value for key, value in self.sizes.items()
-            if key in TIME_PERFORMANCE_KEYS
-        }
+        return {key: value for key, value in self.sizes.items() if key in TIME_PERFORMANCE_KEYS}
 
     @property
     def onset_deviation_token(self) -> str:
@@ -2178,7 +2466,11 @@ class SyMuPe(SyMuPeBase):
 
     @property
     def performed_duration_token(self) -> str:
-        return "RelPerfDuration" if self.config.additional_params["rel_perf_duration"] else "PerfDuration"
+        return (
+            "RelPerfDuration"
+            if self.config.additional_params["rel_perf_duration"]
+            else "PerfDuration"
+        )
 
     @property
     def score_only_tokens(self) -> list[str]:

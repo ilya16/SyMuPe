@@ -1,4 +1,5 @@
-""" Classifier predictions datasets. """
+"""Classifier predictions datasets."""
+
 from __future__ import annotations
 
 import os
@@ -18,10 +19,10 @@ def load_probabilities(path: str | PurePath):
 
 class EmotionPredictionsDataset(Dataset):
     def __init__(
-            self,
-            predictions: dict[str, np.ndarray],
-            labels: dict[int, str] | None = None,
-            label_embeddings: np.ndarray | None = None
+        self,
+        predictions: dict[str, np.ndarray],
+        labels: dict[int, str] | None = None,
+        label_embeddings: np.ndarray | None = None,
     ):
         self.predictions = predictions
         self.labels = labels
@@ -36,16 +37,16 @@ class EmotionPredictionsDataset(Dataset):
 
 class LocalEmotionPredictionsDataset(EmotionPredictionsDataset):
     def __init__(
-            self,
-            root: str | PurePath,
-            files: list[str | PurePath] | None = None,
-            extension: str = ".npz",
-            suffix: str = "_emo",
-            labels_file: str = "labels.txt",
-            label_embeddings_file: str = "label_embeddings.npy",
-            load_fn: callable = load_probabilities,
-            preload: bool = False,
-            cache: bool | float | int = False  # cache can be a bool or a float ratio in [0, 1]
+        self,
+        root: str | PurePath,
+        files: list[str | PurePath] | None = None,
+        extension: str = ".npz",
+        suffix: str = "_emo",
+        labels_file: str = "labels.txt",
+        label_embeddings_file: str = "label_embeddings.npy",
+        load_fn: callable = load_probabilities,
+        preload: bool = False,
+        cache: bool | float | int = False,  # cache can be a bool or a float ratio in [0, 1]
     ):
         self.root = root
         self.load_fn = load_fn
@@ -93,7 +94,7 @@ class LocalEmotionPredictionsDataset(EmotionPredictionsDataset):
         super().__init__(
             predictions=predictions,
             labels=labels,
-            label_embeddings=label_embeddings
+            label_embeddings=label_embeddings,
         )
 
     def load_prediction(self, path: str | PurePath):
@@ -101,7 +102,12 @@ class LocalEmotionPredictionsDataset(EmotionPredictionsDataset):
 
     def load_predictions(self, preload):
         if preload:
-            return apply_dict(self.paths, names=self.names, func=self.load_prediction, desc="Loading predictions...")
+            return apply_dict(
+                self.paths,
+                names=self.names,
+                func=self.load_prediction,
+                desc="Loading predictions...",
+            )
         else:
             return {name: None for name in self.names}
 
@@ -112,7 +118,7 @@ class LocalEmotionPredictionsDataset(EmotionPredictionsDataset):
         prediction = self.predictions.get(name, None)
         if prediction is None:
             prediction = self.load_prediction(self._name_to_path[name])
-            if self.cache > 0.:
+            if self.cache > 0.0:
                 if len(self.cache_map) > self.max_cache_size:
                     evict_name, _ = self.cache_map.popitem(last=False)
                     self.predictions[evict_name] = None

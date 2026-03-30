@@ -1,4 +1,4 @@
-""" Music constants. """
+"""Music constants."""
 
 # notes and pitch-sitch maps
 NOTES_WSHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
@@ -13,6 +13,6 @@ def pitch2sitch(pitch: int) -> str:
 
 
 def sitch2pitch(sitch: str) -> int:
-    note = sitch[:1 + int(sitch[1] in ("#", "b"))]
-    octave = sitch[len(note):]
+    note = sitch[: 1 + int(sitch[1] in ("#", "b"))]
+    octave = sitch[len(note) :]
     return NOTE_MAP[note] + 12 * (int(octave) + 1)

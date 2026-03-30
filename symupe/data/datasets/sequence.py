@@ -1,4 +1,5 @@
-""" Any token sequence dataset. """
+"""Any token sequence dataset."""
+
 from __future__ import annotations
 
 import copy
@@ -16,11 +17,21 @@ from symupe.utils import prob2bool, load_json, dump_json, tqdm_iterator, find_cl
 from .base import NoteSegments, SequenceTask, TASK_TO_ENCODINGS, DATA_SPLITS, TASK_SEQUENCE_SORTING
 from .classifiers import EmotionPredictionsDataset, LocalEmotionPredictionsDataset
 from .processors import TupleTokenSequenceProcessor, TokenSequenceAugmentations
-from .token_sequence import load_and_process_token_sequence, LocalTokenSequenceDataset, TokenSequenceDataset
+from .token_sequence import (
+    load_and_process_token_sequence,
+    LocalTokenSequenceDataset,
+    TokenSequenceDataset,
+)
 from .utils import compute_sample_positions, load_token_sequence
 from ..tokenizers import (
-    TokSequence, SequenceType, EncodingType, SortingType, ENCODING_SORTING,
-    TOKENIZERS, SyMuPe, SyMuPeTransformer
+    TokSequence,
+    SequenceType,
+    EncodingType,
+    SortingType,
+    ENCODING_SORTING,
+    TOKENIZERS,
+    SyMuPe,
+    SyMuPeTransformer,
 )
 from ..tokenizers.constants import EOD_TOKEN, BAR_LINE_TOKEN
 
@@ -35,7 +46,9 @@ class SequenceSampleMeta:
     position_shifts: dict[str, int | float] | None = None
     augmentations: TokenSequenceAugmentations | None = None
     sequence_type: str | SequenceType = SequenceType.SCORE
-    encoding_type: tuple[str, str | None] | tuple[EncodingType, EncodingType | None] = EncodingType.SCORE
+    encoding_type: tuple[str, str | None] | tuple[EncodingType, EncodingType | None] = (
+        EncodingType.SCORE
+    )
     task_type: str | SequenceTask = SequenceTask.SCORE
     sort_by_time: tuple[bool, bool] = False
     token_sizes: dict[str, int] | None = None
@@ -65,56 +78,51 @@ class SequenceSample:
 
 class SequenceDataset(Dataset):
     def __init__(
-            self,
-            sequences: TokenSequenceDataset,
-            metadata: dict[str, list[str]],
-            tokenizer: SyMuPe | dict[str, object],
-            token_types: list[str] | None = None,
-            context_token_types: list[str] | None = None,
-            score_sequences: TokenSequenceDataset | None = None,
-            score_token_types: list[str] | None = None,
-            emotion_dataset: EmotionPredictionsDataset | None = None,
-            auxiliary_data: dict[str, object] | None = None,
-
-            max_seq_len: int = 512,
-            min_seq_len: int = 16,
-            note_sliding_window: int = 128,
-            max_bar: int = 512,
-            max_time: float = 1_000.,
-            max_len_single_seq: bool = True,
-
-            sample_start_index: bool | float = False,
-            sample_length: bool | float = False,
-
-            shift_time_to_zero: bool | float = False,
-
-            sort_by_time: bool | float = False,
-            sample_sort: bool = False,
-
-            add_sos_eos: bool = False,
-            add_eod_token: bool = False,
-            remove_special_tokens: bool = False,
-            enc_seq_minimal: bool = False,
-            eod_same_encoding: bool = False,
-
-            sample: bool = False,
-            seed: int = 23,
-            shuffle: bool = False,
-
-            augment_sequence: bool = False,
-            pitch_shift_range: tuple[int, int] = (-3, 3),
-            velocity_shift_range: tuple[int, int] = (-4, 4),
-            tempo_stretch_range: tuple[float, float] = (-0.1, 0.1),
-
-            sequence_tasks: dict[str, dict[str, float]] | None = None,
-
-            quantize_values: bool | float = False,
-            clip_values: bool = False,
-            normalize_values: bool = False,
-
-            compute_note_types: bool = False,
-
-            **kwargs
+        self,
+        sequences: TokenSequenceDataset,
+        metadata: dict[str, list[str]],
+        tokenizer: SyMuPe | dict[str, object],
+        token_types: list[str] | None = None,
+        context_token_types: list[str] | None = None,
+        score_sequences: TokenSequenceDataset | None = None,
+        score_token_types: list[str] | None = None,
+        emotion_dataset: EmotionPredictionsDataset | None = None,
+        auxiliary_data: dict[str, object] | None = None,
+        # sequence lengths
+        max_seq_len: int = 512,
+        min_seq_len: int = 16,
+        note_sliding_window: int = 128,
+        max_bar: int = 512,
+        max_time: float = 1_000.0,
+        max_len_single_seq: bool = True,
+        sample_start_index: bool | float = False,
+        sample_length: bool | float = False,
+        shift_time_to_zero: bool | float = False,
+        sort_by_time: bool | float = False,
+        sample_sort: bool = False,
+        # special tokens
+        add_sos_eos: bool = False,
+        add_eod_token: bool = False,
+        remove_special_tokens: bool = False,
+        enc_seq_minimal: bool = False,
+        eod_same_encoding: bool = False,
+        # sampling
+        sample: bool = False,
+        seed: int = 23,
+        shuffle: bool = False,
+        # augmentations
+        augment_sequence: bool = False,
+        pitch_shift_range: tuple[int, int] = (-3, 3),
+        velocity_shift_range: tuple[int, int] = (-4, 4),
+        tempo_stretch_range: tuple[float, float] = (-0.1, 0.1),
+        # tasks
+        sequence_tasks: dict[str, dict[str, float]] | None = None,
+        # tokens/values
+        quantize_values: bool | float = False,
+        clip_values: bool = False,
+        normalize_values: bool = False,
+        compute_note_types: bool = False,
+        **kwargs,
     ):
         self.metadata = metadata
 
@@ -135,16 +143,24 @@ class SequenceDataset(Dataset):
         self.token_sizes = {key: self.tokenizer.sizes[key] for key in self.token_types}
 
         self.context_token_types = context_token_types or None
-        self.context_token_sizes = {
-            key: num for key, num in self.tokenizer.sizes.items()
-            if key in self.context_token_types
-        } if self.context_token_types is not None else None
+        self.context_token_sizes = (
+            {
+                key: num
+                for key, num in self.tokenizer.sizes.items()
+                if key in self.context_token_types
+            }
+            if self.context_token_types is not None
+            else None
+        )
 
-        self.score_token_types = (score_token_types or None) if score_sequences is not None else None
-        self.score_token_sizes = {
-            key: num for key, num in self.tokenizer.sizes.items()
-            if key in self.score_token_types
-        } if self.score_token_types is not None else None
+        self.score_token_types = (
+            (score_token_types or None) if score_sequences is not None else None
+        )
+        self.score_token_sizes = (
+            {key: num for key, num in self.tokenizer.sizes.items() if key in self.score_token_types}
+            if self.score_token_types is not None
+            else None
+        )
 
         # augmentations
         self.augment_sequence = augment_sequence
@@ -154,11 +170,9 @@ class SequenceDataset(Dataset):
             tokenizer=self.tokenizer,
             pitch_shift_range=pitch_shift_range,
             velocity_shift_range=velocity_shift_range,
-            tempo_stretch_range=tempo_stretch_range
+            tempo_stretch_range=tempo_stretch_range,
         )
-        self.transformer = SyMuPeTransformer(
-            tokenizer=self.tokenizer
-        )
+        self.transformer = SyMuPeTransformer(tokenizer=self.tokenizer)
 
         # score sequence dataset
         self.score_sequences = score_sequences
@@ -191,7 +205,9 @@ class SequenceDataset(Dataset):
 
         # load or compute number of notes in sequences used to build samples
         self.lengths = getattr(self, "lengths", {})
-        for seq_idx, name in enumerate(tqdm_iterator(self.sequence_names, desc="Precomputing lengths...")):
+        for seq_idx, name in enumerate(
+            tqdm_iterator(self.sequence_names, desc="Precomputing lengths...")
+        ):
             if name not in self.lengths:
                 self.lengths[name] = len(self.sequences[seq_idx])
         _num_notes = np.array([self.lengths[name] for name in self.sequence_names])
@@ -238,9 +254,11 @@ class SequenceDataset(Dataset):
 
         sequence_encoding_types = sorted(
             filter(lambda x: x is not None, list(set(sequence_encoding_types))),
-            key=lambda x: EncodingType.list().index(x.value)
+            key=lambda x: EncodingType.list().index(x.value),
         )
-        self.sequence_encoding_types = {encoding.value: i for i, encoding in enumerate(sequence_encoding_types)}
+        self.sequence_encoding_types = {
+            encoding.value: i for i, encoding in enumerate(sequence_encoding_types)
+        }
 
         # values processing
         self.quantize_values = quantize_values
@@ -250,10 +268,10 @@ class SequenceDataset(Dataset):
         self.compute_note_types = compute_note_types
 
     def _get_augmentations(
-            self,
-            meta: SequenceSampleMeta,
-            min_pitch: int | None = None,
-            max_pitch: int | None = None
+        self,
+        meta: SequenceSampleMeta,
+        min_pitch: int | None = None,
+        max_pitch: int | None = None,
     ) -> TokenSequenceAugmentations | None:
         if meta is None:
             if self.sample and prob2bool(self.augment_sequence):
@@ -264,9 +282,9 @@ class SequenceDataset(Dataset):
             return meta.augmentations
 
     def _augment_sequence(
-            self,
-            seq: TokSequence,
-            augmentations: TokenSequenceAugmentations | None = None
+        self,
+        seq: TokSequence,
+        augmentations: TokenSequenceAugmentations | None = None,
     ) -> tuple[TokSequence, np.ndarray]:
         if augmentations is None:
             return seq, np.ones_like(seq.ids[:, 0]).astype(bool)
@@ -280,14 +298,14 @@ class SequenceDataset(Dataset):
         return seq, mask
 
     def get(self, idx: int | None = None, meta: SequenceSampleMeta | None = None) -> SequenceSample:
-        assert idx is not None or meta is not None, "one of `idx`/`meta` should be provided as an argument"
+        assert idx is not None or meta is not None, (
+            "one of `idx`/`meta` should be provided as an argument"
+        )
 
         if self._shuffle is not None:
             idx = self._shuffle[idx]
 
         _bar_index = self.tokenizer.vocab_types_idx["Bar"]
-        # use_time_positions = self.tokenizer.config.additional_params.get("use_time_positions", False)
-        # _time_index = self.tokenizer.vocab_types_idx["TimePosition"] if use_time_positions else None
 
         # get sequence
         if meta is None:
@@ -313,7 +331,9 @@ class SequenceDataset(Dataset):
                 assert seq_type in self.sequence_tasks
                 sequence_tasks = self.sequence_tasks[seq_type]
                 probs = list(sequence_tasks.values())
-                task_type = list(sequence_tasks)[random.choices(list(range(len(probs))), weights=probs)[0]]
+                task_type = list(sequence_tasks)[
+                    random.choices(list(range(len(probs))), weights=probs)[0]
+                ]
             else:
                 task_type = SequenceTask.SCORE
                 if seq_type == SequenceType.PERFORMANCE:
@@ -335,17 +355,24 @@ class SequenceDataset(Dataset):
         if meta is None:
             start = self._sample_positions[idx]
             start = max(0, min(start, seq_total_notes - self.min_seq_len))
-            sample_start_index = self.sample_start_index if start > 0 else float(self.sample_start_index) / 2
+            sample_start_index = (
+                self.sample_start_index if start > 0 else float(self.sample_start_index) / 2
+            )
             if self.sample and prob2bool(sample_start_index):
                 low = max(0, start - self.note_sliding_window // 2)
-                high = min(seq_total_notes - self.note_sliding_window // 4, start + self.note_sliding_window // 2)
+                high = min(
+                    seq_total_notes - self.note_sliding_window // 4,
+                    start + self.note_sliding_window // 2,
+                )
                 high = max(low + 1, high)
                 start = np.random.randint(low, high)
         else:
             start = meta.start
 
-        has_bars = tok_seq.type not in (SequenceType.TIME_PERFORMANCE, SequenceType.TIME_PERFORMANCE_SUSTAIN)
-        # has_time = _time_index is not None and tok_seq.type != SequenceType.SCORE
+        has_bars = tok_seq.type not in (
+            SequenceType.TIME_PERFORMANCE,
+            SequenceType.TIME_PERFORMANCE_SUSTAIN,
+        )
 
         # compute end index
         if meta is None or meta.end is None:
@@ -356,8 +383,10 @@ class SequenceDataset(Dataset):
 
             # adjust maximum sequence length by the removed special tokens
             seq_len_adjusted = self.transformer.adjust_seq_len_for_special_tokens(
-                tok_seq, encodings=(EncodingType.SCORE_TIME_PERFORMANCE, source_encoding, target_encoding),
-                offset=start, seq_len=seq_len,
+                tok_seq,
+                encodings=(EncodingType.SCORE_TIME_PERFORMANCE, source_encoding, target_encoding),
+                offset=start,
+                seq_len=seq_len,
             )
 
             if self.remove_special_tokens:
@@ -367,14 +396,10 @@ class SequenceDataset(Dataset):
 
             if has_bars:
                 max_seq_len = np.where(
-                    tok_seq.ids[start:, _bar_index] > tok_seq.ids[start, _bar_index] + self.max_bar - 1
+                    tok_seq.ids[start:, _bar_index]
+                    > tok_seq.ids[start, _bar_index] + self.max_bar - 1
                 )[0]
                 seq_len = min(seq_len, max_seq_len[0]) if len(max_seq_len) > 0 else seq_len
-            # if has_time:
-            #     max_seq_len = np.where(
-            #         tok_seq.ids[start:, _time_index] > tok_seq.ids[start, _time_index] + self.max_time - 1
-            #     )[0]
-            #     seq_len = min(seq_len, max_seq_len[0]) if len(max_seq_len) > 0 else seq_len
 
             if self.sample and prob2bool(self.sample_length) and seq_len >= self.min_seq_len:
                 seq_len = np.random.randint(self.min_seq_len, seq_len + 1)
@@ -383,8 +408,9 @@ class SequenceDataset(Dataset):
             end = meta.end
 
         bar_end = (
-                end == seq_total_notes
-                or tok_seq.ids[min(seq_total_notes - 1, end - 1), _bar_index] != tok_seq.ids[end, _bar_index]
+            end == seq_total_notes
+            or tok_seq.ids[min(seq_total_notes - 1, end - 1), _bar_index]
+            != tok_seq.ids[end, _bar_index]
         )
 
         # get subsequence
@@ -399,7 +425,7 @@ class SequenceDataset(Dataset):
             pedals = seq.pedals
 
             if pedals is not None:
-                pedals[:, 1] = np.diff(np.concatenate([[0.], pedals[:, 1]]))
+                pedals[:, 1] = np.diff(np.concatenate([[0.0], pedals[:, 1]]))
         else:
             seq = self.tokenizer.add_time_position_tokens(seq)
 
@@ -414,22 +440,24 @@ class SequenceDataset(Dataset):
             seq_index = seq.ids[:, :3]
             seq_index = 1_000_000 * seq_index[:, 0] + 1_000 * seq_index[:, 1] + seq_index[:, 2]
             score_index = score_tok_seq.ids[:, :3]
-            score_index = 1_000_000 * score_index[:, 0] + 1_000 * score_index[:, 1] + score_index[:, 2]
+            score_index = (
+                1_000_000 * score_index[:, 0] + 1_000 * score_index[:, 1] + score_index[:, 2]
+            )
             index = find_closest(score_index, seq_index)
 
-            score_seq = replace(score_tok_seq, ids=score_tok_seq.ids[index], values=score_tok_seq.values[index])
+            score_seq = replace(
+                score_tok_seq, ids=score_tok_seq.ids[index], values=score_tok_seq.values[index]
+            )
 
             if len(score_seq) != len(seq):
                 rand_idx = np.random.randint(0, len(self))
-                print("diff score seq", idx, seq_idx, start, end,
-                      len(tok_seq), len(score_tok_seq), len(seq), len(score_seq), "rand_idx", rand_idx)
                 return self.get(rand_idx)
 
         # bars that might be used after the sequence encoding
         bars_init = None
-        if (
-                self.emotion_dataset is not None
-                and seq_type in (SequenceType.PERFORMANCE, SequenceType.PERFORMANCE_SUSTAIN)
+        if self.emotion_dataset is not None and seq_type in (
+            SequenceType.PERFORMANCE,
+            SequenceType.PERFORMANCE_SUSTAIN,
         ):
             bars_init, _, _ = self.tokenizer.compute_bar_beat_onset_indices(seq)
 
@@ -441,8 +469,6 @@ class SequenceDataset(Dataset):
         pitches = pitches[pitches >= 0]
         if len(pitches) == 0 or len(source_seq) == 0 or len(target_seq) == 0:
             rand_idx = np.random.randint(0, len(self))
-            print("no notes", idx, seq_idx, start, end, len(tok_seq),
-                  "seq", len(seq), len(source_seq), len(target_seq), len(pitches), "rand_idx", rand_idx)
             return self.get(rand_idx)
 
         if len(source_seq) != len(seq):
@@ -450,13 +476,13 @@ class SequenceDataset(Dataset):
 
         def sort_sequence(tok_sequence, encoding_type):
             if (
-                    task_type in TASK_SEQUENCE_SORTING[SortingType.SCORE]
-                    or encoding_type in ENCODING_SORTING[SortingType.SCORE]
+                task_type in TASK_SEQUENCE_SORTING[SortingType.SCORE]
+                or encoding_type in ENCODING_SORTING[SortingType.SCORE]
             ):
                 sort_by_time = False
             elif (
-                    task_type in TASK_SEQUENCE_SORTING[SortingType.TIME]
-                    or encoding_type in ENCODING_SORTING[SortingType.TIME]
+                task_type in TASK_SEQUENCE_SORTING[SortingType.TIME]
+                or encoding_type in ENCODING_SORTING[SortingType.TIME]
             ):
                 sort_by_time = True
             elif self.sample and self.sample_sort:
@@ -464,7 +490,10 @@ class SequenceDataset(Dataset):
             else:
                 sort_by_time = self.sort_by_time > 0.5
 
-            is_sort_by_time = seq_type in (SequenceType.TIME_PERFORMANCE, SequenceType.TIME_PERFORMANCE_SUSTAIN)
+            is_sort_by_time = seq_type in (
+                SequenceType.TIME_PERFORMANCE,
+                SequenceType.TIME_PERFORMANCE_SUSTAIN,
+            )
             if is_sort_by_time != sort_by_time:
                 tok_sequence = self.tokenizer.sort_tokens(tok_sequence, by_time=sort_by_time)
 
@@ -486,8 +515,12 @@ class SequenceDataset(Dataset):
         else:
             shifts = meta.position_shifts
 
-        source_seq, shifts = self.tokenizer.shift_positions(source_seq, shifts=shifts, shift_to_zero=shift_to_zero)
-        target_seq, _ = self.tokenizer.shift_positions(target_seq, shifts=None, shift_to_zero=shift_to_zero)
+        source_seq, shifts = self.tokenizer.shift_positions(
+            source_seq, shifts=shifts, shift_to_zero=shift_to_zero
+        )
+        target_seq, _ = self.tokenizer.shift_positions(
+            target_seq, shifts=None, shift_to_zero=shift_to_zero
+        )
 
         # augmentations
         pitches = self.tokenizer.get_values(source_seq, "Pitch", from_ids=True)
@@ -504,11 +537,6 @@ class SequenceDataset(Dataset):
         elif has_bars and not source_sort_by_time:
             bars_init, _, _ = self.tokenizer.compute_bar_beat_onset_indices(source_seq)
             bars_init -= shifts["Bar"]
-
-        # # map score sequence
-        # if score_seq is not None:
-        #     score_seq.ids = score_seq.ids[mask]
-        #     score_seq.values = score_seq.values[mask] if score_seq.values is not None else None
 
         # emotion embeddings
         emotion_embeddings, emotion_template_idx = None, 0
@@ -536,9 +564,17 @@ class SequenceDataset(Dataset):
 
         # bar start tokens for scores
         if BAR_LINE_TOKEN in self.tokenizer.special_tokens and not self.remove_special_tokens:
-            if not bar_end and not source_sort_by_time and source_encoding in ENCODING_SORTING[SortingType.SCORE]:
+            if (
+                not bar_end
+                and not source_sort_by_time
+                and source_encoding in ENCODING_SORTING[SortingType.SCORE]
+            ):
                 source_seq = source_seq[:-1]
-            if not bar_end and not target_sort_by_time and target_encoding in ENCODING_SORTING[SortingType.SCORE]:
+            if (
+                not bar_end
+                and not target_sort_by_time
+                and target_encoding in ENCODING_SORTING[SortingType.SCORE]
+            ):
                 target_seq = target_seq[:-1]
 
         if has_bars and not source_sort_by_time:
@@ -547,7 +583,9 @@ class SequenceDataset(Dataset):
             bars, beats, onsets = self.tokenizer.compute_time_bar_beat_onset_indices(source_seq)
 
         # slice and shift bar/beat/onset maps
-        bars, beats, onsets = map(lambda s: s - s.min() + self.tokenizer.zero_token, (bars, beats, onsets))
+        bars, beats, onsets = map(
+            lambda s: s - s.min() + self.tokenizer.zero_token, (bars, beats, onsets)
+        )
 
         # process values
         for _seq in (source_seq, target_seq, score_seq):
@@ -594,37 +632,51 @@ class SequenceDataset(Dataset):
         # process segments and emotions
         if num_sos + num_eos > 0:
             bars, beats, onsets = map(
-                lambda s: np.concatenate([
-                    [s[0] if len(s) > 0 else self.tokenizer.zero_token] * num_sos,
-                    s,
-                    [s[-1] if len(s) > 0 else self.tokenizer.zero_token] * num_eos,
-                ]),
-                (bars, beats, onsets)
+                lambda s: np.concatenate(
+                    [
+                        [s[0] if len(s) > 0 else self.tokenizer.zero_token] * num_sos,
+                        s,
+                        [s[-1] if len(s) > 0 else self.tokenizer.zero_token] * num_eos,
+                    ]
+                ),
+                (bars, beats, onsets),
             )
             if emotion_embeddings is not None:
-                emotion_embeddings = np.concatenate([
-                    np.zeros((num_sos, emotion_embeddings.shape[1])),
-                    emotion_embeddings,
-                    np.zeros((num_eos, emotion_embeddings.shape[1]))
-                ], axis=0)
+                emotion_embeddings = np.concatenate(
+                    [
+                        np.zeros((num_sos, emotion_embeddings.shape[1])),
+                        emotion_embeddings,
+                        np.zeros((num_eos, emotion_embeddings.shape[1])),
+                    ],
+                    axis=0,
+                )
 
         # filter score token types
         if score_seq is not None and self.score_token_types:
-            score_seq = self.tokenizer.compress(replace(score_seq), token_types=self.score_token_types)
+            score_seq = self.tokenizer.compress(
+                replace(score_seq), token_types=self.score_token_types
+            )
 
         # filter token types
         context_seq = None
         if self.context_token_types is not None:
-            context_seq = self.tokenizer.compress(replace(target_seq), token_types=self.context_token_types)
+            context_seq = self.tokenizer.compress(
+                replace(target_seq), token_types=self.context_token_types
+            )
 
         # just a random sequence that might be used during MLM
         random_seq = replace(
             source_seq,
-            ids=np.stack([
-                np.random.randint(low=self.tokenizer.zero_token, high=num, size=(len(source_seq),))
-                for i, num in enumerate(self.tokenizer.sizes.values())
-            ], axis=-1),
-            values=None
+            ids=np.stack(
+                [
+                    np.random.randint(
+                        low=self.tokenizer.zero_token, high=num, size=(len(source_seq),)
+                    )
+                    for i, num in enumerate(self.tokenizer.sizes.values())
+                ],
+                axis=-1,
+            ),
+            values=None,
         )
         random_seq.values = self.tokenizer.decode_values(random_seq.ids)
 
@@ -662,7 +714,7 @@ class SequenceDataset(Dataset):
             task_type=task_type,
             sort_by_time=(source_sort_by_time, target_sort_by_time),
             token_sizes=self.token_sizes,
-            sequence_task_types=self.sequence_task_types
+            sequence_task_types=self.sequence_task_types,
         )
 
         emotion_labels = source_seq.meta.get("label_probs", None)
@@ -675,14 +727,14 @@ class SequenceDataset(Dataset):
             segments=NoteSegments(
                 bar=bars,
                 beat=beats,
-                onset=onsets
+                onset=onsets,
             ),
             pedals=pedals,
             seq_label=seq_label,
             type_ids=type_ids,
             encoding_ids=(
                 self.sequence_encoding_types[source_encoding],
-                self.sequence_encoding_types[target_encoding]
+                self.sequence_encoding_types[target_encoding],
             ),
             task_idx=self.sequence_task_types[task_type],
             task_seq=task_seq,
@@ -692,7 +744,7 @@ class SequenceDataset(Dataset):
             emotion_labels=emotion_labels,
             emotion_embeddings=emotion_embeddings,
             emotion_template_idx=emotion_template_idx,
-            random_seq=random_seq
+            random_seq=random_seq,
         )
 
     def __getitem__(self, idx: int) -> SequenceSample:
@@ -712,67 +764,61 @@ class SequenceDataset(Dataset):
 
 class LocalSequenceDataset(SequenceDataset):
     def __init__(
-            self,
-            root: str,
-            metadata: str = "metadata.json",
-            split: str = "train",
-            extension: str = ".json",
-            tokenizer: str = "config.json",
-            token_types: list[str] | None = None,
-            context_token_types: list[str] | None = None,
-
-            scores_root: str | None = None,
-            scores_metadata: str | None = None,
-            score_token_types: list[str] | None = None,
-
-            emotions_root: str | None = None,
-            emotion_embeddings: str = "label_embeddings.npy",
-
-            auxiliary_data_keys: list[str] | None = None,
-            save_auxiliary_data: bool = True,
-
-            max_seq_len: int = 512,
-            min_seq_len: int = 16,
-            note_sliding_window: int = 128,
-            max_bar: int = 512,
-            max_time: float = 10_000.,
-            max_len_single_seq: bool = True,
-
-            sample_start_index: bool | float = False,
-            sample_length: bool | float = False,
-
-            shift_time_to_zero: bool = False,
-
-            sort_by_time: bool | float = False,
-            sample_sort: bool = False,
-
-            add_sos_eos: bool = False,
-            add_eod_token: bool = False,
-            remove_special_tokens: bool = False,
-            enc_seq_minimal: bool = False,
-
-            sample: bool = False,
-            seed: int = 23,
-            shuffle: bool = False,
-
-            augment_sequence: bool | float = False,
-            pitch_shift_range: tuple[int, int] = (-3, 3),
-            velocity_shift_range: tuple[int, int] = (-6, 6),
-            tempo_stretch_range: tuple[float, float] = (-0., 0.),
-
-            sequence_tasks: dict[str, float] | None = None,
-
-            quantize_values: bool | float = False,
-            clip_values: bool = False,
-            normalize_values: bool = False,
-
-            zero_out_silent_durations: bool = True,
-            delete_silent_notes: bool = False,
-            compute_note_types: bool = False,
-
-            preload: bool = False,
-            cache: bool = True,
-            **kwargs
+        self,
+        root: str,
+        metadata: str = "metadata.json",
+        split: str = "train",
+        extension: str = ".json",
+        tokenizer: str = "config.json",
+        token_types: list[str] | None = None,
+        context_token_types: list[str] | None = None,
+        scores_root: str | None = None,
+        scores_metadata: str | None = None,
+        score_token_types: list[str] | None = None,
+        emotions_root: str | None = None,
+        emotion_embeddings: str = "label_embeddings.npy",
+        auxiliary_data_keys: list[str] | None = None,
+        save_auxiliary_data: bool = True,
+        # sequence lengths
+        max_seq_len: int = 512,
+        min_seq_len: int = 16,
+        note_sliding_window: int = 128,
+        max_bar: int = 512,
+        max_time: float = 10_000.0,
+        max_len_single_seq: bool = True,
+        sample_start_index: bool | float = False,
+        sample_length: bool | float = False,
+        shift_time_to_zero: bool = False,
+        sort_by_time: bool | float = False,
+        sample_sort: bool = False,
+        # special tokens
+        add_sos_eos: bool = False,
+        add_eod_token: bool = False,
+        remove_special_tokens: bool = False,
+        enc_seq_minimal: bool = False,
+        # sampling
+        sample: bool = False,
+        seed: int = 23,
+        shuffle: bool = False,
+        # augmentations
+        augment_sequence: bool | float = False,
+        pitch_shift_range: tuple[int, int] = (-3, 3),
+        velocity_shift_range: tuple[int, int] = (-6, 6),
+        tempo_stretch_range: tuple[float, float] = (-0.0, 0.0),
+        # tasks
+        sequence_tasks: dict[str, float] | None = None,
+        # tokens/values
+        quantize_values: bool | float = False,
+        clip_values: bool = False,
+        normalize_values: bool = False,
+        # preprocessing
+        zero_out_silent_durations: bool = True,
+        delete_silent_notes: bool = False,
+        compute_note_types: bool = False,
+        # memory cache
+        preload: bool = False,
+        cache: bool = True,
+        **kwargs,
     ):
 
         self.root = root
@@ -785,10 +831,9 @@ class LocalSequenceDataset(SequenceDataset):
         if any(key in metadata for key in DATA_SPLITS):
             metadata = metadata[self.split]
             if isinstance(metadata, dict):
-                metadata = list(metadata.keys()) + list(itertools.chain.from_iterable(metadata.values()))
-
-        # metadata = [x for x in metadata if "ATEPP" in x]
-        # metadata = [x for x in metadata if "GiantMIDI" in x]
+                metadata = list(metadata.keys()) + list(
+                    itertools.chain.from_iterable(metadata.values())
+                )
 
         self.sequence_names = list(metadata)
 
@@ -805,10 +850,7 @@ class LocalSequenceDataset(SequenceDataset):
         # load sequences
         token_types = token_types or []
         context_token_types = context_token_types or []
-        load_tokens_fn = partial(
-            load_token_sequence,
-            tokenizer=tokenizer
-        )
+        load_tokens_fn = partial(load_token_sequence, tokenizer=tokenizer)
         seq_proc_funcs, seq_proc_funcs = [], []
         if zero_out_silent_durations:  # silent notes have non-zero duration
             seq_proc_funcs.append(processor.zero_out_durations)
@@ -816,9 +858,7 @@ class LocalSequenceDataset(SequenceDataset):
             seq_proc_funcs.append(processor.remove_silent_notes)
 
         seq_load_fn = partial(
-            load_and_process_token_sequence,
-            load_fn=load_tokens_fn,
-            processing_funcs=seq_proc_funcs
+            load_and_process_token_sequence, load_fn=load_tokens_fn, processing_funcs=seq_proc_funcs
         )
         sequences = LocalTokenSequenceDataset(
             root=self.root,
@@ -826,7 +866,7 @@ class LocalSequenceDataset(SequenceDataset):
             extension=extension,
             load_fn=seq_load_fn,
             preload=preload,
-            cache=cache
+            cache=cache,
         )
 
         # build score sequence dataset if available
@@ -845,9 +885,11 @@ class LocalSequenceDataset(SequenceDataset):
                 files=score_sequence_names,
                 extension=extension,
                 load_fn=seq_load_fn,
-                name_map=lambda x: os.path.dirname(x) + ("/mini" if "_mini" in os.path.basename(x) else ""),
+                name_map=lambda x: (
+                    os.path.dirname(x) + ("/mini" if "_mini" in os.path.basename(x) else "")
+                ),
                 preload=preload,
-                cache=cache
+                cache=cache,
             )
 
         # load emotion predictions if available
@@ -858,7 +900,7 @@ class LocalSequenceDataset(SequenceDataset):
                 files=self.sequence_names,
                 label_embeddings_file=emotion_embeddings,
                 preload=preload,
-                cache=cache
+                cache=cache,
             )
 
         # load auxiliary data
@@ -905,7 +947,7 @@ class LocalSequenceDataset(SequenceDataset):
             quantize_values=quantize_values,
             clip_values=clip_values,
             normalize_values=normalize_values,
-            compute_note_types=compute_note_types
+            compute_note_types=compute_note_types,
         )
 
         if save_auxiliary_data:

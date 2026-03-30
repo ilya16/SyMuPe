@@ -1,4 +1,5 @@
-""" A centralized initialization on all Experiment Modules. """
+"""A centralized initialization on all Experiment Modules."""
+
 from __future__ import annotations
 
 import copy
@@ -56,8 +57,9 @@ class ExperimentModules:
 
         config = resolve_config_hierarchy(config, config_root=config_root)
 
-        assert all([key in config for key in ExperimentConfigFields[:3]]), \
+        assert all([key in config for key in ExperimentConfigFields[:3]]), (
             f"ExperimentConfig is missing one of the keys: {ExperimentConfigFields[:3]}"
+        )
 
         disable_nodes(config)
         OmegaConf.resolve(config)
@@ -66,7 +68,7 @@ class ExperimentModules:
             data=config.data,
             model=config.model,
             trainer=config.trainer,
-            evaluator=config.get("evaluator", None)
+            evaluator=config.get("evaluator", None),
         )
 
         self.train_dataset = None
@@ -86,13 +88,17 @@ class ExperimentModules:
             "train_dataset": self.train_dataset,
             "eval_dataset": self.eval_dataset,
             "collator": self.collator,
-            "evaluator": self.evaluator
+            "evaluator": self.evaluator,
         }
 
     def init_datasets(self):
         cfg = self.config.data.dataset
-        self.train_dataset = build_dataset(cfg, split=cfg._splits_.train) if cfg._splits_.train is not None else None
-        self.eval_dataset = build_dataset(cfg, split=cfg._splits_.eval) if cfg._splits_.eval is not None else None
+        self.train_dataset = (
+            build_dataset(cfg, split=cfg._splits_.train) if cfg._splits_.train is not None else None
+        )
+        self.eval_dataset = (
+            build_dataset(cfg, split=cfg._splits_.eval) if cfg._splits_.eval is not None else None
+        )
 
         return self.train_dataset, self.eval_dataset
 
@@ -123,9 +129,7 @@ class ExperimentModules:
         dataset = self.train_dataset or self.eval_dataset
 
         cfg = self.config.evaluator
-        self.evaluator = build_evaluator(
-            cfg, model=self.model, tokenizer=dataset.tokenizer
-        )
+        self.evaluator = build_evaluator(cfg, model=self.model, tokenizer=dataset.tokenizer)
 
         return self.evaluator
 

@@ -1,4 +1,4 @@
-""" Tokenizer related constants. """
+"""Tokenizer related constants."""
 
 # override MidiTok default special tokens for backward compatibility
 SOS_TOKEN_NAME = "BOS"  # noqa: S105
@@ -17,7 +17,7 @@ PEDAL_ON_TOKEN = "Pedal_On"
 PEDAL_OFF_TOKEN = "Pedal_Off"
 TIME_SEGMENT_TOKEN = "Time_Segment"
 
-SPECIAL_TOKENS_VALUE = -100.
+SPECIAL_TOKENS_VALUE = -100.0
 
 TICKS_PER_QUARTER = 480
 NOTE_ON_MIDI_EVENT = 144
@@ -36,11 +36,11 @@ PLAIN_SCORE_KEYS = [
     "PitchOctave",
     "PositionShift",
     "NotesInOnset",
-    "PositionInOnset"
+    "PositionInOnset",
 ]
 SCORE_KEYS = PLAIN_SCORE_KEYS + [
     "Velocity",
-    "Tempo"
+    "Tempo",
 ]
 PERFORMANCE_KEYS = SCORE_KEYS + [
     "OnsetDev",
@@ -51,7 +51,7 @@ PERFORMANCE_KEYS = SCORE_KEYS + [
     "TimeDuration",
     "TimePosition",
     "TimeDurationSustain",
-    "Sustained"
+    "Sustained",
 ]
 REL_PERFORMANCE_KEYS = SCORE_KEYS + [
     "OnsetDev",
@@ -68,7 +68,7 @@ TIME_PERFORMANCE_KEYS = [
     "TimeDurationSustain",
     "Sustained",
     "PitchClass",
-    "PitchOctave"
+    "PitchOctave",
 ]
 COMPRESSIBLE_TOKENS = [
     "PitchClass",
@@ -76,5 +76,5 @@ COMPRESSIBLE_TOKENS = [
     "PositionShift",
     "NotesInOnset",
     "PositionInOnset",
-    "TimePosition"
+    "TimePosition",
 ]

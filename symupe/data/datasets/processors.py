@@ -20,15 +20,15 @@ def sample_float_stretch(low: float = -0.5, high: float = 0.5):
 class TokenSequenceAugmentations:
     pitch_shift: int | None = 0
     velocity_shift: int | None = 0
-    tempo_shift: float | None = 0.
+    tempo_shift: float | None = 0.0
 
 
 class TokenSequenceProcessor:
     def __init__(
-            self,
-            pitch_shift_range: tuple[int, int] = (0, 0),
-            velocity_shift_range: tuple[int, int] = (0, 0),
-            tempo_stretch_range: tuple[float, float] = (0., 0.)
+        self,
+        pitch_shift_range: tuple[int, int] = (0, 0),
+        velocity_shift_range: tuple[int, int] = (0, 0),
+        tempo_stretch_range: tuple[float, float] = (0.0, 0.0),
     ):
         self.pitch_shift_fn = partial(sample_integer_shift, *pitch_shift_range)
         self.velocity_shift_fn = partial(sample_integer_shift, *velocity_shift_range)
@@ -38,41 +38,45 @@ class TokenSequenceProcessor:
         return TokenSequenceAugmentations(
             pitch_shift=int(multiplier * self.pitch_shift_fn()),
             velocity_shift=int(multiplier * self.velocity_shift_fn()),
-            tempo_shift=round(multiplier * self.tempo_shift_fn(), 3)
+            tempo_shift=round(multiplier * self.tempo_shift_fn(), 3),
         )
 
     def augment_sequence(
-            self,
-            seq: TokSequence,
-            augmentations: TokenSequenceAugmentations
+        self, seq: TokSequence, augmentations: TokenSequenceAugmentations
     ) -> TokSequence:
-        ...
+        raise NotImplementedError
 
 
 class TupleTokenSequenceProcessor(TokenSequenceProcessor):
     def __init__(
-            self,
-            tokenizer: OctupleM,
-            pitch_shift_range: tuple[int, int] = (0, 0),
-            velocity_shift_range: tuple[int, int] = (0, 0),
-            tempo_stretch_range: tuple[float, float] = (0., 0.)
+        self,
+        tokenizer: OctupleM,
+        pitch_shift_range: tuple[int, int] = (0, 0),
+        velocity_shift_range: tuple[int, int] = (0, 0),
+        tempo_stretch_range: tuple[float, float] = (0.0, 0.0),
     ):
         super().__init__(pitch_shift_range, velocity_shift_range, tempo_stretch_range)
 
         self.tokenizer = tokenizer
 
-    def sample_augmentations(self, multiplier: float = 1.0, min_pitch: int | None = None, max_pitch: int | None = None):
+    def sample_augmentations(
+        self, multiplier: float = 1.0, min_pitch: int | None = None, max_pitch: int | None = None
+    ):
         augmentations = super().sample_augmentations(multiplier=multiplier)
         if min_pitch is not None:
-            augmentations.pitch_shift = max(augmentations.pitch_shift, self.tokenizer.config.pitch_range[0] - min_pitch)
+            augmentations.pitch_shift = max(
+                augmentations.pitch_shift, self.tokenizer.config.pitch_range[0] - min_pitch
+            )
         if max_pitch is not None:
-            augmentations.pitch_shift = min(augmentations.pitch_shift, self.tokenizer.config.pitch_range[1] - max_pitch)
+            augmentations.pitch_shift = min(
+                augmentations.pitch_shift, self.tokenizer.config.pitch_range[1] - max_pitch
+            )
         return augmentations
 
     def augment_sequence(
-            self,
-            seq: TokSequence,
-            augmentations: TokenSequenceAugmentations
+        self,
+        seq: TokSequence,
+        augmentations: TokenSequenceAugmentations,
     ) -> TokSequence:
         vocab = seq.vocab or self.tokenizer.vocab_types_idx
 
@@ -96,30 +100,43 @@ class TupleTokenSequenceProcessor(TokenSequenceProcessor):
                 velocities[token_mask] += augmentations.velocity_shift
 
                 vel_min, vel_max = self.tokenizer.velocities[0], self.tokenizer.velocities[-1]
-                velocities[token_mask] = np.maximum(vel_min, np.minimum(vel_max, velocities[token_mask]))
+                velocities[token_mask] = np.maximum(
+                    vel_min, np.minimum(vel_max, velocities[token_mask])
+                )
 
                 if seq.values is not None:
                     seq.values[token_mask, type_index] = velocities[token_mask]
-                seq.ids[token_mask, type_index] = self.tokenizer.encode_tokens(velocities[token_mask], "Velocity")
+                seq.ids[token_mask, type_index] = self.tokenizer.encode_tokens(
+                    velocities[token_mask], "Velocity"
+                )
 
-        if augmentations.tempo_shift != 0.:
+        if augmentations.tempo_shift != 0.0:
             if self.tokenizer.config.use_tempos and "Tempo" in vocab:
                 type_index = vocab["Tempo"]
                 token_mask = seq.ids[:, type_index] >= self.tokenizer.zero_token
 
                 if np.any(token_mask):
                     tempos = self.tokenizer.get_values(seq, "Tempo")
-                    tempos[token_mask] *= (1 + augmentations.tempo_shift)
+                    tempos[token_mask] *= 1 + augmentations.tempo_shift
 
                     tempo_min, tempo_max = self.tokenizer.tempos[0], self.tokenizer.tempos[-1]
-                    tempos[token_mask] = np.maximum(tempo_min, np.minimum(tempo_max, tempos[token_mask]))
+                    tempos[token_mask] = np.maximum(
+                        tempo_min, np.minimum(tempo_max, tempos[token_mask])
+                    )
 
                     if seq.values is not None:
                         seq.values[token_mask, type_index] = tempos[token_mask]
-                    seq.ids[token_mask, type_index] = self.tokenizer.encode_tokens(tempos[token_mask], "Tempo")
+                    seq.ids[token_mask, type_index] = self.tokenizer.encode_tokens(
+                        tempos[token_mask], "Tempo"
+                    )
 
-            if isinstance(self.tokenizer, SyMuPe) :
-                for token_type in ["TimeShift", "TimeDuration", "TimeDurationSustain", "TimePosition"]:
+            if isinstance(self.tokenizer, SyMuPe):
+                for token_type in [
+                    "TimeShift",
+                    "TimeDuration",
+                    "TimeDurationSustain",
+                    "TimePosition",
+                ]:
                     if token_type not in vocab:
                         continue
 
@@ -128,7 +145,7 @@ class TupleTokenSequenceProcessor(TokenSequenceProcessor):
 
                     if np.any(token_mask):
                         token_values = self.tokenizer.get_values(seq, token_type)
-                        token_values[token_mask] *= (1 + augmentations.tempo_shift)
+                        token_values[token_mask] *= 1 + augmentations.tempo_shift
 
                         if seq.values is not None:
                             seq.values[token_mask, type_index] = token_values[token_mask]
@@ -159,7 +176,7 @@ class TupleTokenSequenceProcessor(TokenSequenceProcessor):
         vocab = seq.vocab or self.tokenizer.vocab_types_idx
         velocity_index = vocab["Velocity"]
 
-        silent_mask = seq.values[:, velocity_index] == 0.
+        silent_mask = seq.values[:, velocity_index] == 0.0
         seq.ids = seq.ids[~silent_mask]
         if seq.values is not None:
             seq.values = seq.values[~silent_mask]
@@ -171,8 +188,14 @@ class TupleTokenSequenceProcessor(TokenSequenceProcessor):
         pitch_index, velocity_index = vocab["Pitch"], vocab["Velocity"]
         pitch_min, pitch_max = self.tokenizer.zero_token, len(self.tokenizer.vocab[pitch_index]) - 1
         mask = np.logical_or(
-            np.logical_and(seq.ids[:, pitch_index] <= self.tokenizer.zero_token, seq.ids[:, velocity_index] <= self.tokenizer.zero_token),
-            np.logical_and(seq.ids[:, pitch_index] >= pitch_min, seq.ids[:, pitch_index] <= pitch_max)
+            np.logical_and(
+                seq.ids[:, pitch_index] <= self.tokenizer.zero_token,
+                seq.ids[:, velocity_index] <= self.tokenizer.zero_token,
+            ),
+            np.logical_and(
+                seq.ids[:, pitch_index] >= pitch_min,
+                seq.ids[:, pitch_index] <= pitch_max,
+            ),
         )
         return mask
 
@@ -181,7 +204,9 @@ class TupleTokenSequenceProcessor(TokenSequenceProcessor):
         return 0
 
     @staticmethod
-    def compute_note_type_ids(seq: TokSequence, name: str, is_interpolated: bool = False) -> np.ndarray:
+    def compute_note_type_ids(
+        seq: TokSequence, name: str, is_interpolated: bool = False
+    ) -> np.ndarray:
         if is_interpolated:
             return seq.interpolated.astype(int)
 

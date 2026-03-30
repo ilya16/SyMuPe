@@ -1,4 +1,5 @@
-""" General purpose transformer embeddings. """
+"""General purpose transformer embeddings."""
+
 from __future__ import annotations
 
 import math
@@ -12,19 +13,19 @@ from torch import einsum
 
 class DiscreteContinuousEmbedding(nn.Module):
     def __init__(
-            self,
-            num_embeddings: int,
-            embedding_dim: int,
-            discrete: bool = True,
-            continuous: bool = True,
-            num_first_discrete: int = 0,
-            depth: int = 1,
-            token_values: list[float] | torch.Tensor | None = None,
-            padding_idx: int | None = None,
-            activation=None,
-            _weight: torch.Tensor | None = None,
-            device=None,
-            dtype=None
+        self,
+        num_embeddings: int,
+        embedding_dim: int,
+        discrete: bool = True,
+        continuous: bool = True,
+        num_first_discrete: int = 0,
+        depth: int = 1,
+        token_values: list[float] | torch.Tensor | None = None,
+        padding_idx: int | None = None,
+        activation=None,
+        _weight: torch.Tensor | None = None,
+        device=None,
+        dtype=None,
     ) -> None:
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -35,13 +36,19 @@ class DiscreteContinuousEmbedding(nn.Module):
 
         if padding_idx is not None:
             if padding_idx > 0:
-                assert padding_idx < self.num_embeddings, "Padding_idx must be within num_embeddings"
+                assert padding_idx < self.num_embeddings, (
+                    "Padding_idx must be within num_embeddings"
+                )
             elif padding_idx < 0:
-                assert padding_idx >= -self.num_embeddings, "Padding_idx must be within num_embeddings"
+                assert padding_idx >= -self.num_embeddings, (
+                    "Padding_idx must be within num_embeddings"
+                )
                 padding_idx = self.num_embeddings + padding_idx
         self.padding_idx = padding_idx
 
-        assert discrete or continuous, "`DiscreteContinuousEmbedding` should be at least discrete or continuous"
+        assert discrete or continuous, (
+            "`DiscreteContinuousEmbedding` should be at least discrete or continuous"
+        )
         self.discrete = discrete
         self.continuous = continuous
 
@@ -53,8 +60,9 @@ class DiscreteContinuousEmbedding(nn.Module):
                     torch.empty((num_discrete_embeddings, embedding_dim), **factory_kwargs)
                 )
             else:
-                assert list(_weight.shape) == [num_discrete_embeddings, embedding_dim], \
+                assert list(_weight.shape) == [num_discrete_embeddings, embedding_dim], (
                     "Shape of weight does not match num_embeddings and embedding_dim"
+                )
                 self.index_weight = nn.Parameter(_weight)
 
         self.value_layer = None
@@ -64,22 +72,26 @@ class DiscreteContinuousEmbedding(nn.Module):
                 if not isinstance(token_values, torch.Tensor):
                     token_values = torch.tensor(token_values)
             else:
-                token_values = torch.cat([
-                    100 * torch.arange(-self.num_first_discrete, 0, 1),
-                    torch.linspace(0., 1., self.num_embeddings - self.num_first_discrete)
-                ])
+                token_values = torch.cat(
+                    [
+                        100 * torch.arange(-self.num_first_discrete, 0, 1),
+                        torch.linspace(0.0, 1.0, self.num_embeddings - self.num_first_discrete),
+                    ]
+                )
             token_values = token_values.to(**factory_kwargs)
 
             layers = [
                 nn.Linear(1, embedding_dim, **factory_kwargs),
-                nn.SiLU() if depth > 1 else nn.Identity()
+                nn.SiLU() if depth > 1 else nn.Identity(),
             ]
 
             for i in range(depth - 1):
-                layers.extend([
-                    nn.Linear(embedding_dim, embedding_dim, **factory_kwargs),
-                    nn.SiLU() if i < depth - 2 else nn.Identity()
-                ])
+                layers.extend(
+                    [
+                        nn.Linear(embedding_dim, embedding_dim, **factory_kwargs),
+                        nn.SiLU() if i < depth - 2 else nn.Identity(),
+                    ]
+                )
 
             layers = layers[:-1] if isinstance(layers[-1], nn.Identity) else layers
 
@@ -97,7 +109,7 @@ class DiscreteContinuousEmbedding(nn.Module):
     def reset_parameters(self) -> None:
         if self.has_discrete:
             nn.init.xavier_uniform_(self.index_weight)
-            nn.init.normal_(self.index_weight[self.num_first_discrete:], std=1e-2)
+            nn.init.normal_(self.index_weight[self.num_first_discrete :], std=1e-2)
         if self.continuous:
             for module in self.value_layer.modules():
                 if isinstance(module, nn.Linear):
@@ -110,19 +122,25 @@ class DiscreteContinuousEmbedding(nn.Module):
                 if self.has_discrete:
                     self.index_weight[self.padding_idx].fill_(0)
 
-    def forward(self, tokens: torch.Tensor | None = None, values: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(
+        self, tokens: torch.Tensor | None = None, values: torch.Tensor | None = None
+    ) -> torch.Tensor:
         assert not self.has_discrete or tokens is not None
         if values is None:  # use fixed `token_values`
-            assert not self._ignore_values or self.token_values is not None, \
+            assert not self._ignore_values or self.token_values is not None, (
                 f"`{self.__class__.__name__}.token_values` cannot be empty when no `values` are provided"
+            )
             token_weight = self.token_weight if self.has_discrete else 0
             value_weight = self.value_weight if self.continuous else 0
             weight = token_weight + value_weight
             return F.embedding(tokens, weight, self.padding_idx)
         else:
-            token_emb = F.embedding(tokens, self.token_weight, self.padding_idx) if self.has_discrete else 0
+            token_emb = (
+                F.embedding(tokens, self.token_weight, self.padding_idx) if self.has_discrete else 0
+            )
             if not self.training and (
-                    not self.continuous or (self.has_discrete and torch.all(tokens < self.num_discrete_embeddings))
+                not self.continuous
+                or (self.has_discrete and torch.all(tokens < self.num_discrete_embeddings))
             ):
                 return token_emb
             else:
@@ -133,17 +151,20 @@ class DiscreteContinuousEmbedding(nn.Module):
         assert self.has_discrete
         return F.embedding(tokens, self.token_weight, self.padding_idx)
 
-    def forward_values(self, tokens: torch.Tensor, values: torch.Tensor | None = None) -> torch.Tensor:
+    def forward_values(
+        self, tokens: torch.Tensor, values: torch.Tensor | None = None
+    ) -> torch.Tensor:
         values = None if self._ignore_values else values
         assert self.continuous
         if values is None:  # use fixed `token_values`
-            assert not self._ignore_values or self.token_values is not None, \
+            assert not self._ignore_values or self.token_values is not None, (
                 f"`{self.__class__.__name__}.token_values` cannot be empty when no `values` are provided"
+            )
             return F.embedding(tokens, self.value_weight, self.padding_idx)
         else:
             value_emb = self._compute_value_embeddings(values)
             if self.num_first_discrete > 0:
-                value_emb[tokens < self.num_first_discrete] = 0.
+                value_emb[tokens < self.num_first_discrete] = 0.0
             return value_emb
 
     def _compute_value_embeddings(self, values: torch.Tensor) -> torch.Tensor:
@@ -159,10 +180,13 @@ class DiscreteContinuousEmbedding(nn.Module):
             if self.discrete:
                 return self.index_weight
             elif self.num_first_discrete > 0:
-                return torch.cat([
-                    self.index_weight,
-                    self.index_weight.new_zeros((self.num_embeddings - self.num_first_discrete, self.embedding_dim))
-                ])
+                num_continuous = self.num_embeddings - self.num_first_discrete
+                return torch.cat(
+                    [
+                        self.index_weight,
+                        self.index_weight.new_zeros((num_continuous, self.embedding_dim)),
+                    ]
+                )
         return self._token_weight
 
     @property
@@ -170,13 +194,16 @@ class DiscreteContinuousEmbedding(nn.Module):
         if self.continuous:
             if self.token_values is None:
                 value_weight = self._compute_value_embeddings(
-                    torch.arange(self.num_embeddings - self.num_first_discrete, device=self.index_weight.device)
+                    torch.arange(
+                        self.num_embeddings - self.num_first_discrete,
+                        device=self.index_weight.device,
+                    )
                 )
                 return torch.cat([torch.zeros_like(self.index_weight), value_weight], dim=0)
             elif self._value_weight is None:
                 value_weight = self._compute_value_embeddings(self.token_values.view(-1))
                 if self.num_first_discrete > 0:
-                    value_weight[:self.num_first_discrete] = 0.
+                    value_weight[: self.num_first_discrete] = 0.0
                 return value_weight
             return self._value_weight
 
@@ -212,24 +239,24 @@ class DiscreteContinuousEmbedding(nn.Module):
 
 class DiscreteSinusoidalEmbedding(DiscreteContinuousEmbedding):
     def __init__(
-            self,
-            num_embeddings: int,
-            embedding_dim: int,
-            learned: bool = False,
-            depth: int = 0,
-            theta: int | None = 1000.,
-            freq_scale: float | None = 1.,
-            with_positions: bool = True,
-            log_inv_freq: bool = False,
-            ignore_values: bool = False,
-            discrete: bool = False,
-            num_first_discrete: int = 0,
-            token_values: list[float] | torch.Tensor | None = None,
-            padding_idx: int | None = None,
-            activation=None,
-            _weight: torch.Tensor | None = None,
-            device=None,
-            dtype=None
+        self,
+        num_embeddings: int,
+        embedding_dim: int,
+        learned: bool = False,
+        depth: int = 0,
+        theta: int | None = 1000.0,
+        freq_scale: float | None = 1.0,
+        with_positions: bool = True,
+        log_inv_freq: bool = False,
+        ignore_values: bool = False,
+        discrete: bool = False,
+        num_first_discrete: int = 0,
+        token_values: list[float] | torch.Tensor | None = None,
+        padding_idx: int | None = None,
+        activation=None,
+        _weight: torch.Tensor | None = None,
+        device=None,
+        dtype=None,
     ) -> None:
         super().__init__(
             num_embeddings=num_embeddings,
@@ -240,16 +267,19 @@ class DiscreteSinusoidalEmbedding(DiscreteContinuousEmbedding):
             token_values=token_values,
             padding_idx=padding_idx,
             device=device,
-            dtype=dtype
+            dtype=dtype,
         )
 
         factory_kwargs = {"device": device, "dtype": dtype}
 
         if token_values is not None:
-            min_diff = torch.diff(torch.sort(self.token_values[self.num_first_discrete:]).values.unique()).min().item()
-            max_value = max(1., self.token_values[self.num_first_discrete:].max().item())
+            diffs = torch.diff(
+                torch.sort(self.token_values[self.num_first_discrete :]).values.unique()
+            )
+            min_diff = diffs.min().item()
+            max_value = max(1.0, self.token_values[self.num_first_discrete :].max().item())
 
-            theta = math.ceil(round(max_value / min_diff) / 100) * 100.
+            theta = math.ceil(round(max_value / min_diff) / 100) * 100.0
             freq_scale = math.pi / 2 / min_diff
 
         cls = SinusoidalEmbedding
@@ -262,21 +292,25 @@ class DiscreteSinusoidalEmbedding(DiscreteContinuousEmbedding):
                 theta=theta,
                 freq_scale=freq_scale,
                 scale=False,
-                with_positions=with_positions
+                with_positions=with_positions,
             )
         ]
 
         if depth > 0:
-            layers.extend([
-                nn.Linear(embedding_dim + int(with_positions), embedding_dim, **factory_kwargs),
-                nn.SiLU() if depth > 1 or activation else nn.Identity()
-            ])
+            layers.extend(
+                [
+                    nn.Linear(embedding_dim + int(with_positions), embedding_dim, **factory_kwargs),
+                    nn.SiLU() if depth > 1 or activation else nn.Identity(),
+                ]
+            )
 
             for i in range(1, depth):
-                layers.extend([
-                    nn.Linear(embedding_dim, embedding_dim, **factory_kwargs),
-                    nn.SiLU() if i < depth - 1 or activation else nn.Identity()
-                ])
+                layers.extend(
+                    [
+                        nn.Linear(embedding_dim, embedding_dim, **factory_kwargs),
+                        nn.SiLU() if i < depth - 1 or activation else nn.Identity(),
+                    ]
+                )
 
         layers = layers[:-1] if isinstance(layers[-1], nn.Identity) else layers
 
@@ -286,10 +320,12 @@ class DiscreteSinusoidalEmbedding(DiscreteContinuousEmbedding):
         if ignore_values:
             self.register_buffer(
                 "token_values",
-                torch.cat([
-                    100 * torch.arange(-self.num_first_discrete, 0, 1),
-                    torch.arange(self.num_embeddings - self.num_first_discrete)
-                ])
+                torch.cat(
+                    [
+                        100 * torch.arange(-self.num_first_discrete, 0, 1),
+                        torch.arange(self.num_embeddings - self.num_first_discrete),
+                    ]
+                ),
             )
         self._ignore_values = ignore_values
 
@@ -304,13 +340,15 @@ class DiscreteSinusoidalEmbedding(DiscreteContinuousEmbedding):
             return self._value_weight
         if self.token_values is None:
             value_weight = self._compute_value_embeddings(
-                torch.arange(self.num_embeddings - self.num_first_discrete, device=self.index_weight.device)
+                torch.arange(
+                    self.num_embeddings - self.num_first_discrete, device=self.index_weight.device
+                )
             )
             value_weight = torch.cat([torch.zeros_like(self.index_weight), value_weight], dim=0)
         else:
             value_weight = self._compute_value_embeddings(self.token_values.view(-1))
             if self.num_first_discrete > 0:
-                value_weight[:self.num_first_discrete] = 0.
+                value_weight[: self.num_first_discrete] = 0.0
         return value_weight
 
 
@@ -318,7 +356,7 @@ class AbsolutePositionalEmbedding(nn.Module):
     def __init__(self, dim: int, max_seq_len: int):
         super().__init__()
         self.dim = dim
-        self.scale = dim ** -0.5
+        self.scale = dim**-0.5
         self.max_seq_len = max_seq_len
         self.emb = nn.Embedding(max_seq_len, dim)
 
@@ -339,12 +377,12 @@ class AbsolutePositionalEmbedding(nn.Module):
 
 class SinusoidalEmbedding(nn.Module):
     def __init__(
-            self,
-            dim: int,
-            theta: float = 10000,
-            freq_scale: float = 1.,
-            scale: bool | float | None = 1.,
-            with_positions: bool = False
+        self,
+        dim: int,
+        theta: float = 10000,
+        freq_scale: float = 1.0,
+        scale: bool | float | None = 1.0,
+        with_positions: bool = False,
     ):
         super().__init__()
         assert dim % 2 == 0
@@ -355,11 +393,11 @@ class SinusoidalEmbedding(nn.Module):
 
         half_dim = dim // 2
         freq_seq = torch.arange(half_dim).float() / half_dim
-        inv_freq = theta ** -freq_seq
+        inv_freq = theta**-freq_seq
         self.register_buffer("inv_freq", inv_freq, persistent=False)
 
         if isinstance(scale, bool) and scale:
-            scale = dim ** -0.5
+            scale = dim**-0.5
         if scale:
             self.scale = nn.Parameter(torch.ones(1) * scale)
         else:
@@ -367,7 +405,9 @@ class SinusoidalEmbedding(nn.Module):
 
         self.with_positions = with_positions
 
-    def forward(self, x: torch.Tensor, is_pos: bool = True, seq_dim: int = 1, offset: float = 0) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, is_pos: bool = True, seq_dim: int = 1, offset: float = 0
+    ) -> torch.Tensor:
         pos = x if is_pos else torch.arange(x.shape[seq_dim], device=x.device)
 
         inv_freq = self.get_inv_freq()
@@ -394,15 +434,17 @@ class SinusoidalEmbedding(nn.Module):
 
 class LearnedSinusoidalEmbedding(SinusoidalEmbedding):
     def __init__(
-            self,
-            dim: int,
-            theta: float = 10000,
-            freq_scale: float = 1.,
-            scale: bool | float | None = 1.,
-            with_positions: bool = False,
-            log_inv_freq: bool = False
+        self,
+        dim: int,
+        theta: float = 10000,
+        freq_scale: float = 1.0,
+        scale: bool | float | None = 1.0,
+        with_positions: bool = False,
+        log_inv_freq: bool = False,
     ):
-        super().__init__(dim=dim, theta=theta, freq_scale=freq_scale, scale=scale, with_positions=with_positions)
+        super().__init__(
+            dim=dim, theta=theta, freq_scale=freq_scale, scale=scale, with_positions=with_positions
+        )
 
         if log_inv_freq:
             self.log_inv_freq = nn.Parameter(torch.log(self.inv_freq))
@@ -417,13 +459,13 @@ class LearnedSinusoidalEmbedding(SinusoidalEmbedding):
 
 class ALiBiPositionalBias(nn.Module):
     def __init__(
-            self,
-            heads: int | tuple[int, int, int],
-            total_heads: int,
-            contextual_heads: int = 0,
-            symmetric: bool = True,
-            prefix: bool = False,
-            ignore_positive: bool = False
+        self,
+        heads: int | tuple[int, int, int],
+        total_heads: int,
+        contextual_heads: int = 0,
+        symmetric: bool = True,
+        prefix: bool = False,
+        ignore_positive: bool = False,
     ):
         super().__init__()
 
@@ -445,23 +487,29 @@ class ALiBiPositionalBias(nn.Module):
         self.register_buffer("slopes", slopes, persistent=False)
 
         self.cross_attn_bias = nn.Parameter(torch.zeros(self.total_heads, 1, 1)) if prefix else None
-        self.ignore_attn_bias = nn.Parameter(torch.zeros(self.total_heads, 1, 1)) if ignore_positive else None
+        self.ignore_attn_bias = (
+            nn.Parameter(torch.zeros(self.total_heads, 1, 1)) if ignore_positive else None
+        )
 
     @staticmethod
     def _compute_slopes(heads) -> list[float]:
         def slopes_power_of_2(n):
-            start = (2 ** (-2 ** -(math.log2(n) - 3)))
+            start = 2 ** (-(2 ** -(math.log2(n) - 3)))
             ratio = start
-            return [start * ratio ** i for i in range(n)]
+            return [start * ratio**i for i in range(n)]
 
         if math.log2(heads).is_integer():
             return slopes_power_of_2(heads)
 
         closest_power_of_2 = 2 ** math.floor(math.log2(heads))
-        return slopes_power_of_2(closest_power_of_2) \
-            + slopes_power_of_2(2 * closest_power_of_2)[0::2][:heads - closest_power_of_2]
+        return (
+            slopes_power_of_2(closest_power_of_2)
+            + slopes_power_of_2(2 * closest_power_of_2)[0::2][: heads - closest_power_of_2]
+        )
 
-    def get_bias(self, i: int, j: int, offset: int = 0, pos: torch.Tensor | None = None) -> torch.Tensor:
+    def get_bias(
+        self, i: int, j: int, offset: int = 0, pos: torch.Tensor | None = None
+    ) -> torch.Tensor:
         if pos is None:
             i_arange = torch.arange(offset, i + offset, dtype=torch.int, device=self.slopes.device)
             j_arange = torch.arange(j, dtype=torch.int, device=self.slopes.device)
@@ -478,12 +526,14 @@ class ALiBiPositionalBias(nn.Module):
         return self.slopes
 
     def forward(
-            self,
-            i: int, j: int,
-            offset: int = 0, prefix: int = 0,
-            bias: torch.Tensor | None = None,
-            q: torch.Tensor | None = None,
-            k: torch.Tensor | None = None
+        self,
+        i: int,
+        j: int,
+        offset: int = 0,
+        prefix: int = 0,
+        bias: torch.Tensor | None = None,
+        q: torch.Tensor | None = None,
+        k: torch.Tensor | None = None,
     ) -> torch.Tensor:
         if bias is not None and bias.shape[-2] >= i and bias.shape[-1] >= j:
             bias = bias[..., :i, :j] if bias.shape[-2] > i or bias.shape[-1] > j else bias
@@ -492,17 +542,21 @@ class ALiBiPositionalBias(nn.Module):
 
         if self.contextual_heads > 0:
             assert q is not None and k is not None
-            q = q[:, :self.contextual_heads]
-            k = k[:, None] if k.ndim == 3 else k[:, :self.contextual_heads]
+            q = q[:, : self.contextual_heads]
+            k = k[:, None] if k.ndim == 3 else k[:, : self.contextual_heads]
             dots = einsum("b h i d, b h j d -> b h i j", q, k) * (q.shape[-1] ** -0.5)
             c_bias = -dots.sigmoid()
-            c_pos = c_bias.triu(diagonal=offset + 1).cumsum(dim=-1) \
-                + c_bias.tril(diagonal=offset - 1).flip(-1).cumsum(dim=-1).flip(-1)
+            c_pos = c_bias.triu(diagonal=offset + 1).cumsum(dim=-1) + c_bias.tril(
+                diagonal=offset - 1
+            ).flip(-1).cumsum(dim=-1).flip(-1)
 
-            bias = torch.cat([
-                c_pos,
-                bias[None].expand(q.shape[0], self.total_heads - self.contextual_heads, -1, -1),
-            ], dim=1)
+            bias = torch.cat(
+                [
+                    c_pos,
+                    bias[None].expand(q.shape[0], self.total_heads - self.contextual_heads, -1, -1),
+                ],
+                dim=1,
+            )
 
         slopes = self.get_slopes()
         if self.total_heads - slopes.shape[-3] > 0:
@@ -515,12 +569,18 @@ class ALiBiPositionalBias(nn.Module):
 
         if self.heads[0] != sum(self.heads):
             mask_value = -torch.finfo(attn_bias.dtype).max
-            mask_bias = attn_bias.new_full((attn_bias.shape[-2], attn_bias.shape[-1]), fill_value=mask_value // 2)
+            mask_bias = attn_bias.new_full(
+                (attn_bias.shape[-2], attn_bias.shape[-1]), fill_value=mask_value // 2
+            )
 
             if self.heads[1] > 0:
-                attn_bias[self.heads[0]:sum(self.heads[:2])] += torch.triu(mask_bias, diagonal=offset + 1)
+                attn_bias[self.heads[0] : sum(self.heads[:2])] += torch.triu(
+                    mask_bias, diagonal=offset + 1
+                )
             if self.heads[2] > 0:
-                attn_bias[sum(self.heads[:2]):sum(self.heads)] += torch.tril(mask_bias, diagonal=offset - 1)
+                attn_bias[sum(self.heads[:2]) : sum(self.heads)] += torch.tril(
+                    mask_bias, diagonal=offset - 1
+                )
 
         if prefix > 0:
             is_prefix = torch.arange(j, device=attn_bias.device) < prefix
@@ -529,9 +589,10 @@ class ALiBiPositionalBias(nn.Module):
 
             attn_bias = torch.where(
                 is_cross_attn,
-                self.cross_attn_bias if self.cross_attn_bias is not None
+                self.cross_attn_bias
+                if self.cross_attn_bias is not None
                 else attn_bias.new_zeros((self.total_heads, 1, 1)),
-                attn_bias
+                attn_bias,
             )
 
         if self.ignore_positive and self.ignore_attn_bias is not None:
@@ -546,17 +607,21 @@ class ALiBiPositionalBias(nn.Module):
 
 class LearnedALiBiPositionalBias(ALiBiPositionalBias):
     def __init__(
-            self,
-            heads: int | tuple[int, int, int],
-            total_heads: int,
-            contextual_heads: int = 0,
-            symmetric: bool = True,
-            prefix: bool = False,
-            ignore_positive: bool = False
+        self,
+        heads: int | tuple[int, int, int],
+        total_heads: int,
+        contextual_heads: int = 0,
+        symmetric: bool = True,
+        prefix: bool = False,
+        ignore_positive: bool = False,
     ):
         super().__init__(
-            heads, total_heads, contextual_heads=contextual_heads,
-            symmetric=symmetric, prefix=prefix, ignore_positive=ignore_positive
+            heads,
+            total_heads,
+            contextual_heads=contextual_heads,
+            symmetric=symmetric,
+            prefix=prefix,
+            ignore_positive=ignore_positive,
         )
         log_slopes = torch.log(self.slopes)
         self.learned_logslopes = nn.Parameter(log_slopes)
@@ -571,9 +636,9 @@ class RotaryEmbedding(nn.Module):
         dim: int,
         use_xpos: bool = False,
         scale_base: float = 512,
-        interpolation_factor: float = 1.,
+        interpolation_factor: float = 1.0,
         base: float = 10000,
-        base_rescale_factor: float = 1.
+        base_rescale_factor: float = 1.0,
     ):
         super().__init__()
         self.dim = dim
@@ -583,12 +648,12 @@ class RotaryEmbedding(nn.Module):
         # https://www.reddit.com/r/LocalLLaMA/comments/14lz7j5/ntkaware_scaled_rope_allows_llama_models_to_have/
         base *= base_rescale_factor ** (dim / (dim - 2))
 
-        inv_freq = 1. / (base ** (torch.arange(0, dim, 2).float() / dim))
+        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
         self.register_buffer("inv_freq", inv_freq)
 
         self.register_buffer("freqs", torch.empty(1, 0, dim), persistent=False)
 
-        assert interpolation_factor >= 1.
+        assert interpolation_factor >= 1.0
         self.interpolation_factor = interpolation_factor
 
         if not use_xpos:
@@ -601,15 +666,20 @@ class RotaryEmbedding(nn.Module):
         self.register_buffer("scale", scale)
 
     @torch.autocast("cuda", enabled=False)
-    def get_pos_emb(self, x: torch.Tensor, seq_len: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_pos_emb(
+        self, x: torch.Tensor, seq_len: int | None = None
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         seq_len = x.shape[1] if seq_len is None else seq_len
 
         if seq_len > self.freqs.shape[-2]:
             t = torch.arange(seq_len, dtype=self.inv_freq.dtype, device=x.device)[None]
             max_pos = t.max()
 
-            freqs = torch.einsum("b i , j -> b i j", t.type_as(self.inv_freq), self.inv_freq) / self.interpolation_factor
-            freqs = torch.stack((freqs, freqs), dim = -1)
+            freqs = (
+                torch.einsum("b i , j -> b i j", t.type_as(self.inv_freq), self.inv_freq)
+                / self.interpolation_factor
+            )
+            freqs = torch.stack((freqs, freqs), dim=-1)
             shape = freqs.shape
             freqs = freqs.view(shape[:-2] + (-1,))
             self.freqs = freqs
@@ -617,11 +687,11 @@ class RotaryEmbedding(nn.Module):
             freqs = self.freqs
 
         if self.scale is None:
-            return freqs, torch.tensor(1., device=x.device)
+            return freqs, torch.tensor(1.0, device=x.device)
 
         power = (t - (max_pos // 2)) / self.scale_base
         scale = self.scale ** power[:, None]
-        scale = torch.stack((scale, scale), dim = -1)
+        scale = torch.stack((scale, scale), dim=-1)
         scale = scale.view(shape)
 
         return freqs, scale
@@ -633,7 +703,9 @@ class RotaryEmbedding(nn.Module):
         x = torch.stack((-x2, x1), dim=-1)
         return x.view(shape)
 
-    def apply_rotary_pos_emb(self, t: torch.Tensor, freqs: torch.Tensor, scale: torch.Tensor) -> torch.Tensor:
+    def apply_rotary_pos_emb(
+        self, t: torch.Tensor, freqs: torch.Tensor, scale: torch.Tensor
+    ) -> torch.Tensor:
         rot_dim, seq_len, orig_dtype = freqs.shape[-1], t.shape[-2], t.dtype
 
         freqs = freqs[:, -seq_len:, :]
@@ -649,10 +721,10 @@ class RotaryEmbedding(nn.Module):
         return out.type(orig_dtype)
 
     def forward(
-            self,
-            x: torch.Tensor,
-            seq_len: int | None = None,
-            pos_emb: tuple[torch.Tensor, torch.Tensor] | None = None
+        self,
+        x: torch.Tensor,
+        seq_len: int | None = None,
+        pos_emb: tuple[torch.Tensor, torch.Tensor] | None = None,
     ) -> torch.Tensor:
         pos_emb, scale = self.get_pos_emb(x, seq_len=seq_len) if pos_emb is None else pos_emb
         left = pos_emb.shape[-1]

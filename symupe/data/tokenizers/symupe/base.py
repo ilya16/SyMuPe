@@ -1,4 +1,5 @@
-""" SyMuPe (Symbolic Music Performance) encoding for score and performance music sequences. """
+"""SyMuPe (Symbolic Music Performance) encoding for score and performance music sequences."""
+
 from __future__ import annotations
 
 from abc import abstractmethod
@@ -35,12 +36,12 @@ class SyMuPeBase(OctupleM):
         self.config.additional_params["cut_overlapping_notes"] = True
 
     def preprocess_score(
-            self,
-            midi: Score,
-            quantize_times: bool = True,
-            quantize_velocities: bool = False,
-            quantize_time_signatures: bool = True,
-            quantize_tempos: bool = False
+        self,
+        midi: Score,
+        quantize_times: bool = True,
+        quantize_velocities: bool = False,
+        quantize_time_signatures: bool = True,
+        quantize_tempos: bool = False,
     ) -> Score:
         r"""
         Preprocess a score ``symusic.Score`` to be used by SPMuple encoding.
@@ -56,7 +57,7 @@ class SyMuPeBase(OctupleM):
             quantize_times=quantize_times,
             quantize_velocities=quantize_velocities,
             quantize_time_signatures=quantize_time_signatures,
-            quantize_tempos=quantize_tempos
+            quantize_tempos=quantize_tempos,
         )
 
     def preprocess_performance(self, midi: Score) -> Score:
@@ -70,7 +71,7 @@ class SyMuPeBase(OctupleM):
             quantize_times=False,
             quantize_velocities=False,
             quantize_time_signatures=False,
-            quantize_tempos=False
+            quantize_tempos=False,
         )
 
     def encode_score(self, midi: Score) -> TokSequence:
@@ -106,10 +107,10 @@ class SyMuPeBase(OctupleM):
         return tokens
 
     def encode_performance(
-            self,
-            midi: Score,
-            score_tokens: TokSequence | None,
-            note_alignment: np.ndarray | None = None
+        self,
+        midi: Score,
+        score_tokens: TokSequence | None,
+        note_alignment: np.ndarray | None = None,
     ) -> SyMuPeTokSequence:
         r"""
         Tokenize a performance MIDI file into :class:`miditok.TokSequence`.
@@ -144,7 +145,9 @@ class SyMuPeBase(OctupleM):
             # Find:  `score_token_to_perf_token` alignment
             # Transitivity Rule: A->B = C->B[A->C]
 
-            score_note_to_perf_note = np.arange(len(score_tokens)) if note_alignment is None else note_alignment
+            score_note_to_perf_note = (
+                np.arange(len(score_tokens)) if note_alignment is None else note_alignment
+            )
             score_token_to_score_note = score_tokens.token_to_note
             perf_note_to_perf_token = np.argsort(perf_token_to_perf_note)
 
@@ -162,8 +165,7 @@ class SyMuPeBase(OctupleM):
         # Add alignment between notes and tokens
         tokens = vars(tokens)
         tokens.update(
-            token_to_note=perf_token_to_perf_note,
-            score_to_perf_token=score_token_to_perf_token
+            token_to_note=perf_token_to_perf_note, score_to_perf_token=score_token_to_perf_token
         )
         tokens["meta"] = tokens.get("meta", {})
         tokens["meta"].update(time_division=midi.ticks_per_quarter)
@@ -173,10 +175,10 @@ class SyMuPeBase(OctupleM):
 
     @abstractmethod
     def _encode_performance(
-            self,
-            midi: Score,
-            score_tokens: TokSequence,
-            note_alignment: np.ndarray | None = None
+        self,
+        midi: Score,
+        score_tokens: TokSequence,
+        note_alignment: np.ndarray | None = None,
     ) -> TokSequence:
         r"""
         Convert a MIDI file to a performance tokens representation, a sequence of "time steps"
@@ -190,10 +192,10 @@ class SyMuPeBase(OctupleM):
         raise NotImplementedError
 
     def decode_score(
-            self,
-            tokens: TokSequence | list[list[int]] | np.ndarray,
-            programs: list[tuple[int, bool]] | None = None,
-            output_path: str | None = None
+        self,
+        tokens: TokSequence | list[list[int]] | np.ndarray,
+        programs: list[tuple[int, bool]] | None = None,
+        output_path: str | None = None,
     ) -> Score:
         r"""
         Detokenize a sequence of score tokens into a ``symusic.Score``.
@@ -208,12 +210,12 @@ class SyMuPeBase(OctupleM):
         return self.decode(tokens, programs=programs, output_path=output_path)
 
     def decode_performance(
-            self,
-            tokens: TokSequence | list[list[int]] | np.ndarray,
-            programs: list[tuple[int, bool]] | None = None,
-            time_division: int = TICKS_PER_QUARTER,
-            output_path: str | None = None,
-            **kwargs
+        self,
+        tokens: TokSequence | list[list[int]] | np.ndarray,
+        programs: list[tuple[int, bool]] | None = None,
+        time_division: int = TICKS_PER_QUARTER,
+        output_path: str | None = None,
+        **kwargs,
     ) -> Score:
         r"""
         Detokenize a sequences of performance tokens into a ``symusic.Score``.
@@ -227,8 +229,7 @@ class SyMuPeBase(OctupleM):
         :return: the ``symusic.Score`` object.
         """
         if not isinstance(tokens, (TokSequence, list)) or (
-                isinstance(tokens, list)
-                and any(not isinstance(seq, TokSequence) for seq in tokens)
+            isinstance(tokens, list) and any(not isinstance(seq, TokSequence) for seq in tokens)
         ):
             tokens = self._convert_sequence_to_tokseq(tokens)
 
@@ -270,11 +271,11 @@ class SyMuPeBase(OctupleM):
 
     @abstractmethod
     def _decode_performance(
-            self,
-            tokens: TokSequence,
-            programs: list[tuple[int, bool]] | None = None,
-            time_division: int = TICKS_PER_QUARTER,
-            **kwargs
+        self,
+        tokens: TokSequence,
+        programs: list[tuple[int, bool]] | None = None,
+        time_division: int = TICKS_PER_QUARTER,
+        **kwargs,
     ) -> Score:
         r"""
         Convert performance tokens (:class:`miditok.TokSequence`) into a ``symusic.Score``.
@@ -292,10 +293,10 @@ class SyMuPeBase(OctupleM):
         raise NotImplementedError
 
     def synchronize_performance_midi(
-            self,
-            perf_midi: Score,
-            score_midi: Score,
-            note_alignment: np.ndarray
+        self,
+        perf_midi: Score,
+        score_midi: Score,
+        note_alignment: np.ndarray,
     ) -> Score:
         r"""
         Synchronize a performance MIDI file with a score MIDI file bar/beat grid,
@@ -328,13 +329,13 @@ class SyMuPeBase(OctupleM):
             perf_midi=perf_midi,
             onset_pairs=onset_pairs,
             bar_sync=getattr(self, "_bar_tempos", False),
-            inplace=False
+            inplace=False,
         )
 
     @abstractmethod
     def score_tokens_as_performance(
-            self,
-            score_tokens: TokSequence | list[list[int]] | np.ndarray
+        self,
+        score_tokens: TokSequence | list[list[int]] | np.ndarray,
     ) -> TokSequence:
         r"""
         Convert a sequence of score tokens into a sequence of performance tokens,
@@ -358,10 +359,7 @@ class SyMuPeBase(OctupleM):
 
     @property
     def score_sizes(self):
-        return {
-            key: value for key, value in self.sizes.items()
-            if key in SCORE_KEYS
-        }
+        return {key: value for key, value in self.sizes.items() if key in SCORE_KEYS}
 
     @property
     def performance_sizes(self):

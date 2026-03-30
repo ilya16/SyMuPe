@@ -1,4 +1,1 @@
-from .alignment import (
-    AlignmentNote, AlignmentPair, Alignment,
-    PositionPair
-)
+from .alignment import AlignmentNote, AlignmentPair, Alignment, PositionPair

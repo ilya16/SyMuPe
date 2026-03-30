@@ -1,4 +1,5 @@
-""" Embedding Classifier evaluator. """
+"""Embedding Classifier evaluator."""
+
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -25,7 +26,9 @@ class EmbeddingClassifierEvaluator(Evaluator):
         # top-k accuracies
         for k in self.top_k:
             if outputs.logits.shape[-1] >= k:
-                metrics[f"accuracy/top-{k}"] = accuracy_topk(outputs.logits, labels, k=k, reduction=Reduction.MEAN)
+                metrics[f"accuracy/top-{k}"] = accuracy_topk(
+                    outputs.logits, labels, k=k, reduction=Reduction.MEAN
+                )
 
         # MRR from logits
         mr, mrr = mean_reciprocal_rank(outputs.logits, labels, reduction=Reduction.MEAN)
@@ -46,4 +49,4 @@ class EmbeddingClassifierEvaluator(Evaluator):
 
 
 class SequenceClassifierEvaluator(EmbeddingClassifierEvaluator):
-    ...
+    pass

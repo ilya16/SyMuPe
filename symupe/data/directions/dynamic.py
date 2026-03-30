@@ -22,7 +22,7 @@ CONSTANT_DYNAMIC_KEYS = [
     ("f", "forte"),  # loud / strong
     "ff",  # very loud
     "fff",
-    "ffff"
+    "ffff",
 ]
 
 INCREASE_DYNAMIC_KEYS = [
@@ -31,7 +31,7 @@ INCREASE_DYNAMIC_KEYS = [
 
 DECREASE_DYNAMIC_KEYS = [
     ("diminuendo", "dim", "decresc", "dim.", "descresc."),  # getting softer
-    ("smorzando", "smorz.")  # dying away
+    ("smorzando", "smorz."),  # dying away
 ]
 
 ACC_DYNAMIC_KEYS = [
@@ -39,14 +39,14 @@ ACC_DYNAMIC_KEYS = [
     "ffp",
     "pf",
     ("sf", "fz", "sfz", "sffz", "sforzando", "forzando"),
-    ("rf", "rfz", "rinforzando")
+    ("rf", "rfz", "rinforzando"),
 ]
 
 DYNAMIC_DIRECTIONS_MAPS = {
     DynamicClasses.CONSTANT: CONSTANT_DYNAMIC_KEYS,
     DynamicClasses.INCREASE: INCREASE_DYNAMIC_KEYS,
     DynamicClasses.DECREASE: DECREASE_DYNAMIC_KEYS,
-    DynamicClasses.ACCENT: ACC_DYNAMIC_KEYS
+    DynamicClasses.ACCENT: ACC_DYNAMIC_KEYS,
 }
 DYNAMIC_DIRECTIONS_MAPS[DynamicClasses.ALL] = sum(DYNAMIC_DIRECTIONS_MAPS.values(), [])
 

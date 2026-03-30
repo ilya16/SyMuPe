@@ -3,6 +3,7 @@ Trainer.
 
 As simple as it could be.
 """
+
 from __future__ import annotations
 
 import math
@@ -23,12 +24,18 @@ from symupe import __version__ as symupe_version
 from symupe.models.base import Model, load_state_dict
 from symupe.utils import count_parameters, set_random_seed
 from .callbacks import (
-    TrainerState, TrainerControl,
-    TrainerCallback, CallbackHandler, CallbacksRegistry,
-    PrinterCallback, DefaultFlowCallback, ProgressCallback, TrackerCallback
+    TrainerState,
+    TrainerControl,
+    TrainerCallback,
+    CallbackHandler,
+    CallbacksRegistry,
+    PrinterCallback,
+    DefaultFlowCallback,
+    ProgressCallback,
+    TrackerCallback,
 )
-from .modules import ExperimentConfig
 from .console_logger import setup_logger
+from .modules import ExperimentConfig
 from .optimizers import Optimizer
 from .trainer_config import TrainerConfig
 from .trainer_utils import Accumulator, IntervalStrategy
@@ -43,14 +50,14 @@ DEFAULT_PROGRESS_CALLBACK = ProgressCallback
 
 class Trainer:
     def __init__(
-            self,
-            model: Model,
-            config: TrainerConfig | ExperimentConfig,
-            train_dataset: Dataset | None = None,
-            eval_dataset: Dataset | None = None,
-            collator: Callable[any, any] | None = None,
-            optimizer: Optimizer | None = None,
-            evaluator: Callable[any, any] | None = None
+        self,
+        model: Model,
+        config: TrainerConfig | ExperimentConfig,
+        train_dataset: Dataset | None = None,
+        eval_dataset: Dataset | None = None,
+        collator: Callable[any, any] | None = None,
+        optimizer: Optimizer | None = None,
+        evaluator: Callable[any, any] | None = None,
     ):
         self.model = model
 
@@ -125,10 +132,10 @@ class Trainer:
             is_main_process=self.state.is_main_process,
             process=f"[{os.getpid()}]",
             node_info=f"[{self.config.device}]",
-            message_level=""
+            message_level="",
         )
 
-        logger.info(f"Initialized output directory: {self.config.output_dir}")  # , message_level="INIT")
+        logger.info(f"Initialized output directory: {self.config.output_dir}")
         logger.info(f"Initialized logs directory: {self.config.log_dir}")
 
     def _setup_accelerator(self):
@@ -159,7 +166,9 @@ class Trainer:
         for name, config in callbacks.items():
             self.add_callback(CallbacksRegistry.instantiate(config))
 
-        self.add_callback(PrinterCallback if self.config.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
+        self.add_callback(
+            PrinterCallback if self.config.disable_tqdm else DEFAULT_PROGRESS_CALLBACK
+        )
         logger.info("Built CallbackHandler")
 
     def add_callback(self, callback: TrainerCallback):
@@ -178,17 +187,23 @@ class Trainer:
         # override `self.accelerator.init_trackers` for `tensorboard` logging_dir without `project_name`
         for tracker in self.accelerator.log_with:
             from accelerate.tracking import GeneralTracker
+
             if issubclass(type(tracker), GeneralTracker):
                 # custom trackers are already initialized
                 self.accelerator.trackers.append(tracker)
             else:
                 from accelerate.tracking import LOGGER_TYPE_TO_CLASS
+
                 tracker_init = LOGGER_TYPE_TO_CLASS[str(tracker)]
                 tracker_kwargs = self.config.tracker_kwargs.get(str(tracker), {})
                 if tracker.value == "tensorboard":
-                    self.accelerator.trackers.append(tracker_init("", self.accelerator.logging_dir, **tracker_kwargs))
+                    self.accelerator.trackers.append(
+                        tracker_init("", self.accelerator.logging_dir, **tracker_kwargs)
+                    )
                 elif tracker.value == "wandb":
-                    self.accelerator.trackers.append(tracker_init(self.config.project_name, **tracker_kwargs))
+                    self.accelerator.trackers.append(
+                        tracker_init(self.config.project_name, **tracker_kwargs)
+                    )
 
         if not self.callback_handler.has_callback(TrackerCallback):
             self.add_callback(TrackerCallback(accelerator=self.accelerator))
@@ -202,12 +217,13 @@ class Trainer:
         self.ema_model = None
         if self.config.use_ema:
             from ema_pytorch import EMA
+
             self.ema_model = EMA(
                 self.accelerator.unwrap_model(self.model),
                 beta=self.config.ema_beta,
                 update_after_step=self.config.ema_update_after_step,
                 update_every=self.config.ema_update_every,
-                include_online_model=False
+                include_online_model=False,
             )
             self.ema_model.buffer_names = {}
 
@@ -218,14 +234,16 @@ class Trainer:
             shuffle=is_train and self.config.shuffle and not self.config.eval_mode,
             num_workers=self.config.num_workers,
             collate_fn=self.collator,
-            pin_memory=self.config.pin_memory
+            pin_memory=self.config.pin_memory,
         )
 
     def build_dataloaders(self):
         self.phases = []
         self.train_dataloader = None
         if self.train_dataset is not None:
-            self.train_dataloader = self.build_dataloader(self.train_dataset, is_train=self.config.do_train)
+            self.train_dataloader = self.build_dataloader(
+                self.train_dataset, is_train=self.config.do_train
+            )
             self.callback_handler.train_dataloader = self.train_dataloader
             self.phases.append("train")
             self.train_dataloader = self.accelerator.prepare(self.train_dataloader)
@@ -239,13 +257,17 @@ class Trainer:
             self.eval_dataloader = self.accelerator.prepare(self.eval_dataloader)
             logger.info("Built Evaluation DataLoader")
 
-        assert len(self.phases), "One of `train_dataset`/`eval_dataset` should be explicitly provided."
+        assert len(self.phases), (
+            "One of `train_dataset`/`eval_dataset` should be explicitly provided."
+        )
 
     def build_optimizer(self):
         if self.optimizer is None and self.config.do_train:
             assert self.train_dataloader is not None
 
-            num_update_steps_per_epoch = max(len(self.train_dataloader) // self.config.optimization.grad_accum_steps, 1)
+            num_update_steps_per_epoch = max(
+                len(self.train_dataloader) // self.config.optimization.grad_accum_steps, 1
+            )
             if self.config.max_steps > 0:
                 num_train_steps = self.config.max_steps
             else:
@@ -255,7 +277,7 @@ class Trainer:
                 accelerator=self.accelerator,
                 config=self.config.optimization,
                 model=self.model,
-                num_train_steps=num_train_steps
+                num_train_steps=num_train_steps,
             )
             logger.info("Built Optimizer")
 
@@ -271,7 +293,9 @@ class Trainer:
             if self.state.is_local_main_process:
                 logger.info("Trying to save final checkpoint before exit...")
                 self.state.save_to_json(os.path.join(self.config.output_dir, TRAINER_STATE_NAME))
-                self._save_checkpoint(os.path.join(self.config.output_dir, FINAL_CHECKPOINT_NAME), minimal=False)
+                self._save_checkpoint(
+                    os.path.join(self.config.output_dir, FINAL_CHECKPOINT_NAME), minimal=False
+                )
 
     def _train(self, resume_from_checkpoint: str | float | None = None):
         if not self.config.do_train:
@@ -288,18 +312,23 @@ class Trainer:
         config = self.config
         self.is_in_train = True
 
-        self.callback_handler.on_train_begin(self.config, self.state, self.control, exp_config=self.exp_config)
+        self.callback_handler.on_train_begin(
+            self.config, self.state, self.control, exp_config=self.exp_config
+        )
 
         if config.max_steps > 0:
             logger.info("`max_steps` is given, it will override any value given in `epochs`")
 
-        total_train_batch_size = config.batch_size * self.accelerator.num_processes * self.grad_accum_steps
+        total_train_batch_size = (
+            config.batch_size * self.accelerator.num_processes * self.grad_accum_steps
+        )
         num_update_steps_per_epoch = max(len(self.train_dataloader) // self.grad_accum_steps, 1)
 
         if config.max_steps > 0:
             max_steps = config.max_steps
-            num_train_epochs = config.max_steps // num_update_steps_per_epoch \
-                               + int(config.max_steps % num_update_steps_per_epoch > 0)
+            num_train_epochs = config.max_steps // num_update_steps_per_epoch + int(
+                config.max_steps % num_update_steps_per_epoch > 0
+            )
         else:
             max_steps = math.ceil(config.epochs * num_update_steps_per_epoch)
             num_train_epochs = math.ceil(config.epochs)
@@ -312,10 +341,14 @@ class Trainer:
         logger.info(f"  Batch size per process = {config.batch_size}")
         logger.info(f"  Num processes = {self.accelerator.num_processes}")
         logger.info(f"  Gradient accumulation steps = {self.grad_accum_steps}")
-        logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
+        logger.info(
+            f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}"
+        )
         logger.info(f"  Total optimization steps = {max_steps}")
         logger.info(f"  Model parameters = {count_parameters(self.model):_}")
-        logger.info(f"  Optimized model parameters = {count_parameters(self.model, requires_grad=True):_}")
+        logger.info(
+            f"  Optimized model parameters = {count_parameters(self.model, requires_grad=True):_}"
+        )
         logger.complete()
 
         epochs_trained = self.state.global_step // num_update_steps_per_epoch
@@ -343,7 +376,9 @@ class Trainer:
         elif self.eval_dataloader is not None:
             eval_dataloader = self.eval_dataloader
         elif self.config.do_eval:
-            logger.warning("Trainer has no `eval_dataloader` and `eval_dataset` is not provided. Skipping evaluation.")
+            logger.warning(
+                "Trainer has no `eval_dataloader` and `eval_dataset` is not provided. Skipping evaluation."
+            )
             return
         else:
             return
@@ -368,8 +403,11 @@ class Trainer:
                 "state": self.state.to_json_string(),
             },
             "model": {
-                "config": OmegaConf.to_container(self.exp_config.model, resolve=True)
-                if self.exp_config is not None else None,
+                "config": (
+                    OmegaConf.to_container(self.exp_config.model, resolve=True)
+                    if self.exp_config is not None
+                    else None
+                ),
                 "state_dict": self.accelerator.get_state_dict(self.model),
             },
         }
@@ -412,8 +450,14 @@ class Trainer:
             operator = np.greater if self.config.metric_maximize else np.less
 
             if self.state.best_metric is None or operator(eval_metric, self.state.best_metric):
-                message = f"Metric improvement on evaluation set ({self.config.metric_for_best_model}: "
-                message += f"{self.state.best_metric:7.5f} -> " if self.state.best_metric is not None else ""
+                message = (
+                    f"Metric improvement on evaluation set ({self.config.metric_for_best_model}: "
+                )
+                message += (
+                    f"{self.state.best_metric:7.5f} -> "
+                    if self.state.best_metric is not None
+                    else ""
+                )
                 message += f"{eval_metric:7.5f})"
                 logger.info(message)
                 self.state.best_metric = eval_metric
@@ -426,16 +470,20 @@ class Trainer:
             self._save_checkpoint(checkpoint_path, minimal=not self.config.save_optimizer)
             self.state.last_model_checkpoint = checkpoint_path
 
-            if config.save_rewrite_checkpoint and last_checkpoint_path and os.path.exists(last_checkpoint_path):
+            if (
+                config.save_rewrite_checkpoint
+                and last_checkpoint_path
+                and os.path.exists(last_checkpoint_path)
+            ):
                 os.remove(last_checkpoint_path)
 
         if is_best:
             copyfile(checkpoint_path, os.path.join(config.output_dir, BEST_CHECKPOINT_NAME))
 
     def _maybe_log_save_evaluate(
-            self,
-            eval_dataset: Dataset | None = None,
-            logs: dict | None = None,
+        self,
+        eval_dataset: Dataset | None = None,
+        logs: dict | None = None,
     ):
         if self.control.should_log:
             self.callback_handler.on_log(self.config, self.state, self.control, logs=logs)
@@ -456,16 +504,16 @@ class Trainer:
         if isinstance(resume_from_checkpoint, bool):
             if resume_from_checkpoint:
                 resume_from_checkpoint = os.path.join(self.config.output_dir, FINAL_CHECKPOINT_NAME)
-                assert os.path.exists(resume_from_checkpoint), \
-                    f"`resume_from_checkpoint` is set to True, " \
+                assert os.path.exists(resume_from_checkpoint), (
+                    f"`resume_from_checkpoint` is set to True, "
                     f"but checkpoint {resume_from_checkpoint} is not found in `output_dir`"
+                )
             else:
                 resume_from_checkpoint = None
 
         if resume_from_checkpoint is not None:
             self.load_checkpoint(
-                checkpoint_path=resume_from_checkpoint,
-                warm_start=self.config.warm_start
+                checkpoint_path=resume_from_checkpoint, warm_start=self.config.warm_start
             )
 
         if self.config.finetune_layers:
@@ -482,32 +530,46 @@ class Trainer:
             model_state = checkpoint_dict["model"]["state_dict"]
             if warm_start:
                 logger.info("Warm start is enabled.")
-                model.load(model_state, self.config.ignore_layers, self.config.ignore_mismatched_keys)
+                model.load(
+                    model_state, self.config.ignore_layers, self.config.ignore_mismatched_keys
+                )
 
                 if "optimizer" in checkpoint_dict and self.config.restore_optimizer:
-                    self.optimizer.load_state_dict(checkpoint_dict["optimizer"], self.config.restore_lr)
+                    self.optimizer.load_state_dict(
+                        checkpoint_dict["optimizer"], self.config.restore_lr
+                    )
             else:
                 model.load(model_state, None, False)
 
                 if "optimizer" in checkpoint_dict:
-                    self.optimizer.load_state_dict(checkpoint_dict["optimizer"], self.config.restore_lr)
+                    self.optimizer.load_state_dict(
+                        checkpoint_dict["optimizer"], self.config.restore_lr
+                    )
 
                 trainer_state_path = os.path.join(self.config.output_dir, TRAINER_STATE_NAME)
                 if "experiment" in checkpoint_dict and "state" in checkpoint_dict["experiment"]:
-                    self.state = TrainerState.from_json_string(checkpoint_dict["experiment"]["state"])
+                    self.state = TrainerState.from_json_string(
+                        checkpoint_dict["experiment"]["state"]
+                    )
                     logger.info("Loaded trainer state from the checkpoint.")
                 elif os.path.exists(trainer_state_path):
                     self.state = self.state.load_from_json(trainer_state_path)
                     logger.info(f"Loaded trainer state from `{trainer_state_path}`.")
                 else:
-                    logger.warning("`trainer_state_path` is not found, the training progress will start from scratch "
-                                   "and might be not the expected behaviour.")
+                    logger.warning(
+                        "`trainer_state_path` is not found, the training progress will start from scratch "
+                        "and might be not the expected behaviour."
+                    )
 
                 self.state.is_main_process = self.accelerator.is_main_process
                 self.state.is_local_main_process = self.accelerator.is_local_main_process
 
             if self.ema_model and self.ema_model is not None and "ema_model" in checkpoint_dict:
-                load_state_dict(self.ema_model, checkpoint_dict["ema_model"]["ema_model"], ignore_mismatched_keys=True)
+                load_state_dict(
+                    self.ema_model,
+                    checkpoint_dict["ema_model"]["ema_model"],
+                    ignore_mismatched_keys=True,
+                )
 
         logger.info(f"Loaded checkpoint `{checkpoint_path}`.")
 
@@ -526,10 +588,9 @@ class Trainer:
         if self.optimizer is not None:
             self.optimizer.zero_grad()
 
-        # torch.cuda.empty_cache()
-
+        # accumulating metrics for multiple gradient accumulation steps
         epoch_stats = Accumulator()
-        stats_accumulator = Accumulator()  # accumulating metrics for multiple gradient accumulation steps
+        stats_accumulator = Accumulator()
 
         accum_steps = self.grad_accum_steps if is_train else 1
         batches_in_epoch = len(dataloader)
@@ -537,7 +598,9 @@ class Trainer:
             batches_in_epoch = max(1, min(len(dataloader), config.eval_batches))
         steps_in_epoch = math.ceil(batches_in_epoch / accum_steps)
 
-        self.callback_handler.on_epoch_begin(self.config, self.state, self.control, steps_in_epoch=steps_in_epoch)
+        self.callback_handler.on_epoch_begin(
+            self.config, self.state, self.control, steps_in_epoch=steps_in_epoch
+        )
 
         _epoch_step = self.state.epoch_step
         with torch.set_grad_enabled(is_train):
@@ -565,11 +628,15 @@ class Trainer:
 
                 stats_accumulator.update_value("loss", loss.detach())
                 if losses is not None:
-                    stats_accumulator.update_values({f"loss/{key}": value.detach() for key, value in losses.items()})
+                    stats_accumulator.update_values(
+                        {f"loss/{key}": value.detach() for key, value in losses.items()}
+                    )
 
                 if self.evaluator is not None:
                     metrics = self.evaluator(inputs, outputs)
-                    stats_accumulator.update_values({key: value.detach() for key, value in metrics.items()})
+                    stats_accumulator.update_values(
+                        {key: value.detach() for key, value in metrics.items()}
+                    )
 
                 self.callback_handler.on_substep_end(self.config, self.state, self.control)
 
@@ -588,10 +655,12 @@ class Trainer:
                     epoch_stats.update_values(stats_accumulator.mean_values)
 
                     self.callback_handler.on_step_end(
-                        self.config, self.state, self.control,
+                        self.config,
+                        self.state,
+                        self.control,
                         epoch_stats=epoch_stats.mean_values,
                         lr=self.optimizer.get_last_lr()[0] if self.optimizer is not None else None,
-                        grad_norm=grad_norm
+                        grad_norm=grad_norm,
                     )
 
                     if is_train:
@@ -600,15 +669,21 @@ class Trainer:
                         if self.control.should_log:
                             logs = {
                                 key: value.mean().item()
-                                for key, value in self.accelerator.gather(stats_accumulator.mean_values).items()
+                                for key, value in self.accelerator.gather(
+                                    stats_accumulator.mean_values
+                                ).items()
                             }
-                            logs.update(**{
-                                "stats/time": time.perf_counter() - start_time,
-                                "stats/time/data": time_data,
-                                "stats/time/model": time_model,
-                                "stats/learning_rate": self.optimizer.get_last_lr()[0],
-                                "stats/grad_norm": float(grad_norm) if grad_norm is not None else None
-                            })
+                            logs.update(
+                                **{
+                                    "stats/time": time.perf_counter() - start_time,
+                                    "stats/time/data": time_data,
+                                    "stats/time/model": time_model,
+                                    "stats/learning_rate": self.optimizer.get_last_lr()[0],
+                                    "stats/grad_norm": (
+                                        float(grad_norm) if grad_norm is not None else None
+                                    ),
+                                }
+                            )
                             logs = {f"train_step/{key}": value for key, value in logs.items()}
 
                         # potential model evaluation
@@ -617,7 +692,9 @@ class Trainer:
                         # reset back to training
                         self.control.is_train = True
                         self.control.should_epoch_stop = False  # might still do training
-                        self.state.epoch_step = int((idx + 1) / accum_steps)  # might be reset during evaluation
+
+                        # might be reset during evaluation
+                        self.state.epoch_step = int((idx + 1) / accum_steps)
 
                     stats_accumulator.reset()
 
@@ -634,11 +711,7 @@ class Trainer:
         }
         logs = {f"{prefix}/{key}": value for key, value in metrics.items()}
 
-        # eval_logs = None
-        # if self.evaluator is not None and not is_train:
-        #     eval_logs = self.evaluator.on_eval_epoch_end(inputs=batch, outputs=outputs)
-
-        self.callback_handler.on_log(self.config, self.state, self.control, logs=logs)  # , eval_logs=eval_logs)
+        self.callback_handler.on_log(self.config, self.state, self.control, logs=logs)
 
         self.callback_handler.on_epoch_end(self.config, self.state, self.control, metrics=metrics)
 
@@ -646,7 +719,7 @@ class Trainer:
             self._maybe_log_save_evaluate()
         else:
             self.state.epoch_step = _epoch_step
-        # torch.cuda.empty_cache()
+
         self.accelerator.wait_for_everyone()
 
         return metrics

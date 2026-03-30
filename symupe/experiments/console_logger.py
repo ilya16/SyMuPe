@@ -1,4 +1,5 @@
-""" Console and File Logger. """
+"""Console and File Logger."""
+
 from __future__ import annotations
 
 from loguru import logger

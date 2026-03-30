@@ -23,4 +23,4 @@ class ModelWrapper(nn.Module):
         self.model = model
 
     def forward(self, tokens, labels=None, **kwargs):
-        ...
+        pass

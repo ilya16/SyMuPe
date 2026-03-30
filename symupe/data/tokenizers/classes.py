@@ -1,4 +1,5 @@
-""" Extended miditok classes. """
+"""Extended miditok classes."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -8,7 +9,8 @@ import numpy as np
 import torch
 from miditok.classes import (
     TokSequence as MidiTokTokSequence,
-    TokenizerConfig as MidiTokTokenizerConfig, Event
+    TokenizerConfig as MidiTokTokenizerConfig,
+    Event,
 )
 
 from symupe.utils import ExplicitEnum
@@ -44,17 +46,16 @@ ENCODING_SORTING = {
     SortingType.SCORE: {
         EncodingType.SCORE,
         EncodingType.PLAIN_SCORE,
-        EncodingType.REL_PERFORMANCE
+        EncodingType.REL_PERFORMANCE,
     },
     SortingType.TIME: {
-        EncodingType.TIME_PERFORMANCE
+        EncodingType.TIME_PERFORMANCE,
     },
     SortingType.ANY: {
         EncodingType.PERFORMANCE,
-        EncodingType.SCORE_TIME_PERFORMANCE
-    }
+        EncodingType.SCORE_TIME_PERFORMANCE,
+    },
 }
-
 
 SEQUENCE_DEFAULT_ENCODING = {
     SequenceType.SCORE: EncodingType.SCORE,
@@ -96,10 +97,7 @@ class TokSequence(MidiTokTokSequence):
             if data is not None and len(data) > 0:
                 return data[val]
 
-        msg = (
-            "This TokSequence seems to not be initialized, all its attributes "
-            "are None."
-        )
+        msg = "This TokSequence seems to not be initialized, all its attributes are None."
         raise ValueError(msg)
 
     def __slice(self, sli: slice) -> TokSequence:
@@ -214,9 +212,9 @@ class TokenizerConfig(MidiTokTokenizerConfig):
     """
 
     def __init__(
-            self,
-            special_tokens: Sequence[str] = SPECIAL_TOKENS,
-            **kwargs
+        self,
+        special_tokens: Sequence[str] = SPECIAL_TOKENS,
+        **kwargs,
     ):
         super().__init__(special_tokens=special_tokens, **kwargs)
 
@@ -228,7 +226,7 @@ SEQUENCE_TRANSFORMS = {
         EncodingType.PERFORMANCE,  # zero deviations and times based on score tempos
         EncodingType.REL_PERFORMANCE,  # zero deviations
         EncodingType.TIME_PERFORMANCE,  # times based on score tempos
-        EncodingType.SCORE_TIME_PERFORMANCE  # score tokens + times based on score tempos
+        EncodingType.SCORE_TIME_PERFORMANCE,  # score tokens + times based on score tempos
     ],
     SequenceType.PERFORMANCE: [
         EncodingType.SCORE,
@@ -236,16 +234,16 @@ SEQUENCE_TRANSFORMS = {
         EncodingType.PERFORMANCE,
         EncodingType.REL_PERFORMANCE,
         EncodingType.TIME_PERFORMANCE,
-        EncodingType.SCORE_TIME_PERFORMANCE
+        EncodingType.SCORE_TIME_PERFORMANCE,
     ],
     SequenceType.SYNC_PERFORMANCE: [
         EncodingType.SCORE,
         EncodingType.PLAIN_SCORE,
         EncodingType.TIME_PERFORMANCE,
-        EncodingType.SCORE_TIME_PERFORMANCE
+        EncodingType.SCORE_TIME_PERFORMANCE,
     ],
     SequenceType.TIME_PERFORMANCE: [
-        EncodingType.TIME_PERFORMANCE
+        EncodingType.TIME_PERFORMANCE,
     ],
     SequenceType.PERFORMANCE_SUSTAIN: [
         EncodingType.SCORE,
@@ -253,11 +251,11 @@ SEQUENCE_TRANSFORMS = {
         EncodingType.PERFORMANCE,
         EncodingType.REL_PERFORMANCE,
         EncodingType.TIME_PERFORMANCE,
-        EncodingType.SCORE_TIME_PERFORMANCE
+        EncodingType.SCORE_TIME_PERFORMANCE,
     ],
     SequenceType.TIME_PERFORMANCE_SUSTAIN: [
-        EncodingType.TIME_PERFORMANCE
-    ]
+        EncodingType.TIME_PERFORMANCE,
+    ],
 }
 
 

@@ -1,19 +1,19 @@
-from .base import (
-    DataCollator,
-    SeqInputs, SeqSegments
-)
+from .base import DataCollator, SeqInputs, SeqSegments
 from .sequence import (
-    SequenceInputs, SequenceCollator,
-    LMSequenceInputs, LMSequenceCollator,
+    SequenceInputs,
+    SequenceCollator,
+    LMSequenceInputs,
+    LMSequenceCollator,
     LMMultiSequenceCollator,
-    MixedLMSequenceInputs, MixedLMSequenceCollator
+    MixedLMSequenceInputs,
+    MixedLMSequenceCollator,
 )
-from .seq2seq import (
-    Seq2SeqInputs, Seq2SeqCollator,
-    LMSeq2SeqInputs, LMSeq2SeqCollator
-)
+from .seq2seq import Seq2SeqInputs, Seq2SeqCollator, LMSeq2SeqInputs, LMSeq2SeqCollator
 from .score_performance import (
-    ScorePerformanceInputs, ScorePerformanceCollator,
-    LMScorePerformanceInputs, LMScorePerformanceCollator,
-    MixedLMScorePerformanceInputs, MixedLMScorePerformanceCollator
+    ScorePerformanceInputs,
+    ScorePerformanceCollator,
+    LMScorePerformanceInputs,
+    LMScorePerformanceCollator,
+    MixedLMScorePerformanceInputs,
+    MixedLMScorePerformanceCollator,
 )

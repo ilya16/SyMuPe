@@ -19,7 +19,7 @@ PROGRAMS = [
     "ScorePerfmMatcher",
     "ErrorDetection",
     "RealignmentMOHMM",
-    "MatchToCorresp"
+    "MatchToCorresp",
 ]
 
 FILE_DIRECTORIES = [
@@ -27,7 +27,7 @@ FILE_DIRECTORIES = [
     "fmt3x",
     "hmm",
     "match",
-    "alignments"
+    "alignments",
 ]
 
 
@@ -60,14 +60,14 @@ FILE_EXT = {
     FileType.MATCH: "_match.txt",
     FileType.ERR_CORRESP: "_err-corresp.txt",
     FileType.CORRESP: "_corresp.txt",
-    FileType.ALIGN: "_align.txt"
+    FileType.ALIGN: "_align.txt",
 }
 
 
 def run_subprocess_with_limits(
-        command: list,
-        timeout: float | None = 1000,
-        memory_limit: int | None = 8_000_000_000
+    command: list,
+    timeout: float | None = 1000,
+    memory_limit: int | None = 8_000_000_000,
 ):
     start_time = time.perf_counter()
 
@@ -99,7 +99,7 @@ def run_subprocess_with_limits(
 
 
 class AlignmentTool(Aligner):
-    """ Wrapper for Nakamura's Alignment Tool.
+    """Wrapper for Nakamura's Alignment Tool.
 
     Links:
         https://midialignment.github.io/demo.html
@@ -107,14 +107,14 @@ class AlignmentTool(Aligner):
     """
 
     def __init__(
-            self,
-            tool_path: str,
-            midi_dir: str,
-            alignments_dir: str,
-            sec_per_quarter_note: float = 1.,  # 0.001,
-            extra_note_region: float = 0.3,  # ∆ in the paper
-            check_err_match: bool = False,
-            min_recall: float = 0.8
+        self,
+        tool_path: str,
+        midi_dir: str,
+        alignments_dir: str,
+        sec_per_quarter_note: float = 1.0,  # 0.001,
+        extra_note_region: float = 0.3,  # ∆ in the paper
+        check_err_match: bool = False,
+        min_recall: float = 0.8,
     ):
         self.tool_path = tool_path
         self._check_and_build_programs()
@@ -136,8 +136,9 @@ class AlignmentTool(Aligner):
         self.programs = {}
         for program in PROGRAMS:
             program_path = os.path.join(self.programs_dir, program)
-            assert os.path.exists(program_path), \
+            assert os.path.exists(program_path), (
                 f"Program {program} is not found under {self.programs_dir} directory"
+            )
             self.programs[program] = program_path
 
     def _build_file_directories(self):
@@ -149,18 +150,22 @@ class AlignmentTool(Aligner):
             self.file_dirs[name] = dirname
 
     def align(
-            self,
-            score_midi: str | Path,
-            perf_midi: str | Path,
-            remove_intermediate_files: bool = True,
-            force_recompute: bool = False,
-            timeout: float | None = 1000.,
-            memory_limit: int | None = 8_000_000_000,
-            retries: int = 0
+        self,
+        score_midi: str | Path,
+        perf_midi: str | Path,
+        remove_intermediate_files: bool = True,
+        force_recompute: bool = False,
+        timeout: float | None = 1000.0,
+        memory_limit: int | None = 8_000_000_000,
+        retries: int = 0,
     ):
         start_time = time.perf_counter()
 
-        paths = {DataType.SCORE.value: {}, DataType.PERFORMANCE.value: {}, DataType.ALIGNMENT.value: {}}
+        paths = {
+            DataType.SCORE.value: {},
+            DataType.PERFORMANCE.value: {},
+            DataType.ALIGNMENT.value: {},
+        }
         error_messages = []
 
         # preprocess score midi
@@ -191,7 +196,7 @@ class AlignmentTool(Aligner):
             force_recompute=force_recompute,
             retries=retries,
             timeout=timeout - (time.perf_counter() - start_time),  # time left
-            memory_limit=memory_limit
+            memory_limit=memory_limit,
         )
         paths[DataType.ALIGNMENT][FileType.MATCH.value] = match
         paths[DataType.ALIGNMENT][FileType.CORRESP.value] = corresp
@@ -201,23 +206,23 @@ class AlignmentTool(Aligner):
 
         alignment = None
         if len(error_messages) == 0:
-            alignment = Alignment(
-                path=paths["align"]["corresp"],
-                filetype="corresp"
-            )
+            alignment = Alignment(path=paths["align"]["corresp"], filetype="corresp")
 
         return alignment, paths, error_messages
 
     def midi_to_spr(
-            self,
-            midi_path: str | Path,
-            force_recompute: bool = False
+        self,
+        midi_path: str | Path,
+        force_recompute: bool = False,
     ):
         program = self.programs["midi2pianoroll"]
         midi_path = Path(midi_path)
 
         if not midi_path.exists():
-            return None, f"Error@midi_to_spr: {FileType.MIDI} file not found ({midi_path})"
+            return (
+                None,
+                f"Error@midi_to_spr: {FileType.MIDI} file not found ({midi_path})",
+            )
 
         spr_path = self.file_dirs[FileType.SPR] / midi_path.relative_to(self.midi_dir)
         spr_path = spr_path.parent / (spr_path.stem + FILE_EXT[FileType.SPR])
@@ -229,67 +234,82 @@ class AlignmentTool(Aligner):
             shutil.move(out_path, spr_path)  # move result to `spr_dir`
 
         if not spr_path.exists():
-            return None, f"Error@midi_to_spr: computation of {FileType.SPR} file failed ({spr_path})"
+            return (
+                None,
+                f"Error@midi_to_spr: computation of {FileType.SPR} file failed ({spr_path})",
+            )
 
         return spr_path, ""
 
-    def spr_to_fmt3x(
-            self,
-            spr_path: str | Path,
-            force_recompute: bool = False
-    ):
+    def spr_to_fmt3x(self, spr_path: str | Path, force_recompute: bool = False):
         program = self.programs["SprToFmt3x"]
         spr_path = Path(spr_path)
 
         if not spr_path.exists():
-            return None, f"Error@spr_to_fmt3x: {FileType.SPR} file not found ({spr_path})"
+            return (
+                None,
+                f"Error@spr_to_fmt3x: {FileType.SPR} file not found ({spr_path})",
+            )
 
-        fmt3x_path = self.file_dirs[FileType.FMT3X] / spr_path.relative_to(self.file_dirs[FileType.SPR])
-        fmt3x_path = fmt3x_path.parent / fmt3x_path.name.replace(FILE_EXT[FileType.SPR], FILE_EXT[FileType.FMT3X])
+        fmt3x_path = self.file_dirs[FileType.FMT3X] / spr_path.relative_to(
+            self.file_dirs[FileType.SPR]
+        )
+        fmt3x_path = fmt3x_path.parent / fmt3x_path.name.replace(
+            FILE_EXT[FileType.SPR], FILE_EXT[FileType.FMT3X]
+        )
 
         if not fmt3x_path.exists() or force_recompute:
             fmt3x_path.parent.mkdir(parents=True, exist_ok=True)  # process directories
             subprocess.run([program, spr_path, fmt3x_path])  # run SprToFmt3x
 
         if not fmt3x_path.exists():
-            return None, f"Error@spr_to_fmt3x: computation of {FileType.FMT3X} file failed ({spr_path})"
+            return (
+                None,
+                f"Error@spr_to_fmt3x: computation of {FileType.FMT3X} file failed ({spr_path})",
+            )
 
         return fmt3x_path, ""
 
-    def fmt3x_to_hmm(
-            self,
-            fmt3x_path: str | Path,
-            force_recompute: bool = False
-    ):
+    def fmt3x_to_hmm(self, fmt3x_path: str | Path, force_recompute: bool = False):
         program = self.programs["Fmt3xToHmm"]
         fmt3x_path = Path(fmt3x_path)
 
         if not fmt3x_path.exists():
-            return None, f"Error@fmt3x_to_hmm: {FileType.FMT3X} file not found ({fmt3x_path})"
+            return (
+                None,
+                f"Error@fmt3x_to_hmm: {FileType.FMT3X} file not found ({fmt3x_path})",
+            )
 
-        hmm_path = self.file_dirs[FileType.HMM] / fmt3x_path.relative_to(self.file_dirs[FileType.FMT3X])
-        hmm_path = hmm_path.parent / hmm_path.name.replace(FILE_EXT[FileType.FMT3X], FILE_EXT[FileType.HMM])
+        hmm_path = self.file_dirs[FileType.HMM] / fmt3x_path.relative_to(
+            self.file_dirs[FileType.FMT3X]
+        )
+        hmm_path = hmm_path.parent / hmm_path.name.replace(
+            FILE_EXT[FileType.FMT3X], FILE_EXT[FileType.HMM]
+        )
 
         if fmt3x_path.exists() and (not hmm_path.exists() or force_recompute):
             hmm_path.parent.mkdir(parents=True, exist_ok=True)  # process directories
             subprocess.run([program, fmt3x_path, hmm_path])  # run Fmt3xToHmm
 
         if not hmm_path.exists():
-            return None, f"Error@fmt3x_to_hmm: computation of {FileType.HMM} file failed ({hmm_path})"
+            return (
+                None,
+                f"Error@fmt3x_to_hmm: computation of {FileType.HMM} file failed ({hmm_path})",
+            )
 
         return hmm_path, ""
 
     def compute_alignment(
-            self,
-            score_spr: str | Path,
-            score_fmt3x: str | Path,
-            score_hmm: str | Path,
-            perf_spr: str | Path,
-            remove_intermediate_files: bool = True,
-            force_recompute: bool = False,
-            timeout: float | None = 1000.,
-            memory_limit: int | None = 8_000_000_000,
-            retries: int = 0
+        self,
+        score_spr: str | Path,
+        score_fmt3x: str | Path,
+        score_hmm: str | Path,
+        perf_spr: str | Path,
+        remove_intermediate_files: bool = True,
+        force_recompute: bool = False,
+        timeout: float | None = 1000.0,
+        memory_limit: int | None = 8_000_000_000,
+        retries: int = 0,
     ):
         start_time = time.perf_counter()
 
@@ -299,13 +319,20 @@ class AlignmentTool(Aligner):
 
         if any([not path.exists() for path in (score_spr, score_fmt3x, score_hmm, perf_spr)]):
             # essential files are missing, abort alignment tool
-            return (None, None), "Error@compute_alignment: at least one of spr/fmt3x/hmm files missing"
+            return (
+                None,
+                None,
+            ), "Error@compute_alignment: at least one of spr/fmt3x/hmm files missing"
 
         # prepare alignment name, directory and paths
-        score, perf = map(lambda x: x.name.replace(FILE_EXT[FileType.SPR], ""), (score_spr, perf_spr))
+        score, perf = map(
+            lambda x: x.name.replace(FILE_EXT[FileType.SPR], ""), (score_spr, perf_spr)
+        )
 
         align_name = f"{perf}_{score}"
-        match_dir = (self.file_dirs[FileType.MATCH] / perf_spr.relative_to(self.file_dirs[FileType.SPR])).parent
+        match_dir = (
+            self.file_dirs[FileType.MATCH] / perf_spr.relative_to(self.file_dirs[FileType.SPR])
+        ).parent
         match_dir.mkdir(parents=True, exist_ok=True)  # process directories
 
         match = match_dir / (align_name + FILE_EXT[FileType.MATCH])
@@ -330,21 +357,32 @@ class AlignmentTool(Aligner):
             if status == 0 and file.exists():
                 return True, ""
             if status == 1:
-                return False, f"TimeoutExpired@compute_alignment: computation of {filetype} " \
-                              f"exceeded time limit of {timeout:.2f}s ({file})"
+                return (
+                    False,
+                    f"TimeoutExpired@compute_alignment: computation of {filetype} "
+                    f"exceeded time limit of {timeout:.2f}s ({file})",
+                )
             elif status == 2:
-                return False, f"MemoryError@compute_alignment: computation of {filetype} " \
-                              f"exceeded memory limit of {memory_limit} bytes ({file})"
+                return (
+                    False,
+                    f"MemoryError@compute_alignment: computation of {filetype} "
+                    f"exceeded memory limit of {memory_limit} bytes ({file})",
+                )
             return False, ""
 
         # compute pre-match
         if not pre_match.exists() or force_recompute:
             for i in range(retries + 1):
                 status = run_subprocess_with_limits(
-                    [self.programs["ScorePerfmMatcher"], score_hmm, perf_spr,
-                     pre_match, str(self.sec_per_quarter_note)],
+                    [
+                        self.programs["ScorePerfmMatcher"],
+                        score_hmm,
+                        perf_spr,
+                        pre_match,
+                        str(self.sec_per_quarter_note),
+                    ],
                     timeout=timeout - (time.perf_counter() - start_time),  # time left
-                    memory_limit=memory_limit
+                    memory_limit=memory_limit,
                 )
 
                 succeed, error = _process_status_error(file=pre_match, filetype=FileType.PRE_MATCH)
@@ -355,14 +393,24 @@ class AlignmentTool(Aligner):
                     return (None, None), error
 
         if not pre_match.exists():
-            return (None, None), f"Error@compute_alignment: computation of {FileType.PRE_MATCH} failed ({pre_match})"
+            return (
+                (None, None),
+                f"Error@compute_alignment: computation of {FileType.PRE_MATCH} failed ({pre_match})",
+            )
 
         # find error regions
         if not err_match.exists() or force_recompute:
             status = run_subprocess_with_limits(
-                [self.programs["ErrorDetection"], score_fmt3x, score_hmm, pre_match, err_match, "0"],
+                [
+                    self.programs["ErrorDetection"],
+                    score_fmt3x,
+                    score_hmm,
+                    pre_match,
+                    err_match,
+                    "0",
+                ],
                 timeout=timeout - (time.perf_counter() - start_time),  # time left
-                memory_limit=memory_limit
+                memory_limit=memory_limit,
             )
 
             succeed, error = _process_status_error(file=err_match, filetype=FileType.ERR_MATCH)
@@ -371,7 +419,10 @@ class AlignmentTool(Aligner):
                 return (None, None), error
 
         if not err_match.exists():
-            return (None, None), f"Error@compute_alignment: computation of {FileType.ERR_MATCH} failed ({err_match})"
+            return (
+                (None, None),
+                f"Error@compute_alignment: computation of {FileType.ERR_MATCH} failed ({err_match})",
+            )
 
         if self.check_err_match:
             if not err_corresp.exists() or force_recompute:
@@ -383,19 +434,28 @@ class AlignmentTool(Aligner):
 
             if recall < self.min_recall:
                 _delete_temporary_files()
-                return (None, None), f"LowMatchRatio@compute_alignment: " \
-                                     f"computation of {FileType.MATCH} halted ({match}), " \
-                                     f"{FileType.ERR_CORRESP}'s match ratio: " \
-                                     f"{recall:.3f} < {self.min_recall:.3f}"
+                return (
+                    (None, None),
+                    f"LowMatchRatio@compute_alignment: "
+                    f"computation of {FileType.MATCH} halted ({match}), "
+                    f"{FileType.ERR_CORRESP}'s match ratio: "
+                    f"{recall:.3f} < {self.min_recall:.3f}",
+                )
 
         # realignment and match file
         if not match.exists() or force_recompute:
             for i in range(retries + 1):
                 status = run_subprocess_with_limits(
-                    [self.programs["RealignmentMOHMM"], score_fmt3x, score_hmm,
-                     err_match, match, str(self.extra_note_region)],
+                    [
+                        self.programs["RealignmentMOHMM"],
+                        score_fmt3x,
+                        score_hmm,
+                        err_match,
+                        match,
+                        str(self.extra_note_region),
+                    ],
                     timeout=timeout - (time.perf_counter() - start_time),  # time left
-                    memory_limit=memory_limit
+                    memory_limit=memory_limit,
                 )
 
                 succeed, error = _process_status_error(file=match, filetype=FileType.MATCH)
@@ -408,12 +468,18 @@ class AlignmentTool(Aligner):
         _delete_temporary_files()
 
         if not match.exists():
-            return (None, None), f"Error@compute_alignment: computation of {FileType.MATCH} failed ({match})"
+            return (
+                (None, None),
+                f"Error@compute_alignment: computation of {FileType.MATCH} failed ({match})",
+            )
 
         # transform match to corresp
         subprocess.run([self.programs["MatchToCorresp"], match, score_spr, corresp])
 
         if not corresp.exists():
-            return (match, None), f"Error@compute_alignment: computation of {FileType.CORRESP} failed ({corresp})"
+            return (
+                (match, None),
+                f"Error@compute_alignment: computation of {FileType.CORRESP} failed ({corresp})",
+            )
 
         return (match, corresp), ""

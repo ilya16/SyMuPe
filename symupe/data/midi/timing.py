@@ -16,7 +16,7 @@ class MIDITimeMapper:
 
         prev_tempo_tick, prev_tempo_time = 0, 0
         scale_factor = 60 / float(midi.ticks_per_quarter)
-        seconds_per_tick = scale_factor / 120.
+        seconds_per_tick = scale_factor / 120.0
 
         tempo_data = []
         for tempo in midi.tempos:

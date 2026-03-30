@@ -1,4 +1,5 @@
-""" Base Model class. """
+"""Base Model class."""
+
 from __future__ import annotations
 
 import os
@@ -43,7 +44,9 @@ class Model(nn.Module, Constructor):
         ...
 
     @abstractmethod
-    def prepare_inputs(self, inputs: object, ema_model: nn.Module | None = None) -> dict[str, torch.Tensor]:
+    def prepare_inputs(
+        self, inputs: object, ema_model: nn.Module | None = None
+    ) -> dict[str, torch.Tensor]:
         """
         Format raw input data into a dictionary of tensors for the model.
 
@@ -54,7 +57,9 @@ class Model(nn.Module, Constructor):
         ...
 
     @staticmethod
-    def allocate_inputs(inputs_dict: dict[str, torch.Tensor], device: torch.device) -> dict[str, torch.Tensor]:
+    def allocate_inputs(
+        inputs_dict: dict[str, torch.Tensor], device: torch.device
+    ) -> dict[str, torch.Tensor]:
         """
         Move a dictionary of tensors to the specified device.
 
@@ -66,8 +71,7 @@ class Model(nn.Module, Constructor):
 
     @staticmethod
     def inject_data_config(
-            config: DictConfig | ModuleConfig | None,
-            dataset: Dataset | None
+        config: DictConfig | ModuleConfig | None, dataset: Dataset | None
     ) -> DictConfig | ModuleConfig | None:
         """
         Update the model configuration with data-specific attributes.
@@ -81,7 +85,7 @@ class Model(nn.Module, Constructor):
 
     @staticmethod
     def cleanup_config(
-            config: DictConfig | ModuleConfig | None
+        config: DictConfig | ModuleConfig | None,
     ) -> DictConfig | ModuleConfig | None:
         """
         Remove extra fields from the configuration.
@@ -92,10 +96,10 @@ class Model(nn.Module, Constructor):
         return config
 
     def load(
-            self,
-            state_dict: dict[str, torch.Tensor],
-            ignore_layers: list[str] | None = None,
-            ignore_mismatched_keys: bool = False
+        self,
+        state_dict: dict[str, torch.Tensor],
+        ignore_layers: list[str] | None = None,
+        ignore_mismatched_keys: bool = False,
     ) -> nn.Module:
         """
         Custom `state_dict` loader.
@@ -118,21 +122,22 @@ class Model(nn.Module, Constructor):
         finetune_list = [layer for layer in exception_list if layer[0] != "!"]
         freeze_list = [layer[1:] for layer in exception_list if layer[0] == "!"]
         for name, param in self.named_parameters():
-            param.requires_grad = (
-                    any(name.startswith(layer) for layer in finetune_list)
-                    or all(not name.startswith(layer) for layer in freeze_list)
+            param.requires_grad = any(name.startswith(layer) for layer in finetune_list) or all(
+                not name.startswith(layer) for layer in freeze_list
             )
             if param.requires_grad:
                 not_frozen.append(name)
-        logger.info(f"The model graph has been frozen, except for the following parameters: {not_frozen}")
+        logger.info(
+            f"The model graph has been frozen, except for the following parameters: {not_frozen}"
+        )
 
     @classmethod
     def from_checkpoint(
-            cls,
-            checkpoint_path: str,
-            from_ema: bool = False,
-            load_weights: bool = True,
-            strict: bool = True
+        cls,
+        checkpoint_path: str,
+        from_ema: bool = False,
+        load_weights: bool = True,
+        strict: bool = True,
     ) -> Model:
         """
         Load a model from a monolithic training checkpoint (.pt).
@@ -172,11 +177,7 @@ class Model(nn.Module, Constructor):
 
     @classmethod
     def from_pretrained(
-            cls,
-            pretrained_path: str,
-            strict: bool = True,
-            device: str = "cpu",
-            **kwargs
+        cls, pretrained_path: str, strict: bool = True, device: str = "cpu", **kwargs
     ) -> Model:
         """
         Load a model from the Hugging Face Hub or a local directory.
@@ -190,8 +191,12 @@ class Model(nn.Module, Constructor):
             config_path = os.path.join(pretrained_path, cls.CONFIG_NAME)
             weights_path = os.path.join(pretrained_path, cls.SAFETENSORS_FILE_NAME)
         else:
-            config_path = hf_hub_download(repo_id=pretrained_path, filename=cls.CONFIG_NAME, **kwargs)
-            weights_path = hf_hub_download(repo_id=pretrained_path, filename=cls.SAFETENSORS_FILE_NAME, **kwargs)
+            config_path = hf_hub_download(
+                repo_id=pretrained_path, filename=cls.CONFIG_NAME, **kwargs
+            )
+            weights_path = hf_hub_download(
+                repo_id=pretrained_path, filename=cls.SAFETENSORS_FILE_NAME, **kwargs
+            )
 
         model_cfg = OmegaConf.create(load_json(config_path))
         model = cls.init(model_cfg)
@@ -203,12 +208,12 @@ class Model(nn.Module, Constructor):
         return model
 
     def save_pretrained(
-            self,
-            save_directory: str,
-            *,
-            config: dict | DictConfig | None = None,
-            tokenizer: MusicTokenizer | None = None,
-            model_version: str = "1.0"
+        self,
+        save_directory: str,
+        *,
+        config: dict | DictConfig | None = None,
+        tokenizer: MusicTokenizer | None = None,
+        model_version: str = "1.0",
     ) -> None:
         """
         Export the model and configuration in a Hugging Face compatible format.
@@ -234,7 +239,7 @@ class Model(nn.Module, Constructor):
             metadata = {
                 "_name_": config_dict.pop("_name_", self.__class__.__name__),
                 "_model_version_": config_dict.pop("_version_", model_version),
-                "_symupe_version_": __version__
+                "_symupe_version_": __version__,
             }
 
             config_dict = {**metadata, **config_dict}
@@ -252,15 +257,15 @@ class Model(nn.Module, Constructor):
         logger.info(f"Model and config saved to {save_directory}")
 
     def push_to_hub(
-            self,
-            repo_id: str,
-            *,
-            config: dict | DictConfig | None = None,
-            tokenizer: MusicTokenizer | None = None,
-            commit_message: str = "Push model using huggingface_hub",
-            private: bool | None = None,
-            token: str | None = None,
-            branch: str | None = None
+        self,
+        repo_id: str,
+        *,
+        config: dict | DictConfig | None = None,
+        tokenizer: MusicTokenizer | None = None,
+        commit_message: str = "Push model using huggingface_hub",
+        private: bool | None = None,
+        token: str | None = None,
+        branch: str | None = None,
     ) -> str:
         """
         Upload model weights, config, and tokenizer to the Hugging Face Hub.
@@ -285,15 +290,15 @@ class Model(nn.Module, Constructor):
                 repo_type="model",
                 folder_path=tmp,
                 commit_message=commit_message,
-                revision=branch
+                revision=branch,
             )
 
 
 def load_state_dict(
-        model: nn.Module,
-        state_dict: dict[str, torch.Tensor],
-        ignore_layers: list[str] | None = None,
-        ignore_mismatched_keys: bool = False
+    model: nn.Module,
+    state_dict: dict[str, torch.Tensor],
+    ignore_layers: list[str] | None = None,
+    ignore_mismatched_keys: bool = False,
 ) -> nn.Module:
     """
     Load model weights from a state dictionary.
@@ -310,8 +315,10 @@ def load_state_dict(
 
     extra_keys = [k for k in state_dict.keys() if k not in model_state]
     if extra_keys:
-        logger.warning(f"The following checkpoint keys are not presented in the model "
-                       f"and will be ignored: {extra_keys}")
+        logger.warning(
+            f"The following checkpoint keys are not presented in the model "
+            f"and will be ignored: {extra_keys}"
+        )
         state_dict = {k: v for k, v in state_dict.items() if k not in extra_keys}
 
     ignored_keys = []
@@ -320,8 +327,10 @@ def load_state_dict(
         for k, v in state_dict.items():
             if v.data.shape != model_state[k].data.shape:
                 auto_ignore_layers.append(k)
-        logger.info(f"Automatically found the checkpoint keys "
-                    f"incompatible with the model: {auto_ignore_layers}")
+        logger.info(
+            f"Automatically found the checkpoint keys "
+            f"incompatible with the model: {auto_ignore_layers}"
+        )
         ignored_keys.extend(auto_ignore_layers)
 
     if ignore_layers:
@@ -330,8 +339,7 @@ def load_state_dict(
                 ignored_keys.append(k)
 
     if ignored_keys:
-        state_dict = {k: v for k, v in state_dict.items()
-                      if all(k != key for key in ignored_keys)}
+        state_dict = {k: v for k, v in state_dict.items() if all(k != key for key in ignored_keys)}
         logger.info(f"The following checkpoint keys were ignored: {ignored_keys}")
 
     model_state.update(state_dict)
@@ -341,7 +349,7 @@ def load_state_dict(
 
 
 class Evaluator(Constructor):
-    """ Base class for all model evaluators. """
+    """Base class for all model evaluators."""
 
     def __init__(self, model: Model, **kwargs):
         self.model = model
@@ -349,20 +357,20 @@ class Evaluator(Constructor):
     @abstractmethod
     @torch.no_grad()
     def __call__(self, inputs: object, outputs: object, **kwargs) -> dict[str, torch.Tensor]:
-        """ Compute metrics from inputs and model outputs. """
-        ...
+        """Compute metrics from inputs and model outputs."""
+        raise NotImplementedError
 
 
 class Generator(Constructor):
-    """ Base class for all model evaluators. """
+    """Base class for all model evaluators."""
 
     def __init__(
-            self,
-            model: Model,
-            tokenizer: SyMuPe,
-            dataset: SequenceDataset | None = None,
-            device: str | torch.device | None = None,
-            **kwargs
+        self,
+        model: Model,
+        tokenizer: SyMuPe,
+        dataset: SequenceDataset | None = None,
+        device: str | torch.device | None = None,
+        **kwargs,
     ):
         self.model = model
         self.tokenizer = tokenizer
@@ -374,8 +382,8 @@ class Generator(Constructor):
 
     @abstractmethod
     def reset(self) -> None:
-        ...
+        raise NotImplementedError
 
     @abstractmethod
     def prepare_sequence(self, **kwargs):
-        ...
+        raise NotImplementedError

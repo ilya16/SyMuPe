@@ -1,4 +1,5 @@
-""" Transformer FeedForward layer. """
+"""Transformer FeedForward layer."""
+
 from dataclasses import dataclass
 
 import torch
@@ -25,20 +26,20 @@ class FeedForwardConfig(ModuleConfig):
     glu: bool = False
     swish: bool = False
     post_act_ln: bool = False
-    dropout: float = 0.
+    dropout: float = 0.0
     bias: bool = False
 
 
 class FeedForward(nn.Module, Constructor):
     def __init__(
-            self,
-            dim: int = 512,
-            mult: float = 4,
-            glu: bool = False,
-            swish: bool = False,
-            post_act_ln: bool = False,
-            dropout: float = 0.,
-            bias: bool = False
+        self,
+        dim: int = 512,
+        mult: float = 4,
+        glu: bool = False,
+        swish: bool = False,
+        post_act_ln: bool = False,
+        dropout: float = 0.0,
+        bias: bool = False,
     ):
         super().__init__()
 
@@ -49,8 +50,8 @@ class FeedForward(nn.Module, Constructor):
             nn.Linear(dim, inner_dim * (1 + int(glu)), bias=bias),
             GLU(activation) if glu else activation,
             nn.LayerNorm(inner_dim) if post_act_ln else nn.Identity(),
-            nn.Dropout(dropout) if dropout > 0. else nn.Identity(),
-            nn.Linear(inner_dim, dim, bias=bias)
+            nn.Dropout(dropout) if dropout > 0.0 else nn.Identity(),
+            nn.Linear(inner_dim, dim, bias=bias),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

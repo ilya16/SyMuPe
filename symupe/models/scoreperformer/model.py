@@ -3,6 +3,7 @@ ScorePerformer model.
 
 Combines PerformanceDecoder with ScoreEncoder and PerformanceEncoder TupleTransformers.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, MISSING
@@ -18,28 +19,23 @@ from symupe.modules.constructor import ModuleConfig
 from symupe.modules.tuple_transformer import (
     TupleTransformerConfig,
     TupleTransformerOutput,
-    TupleTransformer
+    TupleTransformer,
 )
-from symupe.modules.tuple_transformer import (
-    TupleTransformerWrappers,
-    TupleTransformerLMWrapper
-)
+from symupe.modules.tuple_transformer import TupleTransformerWrappers, TupleTransformerLMWrapper
 from symupe.utils import asdict
 from .mmd_transformer import MMDTupleTransformer, MMDTupleTransformerOutput
 from .reversal_classifier import (
     MultiHeadReversalClassifierConfig,
     MultiHeadReversalClassifierOutput,
-    MultiHeadReversalClassifier
+    MultiHeadReversalClassifier,
 )
 from ..base import Model
 from ..classifiers.model import (
     MultiHeadEmbeddingClassifierConfig,
     MultiHeadEmbeddingClassifier,
-    MultiHeadEmbeddingClassifierOutput
+    MultiHeadEmbeddingClassifierOutput,
 )
 
-
-# ScorePerformer model
 
 @dataclass
 class ScorePerformerConfig(ModuleConfig):
@@ -79,19 +75,19 @@ class ScorePerformerOutput:
 
 class ScorePerformer(Model):
     def __init__(
-            self,
-            num_tokens: dict[str, int],
-            dim: int,
-            perf_decoder: DictConfig | TupleTransformerConfig,
-            score_encoder: DictConfig | TupleTransformerConfig | None = None,
-            perf_encoder: DictConfig | TupleTransformerConfig | None = None,
-            classifiers: DictConfig | MultiHeadEmbeddingClassifierConfig | None = None,
-            reversal_classifiers: DictConfig | MultiHeadReversalClassifierConfig | None = None,
-            tie_token_emb: bool = False,
-            tie_token_emb_full: bool = False,
-            tie_encoders: bool = False,
-            mode: str | None = None,
-            num_score_tokens: dict[str, int] | None = None
+        self,
+        num_tokens: dict[str, int],
+        dim: int,
+        perf_decoder: DictConfig | TupleTransformerConfig,
+        score_encoder: DictConfig | TupleTransformerConfig | None = None,
+        perf_encoder: DictConfig | TupleTransformerConfig | None = None,
+        classifiers: DictConfig | MultiHeadEmbeddingClassifierConfig | None = None,
+        reversal_classifiers: DictConfig | MultiHeadReversalClassifierConfig | None = None,
+        tie_token_emb: bool = False,
+        tie_token_emb_full: bool = False,
+        tie_encoders: bool = False,
+        mode: str | None = None,
+        num_score_tokens: dict[str, int] | None = None,
     ):
         super().__init__()
 
@@ -101,7 +97,7 @@ class ScorePerformer(Model):
                 score_encoder,
                 num_tokens=num_score_tokens or num_tokens,
                 dim=score_encoder.get("dim", dim),
-                lm_head=None
+                lm_head=None,
             )
 
         self.perf_encoder = None
@@ -110,7 +106,7 @@ class ScorePerformer(Model):
                 perf_encoder,
                 num_tokens=num_tokens,
                 dim=score_encoder.get("dim", dim),
-                lm_head=None
+                lm_head=None,
             )
 
         if tie_encoders:
@@ -123,7 +119,7 @@ class ScorePerformer(Model):
             assert self.perf_encoder is not None
             self.classifiers = MultiHeadEmbeddingClassifier.init(
                 classifiers,
-                input_dim=self.perf_encoder.embedding_dim
+                input_dim=self.perf_encoder.embedding_dim,
             )
 
         self.reversal_classifiers = None
@@ -131,7 +127,7 @@ class ScorePerformer(Model):
             assert self.perf_encoder is not None and self.score_encoder is not None
             self.reversal_classifiers = MultiHeadReversalClassifier.init(
                 reversal_classifiers,
-                input_dim=self.perf_encoder.embedding_dim
+                input_dim=self.perf_encoder.embedding_dim,
             )
 
         perf_decoder.transformer.cross_attend = self.score_encoder is not None
@@ -143,17 +139,24 @@ class ScorePerformer(Model):
             num_tokens=num_tokens,
             dim=dim,
             context_embedding_dim=context_emb_dim,
-            style_embedding_dim=style_emb_dim
+            style_embedding_dim=style_emb_dim,
         )
 
         if tie_token_emb_full:
+            perf_dec_te = self.perf_decoder.token_emb
             if self.score_encoder is not None:
-                assert (len(self.score_encoder.token_emb.embs) == len(self.perf_decoder.token_emb.embs)
-                        and self.score_encoder.token_emb.total_emb_dim == self.perf_decoder.token_emb.total_emb_dim)
+                score_enc_te = self.score_encoder.token_emb
+                assert (
+                    len(score_enc_te.embs) == len(perf_dec_te.embs)
+                    and score_enc_te.total_emb_dim == perf_dec_te.total_emb_dim
+                )
                 self.score_encoder.token_emb = self.perf_decoder.token_emb
             if self.perf_encoder is not None:
-                assert (len(self.perf_encoder.token_emb.embs) == len(self.perf_decoder.token_emb.embs)
-                        and self.perf_encoder.token_emb.total_emb_dim == self.perf_decoder.token_emb.total_emb_dim)
+                perf_enc_te = self.perf_encoder.token_emb
+                assert (
+                    len(perf_enc_te.embs) == len(perf_dec_te.embs)
+                    and perf_enc_te.total_emb_dim == perf_dec_te.total_emb_dim
+                )
                 self.perf_encoder.token_emb = self.perf_decoder.token_emb
         elif tie_token_emb:
             for key, emb in self.perf_decoder.token_emb.embs.items():
@@ -199,34 +202,40 @@ class ScorePerformer(Model):
         return self.perf_decoder
 
     def forward_encoders(
-            self,
-            perf: torch.Tensor | None = None,
-            perf_values: torch.Tensor | None = None,
-            perf_mask: torch.Tensor | None = None,
-            score: torch.Tensor | None = None,
-            score_values: torch.Tensor | None = None,
-            score_mask: torch.Tensor | None = None,
-            bars: torch.Tensor | None = None,
-            beats: torch.Tensor | None = None,
-            onsets: torch.Tensor | None = None,
-            deadpan_mask: torch.Tensor | None = None,
-            compute_loss: bool = True
+        self,
+        perf: torch.Tensor | None = None,
+        perf_values: torch.Tensor | None = None,
+        perf_mask: torch.Tensor | None = None,
+        score: torch.Tensor | None = None,
+        score_values: torch.Tensor | None = None,
+        score_mask: torch.Tensor | None = None,
+        bars: torch.Tensor | None = None,
+        beats: torch.Tensor | None = None,
+        onsets: torch.Tensor | None = None,
+        deadpan_mask: torch.Tensor | None = None,
+        compute_loss: bool = True,
     ) -> ScorePerformerEncoderOutput:
         score_emb = perf_emb = None
         score_enc_out = perf_enc_out = None
 
         if self.score_encoder is not None:
             score_enc_out = self.score_encoder(
-                tokens=score, values=score_values, mask=score_mask
+                tokens=score,
+                values=score_values,
+                mask=score_mask,
             )
             score_emb = score_enc_out.hidden_state
 
         if self.perf_encoder is not None:
             perf_enc_out = self.perf_encoder(
-                tokens=perf, values=perf_values, mask=perf_mask,
-                bars=bars, beats=beats, onsets=onsets,
+                tokens=perf,
+                values=perf_values,
+                mask=perf_mask,
+                bars=bars,
+                beats=beats,
+                onsets=onsets,
                 deadpan_mask=deadpan_mask,
-                compute_loss=compute_loss
+                compute_loss=compute_loss,
             )
             perf_emb = perf_enc_out.embeddings
 
@@ -235,30 +244,30 @@ class ScorePerformer(Model):
             score_mask=score_mask,
             perf_embeddings=perf_emb,
             score_encoder=score_enc_out,
-            perf_encoder=perf_enc_out
+            perf_encoder=perf_enc_out,
         )
 
     def forward(
-            self,
-            perf: torch.Tensor,
-            perf_values: torch.Tensor | None = None,
-            perf_mask: torch.Tensor | None = None,
-            score: torch.Tensor | None = None,
-            score_values: torch.Tensor | None = None,
-            score_mask: torch.Tensor | None = None,
-            noisy_perf: torch.Tensor | None = None,
-            noisy_perf_values: torch.Tensor | None = None,
-            noisy_perf_mask: torch.Tensor | None = None,
-            masked_perf: torch.Tensor | None = None,
-            masked_perf_values: torch.Tensor | None = None,
-            labels: torch.Tensor | None = None,
-            targets: torch.Tensor | None = None,
-            bars: torch.Tensor | None = None,
-            beats: torch.Tensor | None = None,
-            onsets: torch.Tensor | None = None,
-            directions: torch.Tensor | None = None,
-            perf_context_mask: torch.Tensor | None = None,
-            deadpan_mask: torch.Tensor | None = None
+        self,
+        perf: torch.Tensor,
+        perf_values: torch.Tensor | None = None,
+        perf_mask: torch.Tensor | None = None,
+        score: torch.Tensor | None = None,
+        score_values: torch.Tensor | None = None,
+        score_mask: torch.Tensor | None = None,
+        noisy_perf: torch.Tensor | None = None,
+        noisy_perf_values: torch.Tensor | None = None,
+        noisy_perf_mask: torch.Tensor | None = None,
+        masked_perf: torch.Tensor | None = None,
+        masked_perf_values: torch.Tensor | None = None,
+        labels: torch.Tensor | None = None,
+        targets: torch.Tensor | None = None,
+        bars: torch.Tensor | None = None,
+        beats: torch.Tensor | None = None,
+        onsets: torch.Tensor | None = None,
+        directions: torch.Tensor | None = None,
+        perf_context_mask: torch.Tensor | None = None,
+        deadpan_mask: torch.Tensor | None = None,
     ) -> ScorePerformerOutput:
         enc_out = self.forward_encoders(
             perf=noisy_perf if noisy_perf is not None else perf,
@@ -270,7 +279,7 @@ class ScorePerformer(Model):
             bars=bars,
             beats=beats,
             onsets=onsets,
-            deadpan_mask=deadpan_mask
+            deadpan_mask=deadpan_mask,
         )
 
         perf_dec_out = self.perf_decoder(
@@ -283,7 +292,7 @@ class ScorePerformer(Model):
             labels=labels,
             targets=targets,
             masked_tokens=masked_perf,
-            masked_values=masked_perf_values
+            masked_values=masked_perf_values,
         )
         loss, losses = perf_dec_out.loss, perf_dec_out.losses
 
@@ -297,7 +306,7 @@ class ScorePerformer(Model):
             clf_mask = perf_mask if deadpan_mask is None else perf_mask & (~deadpan_mask[:, None])
             clf_out = self.classifiers(
                 embeddings=enc_out.perf_encoder.full_embeddings[clf_mask],
-                labels=directions[clf_mask]
+                labels=directions[clf_mask],
             )
             if clf_out.loss is not None:
                 loss += clf_out.loss
@@ -311,7 +320,7 @@ class ScorePerformer(Model):
                     rev_labels.append(score[..., i])
             rev_clf_out = self.reversal_classifiers(
                 embeddings=enc_out.perf_encoder.full_embeddings[perf_mask],
-                labels=torch.stack(rev_labels, dim=-1)[perf_mask]
+                labels=torch.stack(rev_labels, dim=-1)[perf_mask],
             )
             if rev_clf_out.loss is not None:
                 loss += rev_clf_out.loss
@@ -324,13 +333,13 @@ class ScorePerformer(Model):
             classifiers=clf_out,
             reversal_classifiers=rev_clf_out,
             loss=loss,
-            losses=losses
+            losses=losses,
         )
 
     def prepare_inputs(
-            self,
-            inputs: dict | ScorePerformanceInputs,
-            ema_model: nn.Module | None = None
+        self,
+        inputs: dict | ScorePerformanceInputs,
+        ema_model: nn.Module | None = None,
     ) -> dict[str, torch.Tensor]:
         if isinstance(inputs, ScorePerformanceInputs):
             inputs = asdict(inputs)
@@ -342,8 +351,7 @@ class ScorePerformer(Model):
             "score": inputs["scores"]["tokens"],
             "score_values": inputs["performances"]["values"],
             "score_mask": inputs["scores"]["mask"],
-
-            "perf_context_mask": inputs["performances"]["context_mask"]
+            "perf_context_mask": inputs["performances"]["context_mask"],
         }
 
         if inputs.get("labels", None):
@@ -371,8 +379,8 @@ class ScorePerformer(Model):
 
     @staticmethod
     def inject_data_config(
-            config: DictConfig | ScorePerformerConfig | None,
-            dataset: ScorePerformanceDataset | None
+        config: DictConfig | ScorePerformerConfig | None,
+        dataset: ScorePerformanceDataset | None,
     ) -> DictConfig | ModuleConfig | None:
         assert isinstance(dataset, ScorePerformanceDataset)
 
@@ -383,7 +391,8 @@ class ScorePerformer(Model):
             if config.get(module) is not None:
                 token_emb_cfg = config[module]["token_embeddings"]
                 token_emb_cfg["token_values"] = {
-                    name: value.tolist() for name, value in dataset.tokenizer.token_values(
+                    name: value.tolist()
+                    for name, value in dataset.tokenizer.token_values(
                         normalize=dataset.normalize_values
                     ).items()
                 }
@@ -398,7 +407,8 @@ class ScorePerformer(Model):
         if rev_clf_cfg is not None and rev_clf_cfg.get("num_classes") is None:
             assert "_token_types_" in rev_clf_cfg
             rev_clf_cfg["num_classes"] = {
-                key: num for key, num in dataset.performance_token_sizes.items()
+                key: num
+                for key, num in dataset.performance_token_sizes.items()
                 if key in rev_clf_cfg["_token_types_"]
             }
             del rev_clf_cfg["_token_types_"]
@@ -407,7 +417,7 @@ class ScorePerformer(Model):
 
     @staticmethod
     def cleanup_config(
-            config: DictConfig | ScorePerformerConfig | None,
+        config: DictConfig | ScorePerformerConfig | None,
     ) -> DictConfig | ModuleConfig | None:
         for key in ["score_encoder", "perf_encoder", "perf_decoder"]:
             if config.get(key) is not None:

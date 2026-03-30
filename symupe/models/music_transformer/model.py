@@ -10,6 +10,7 @@ Available models:
     - DFMMusicTransformer
     - FMMusicTransformer
 """
+
 from __future__ import annotations
 
 from abc import abstractmethod
@@ -26,12 +27,21 @@ from symupe.data.tokenizers import OctupleM, SyMuPe
 from symupe.modules.classes import LanguageModelingMode, ModelWrapper
 from symupe.modules.constructor import ModuleConfig
 from symupe.modules.tuple_transformer import (
-    TupleTransformerConfig, TupleTransformer, TupleTransformerOutput,
+    TupleTransformerConfig,
+    TupleTransformer,
+    TupleTransformerOutput,
     TupleTransformerWrappers,
-    TupleTransformerLMWrapper, TupleTransformerLMOutput,
-    TupleTransformerCFMOutput, TupleTransformerCFMWrapper, CFMIntermediates,
-    TupleTransformerDFMWrapper, TupleTransformerDFMOutput, DFMIntermediates,
-    TupleTransformerFMWrapper, TupleTransformerFMOutput, FMIntermediates
+    TupleTransformerLMWrapper,
+    TupleTransformerLMOutput,
+    TupleTransformerCFMOutput,
+    TupleTransformerCFMWrapper,
+    CFMIntermediates,
+    TupleTransformerDFMWrapper,
+    TupleTransformerDFMOutput,
+    DFMIntermediates,
+    TupleTransformerFMWrapper,
+    TupleTransformerFMOutput,
+    FMIntermediates,
 )
 from symupe.modules.tuple_transformer.flow_matching import resample
 from symupe.utils import asdict
@@ -57,15 +67,15 @@ class _MusicTransformerOutput(TupleTransformerOutput):
 
 class _MusicTransformer(Model):
     def __init__(
-            self,
-            num_tokens: dict[str, int],
-            dim: int,
-            transformer: DictConfig | TupleTransformerConfig,
-            context_num_tokens: dict[str, int] | None = None,
-            score_num_tokens: dict[str, int] | None = None,
-            token_keys: list[str] | None = None,
-            value_keys: list[str] | None = None,
-            wrapper_kwargs: dict | None = None
+        self,
+        num_tokens: dict[str, int],
+        dim: int,
+        transformer: DictConfig | TupleTransformerConfig,
+        context_num_tokens: dict[str, int] | None = None,
+        score_num_tokens: dict[str, int] | None = None,
+        token_keys: list[str] | None = None,
+        value_keys: list[str] | None = None,
+        wrapper_kwargs: dict | None = None,
     ):
         super().__init__()
 
@@ -76,14 +86,22 @@ class _MusicTransformer(Model):
             context_num_tokens=context_num_tokens,
             score_num_tokens=score_num_tokens,
             token_keys=token_keys,
-            value_keys=value_keys
+            value_keys=value_keys,
         )
         self.num_tokens = num_tokens
 
         self.token_keys = self.transformer.token_keys
         self.value_keys = self.transformer.value_keys
-        self.token_indices = [idx for idx, key in enumerate(self.num_tokens) if key in token_keys] if token_keys else None
-        self.value_indices = [idx for idx, key in enumerate(self.num_tokens) if key in value_keys] if value_keys else None
+        self.token_indices = (
+            [idx for idx, key in enumerate(self.num_tokens) if key in token_keys]
+            if token_keys
+            else None
+        )
+        self.value_indices = (
+            [idx for idx, key in enumerate(self.num_tokens) if key in value_keys]
+            if value_keys
+            else None
+        )
 
         self.wrapper_kwargs = wrapper_kwargs or {}
 
@@ -103,16 +121,14 @@ class _MusicTransformer(Model):
 
     @abstractmethod
     def forward(self, *args, **kwargs):
-        ...
+        raise NotImplementedError
 
     @abstractmethod
     def generate(self, *args, **kwargs):
-        ...
+        raise NotImplementedError
 
     def prepare_inputs(
-            self,
-            inputs: dict | SequenceInputs | Seq2SeqInputs,
-            ema_model: nn.Module | None = None
+        self, inputs: dict | SequenceInputs | Seq2SeqInputs, ema_model: nn.Module | None = None
     ) -> dict[str, torch.Tensor]:
         if isinstance(inputs, (SequenceInputs, Seq2SeqInputs)):
             inputs = asdict(inputs)
@@ -126,7 +142,7 @@ class _MusicTransformer(Model):
         inputs_dict = {
             "tokens": inputs[seq_key]["tokens"],
             "values": inputs[seq_key]["values"],
-            "mask": inputs[seq_key]["mask"]
+            "mask": inputs[seq_key]["mask"],
         }
 
         if inputs["context_sequences"] is not None:
@@ -172,8 +188,8 @@ class _MusicTransformer(Model):
 
     @staticmethod
     def inject_data_config(
-            config: DictConfig | MusicTransformerConfig | None,
-            dataset: SequenceDataset
+        config: DictConfig | MusicTransformerConfig | None,
+        dataset: SequenceDataset,
     ) -> DictConfig | ModuleConfig | None:
         assert isinstance(dataset, SequenceDataset)
 
@@ -187,7 +203,8 @@ class _MusicTransformer(Model):
         token_emb_cfg = config["transformer"]["token_embeddings"]
         if token_emb_cfg is not None:
             token_emb_cfg["token_values"] = {
-                key: value.tolist() for key, value in dataset.tokenizer.token_values(normalize=True).items()
+                key: value.tolist()
+                for key, value in dataset.tokenizer.token_values(normalize=True).items()
             }
             token_emb_cfg["special_tokens"] = dataset.tokenizer.special_tokens_dict
 
@@ -196,7 +213,8 @@ class _MusicTransformer(Model):
             assert "_token_types_" in token_pos_emb_cfg
 
             token_pos_emb_cfg["token_dims"] = {
-                key: idx for idx, key in enumerate(dataset.token_sizes.keys())
+                key: idx
+                for idx, key in enumerate(dataset.token_sizes.keys())
                 if key in token_pos_emb_cfg["_token_types_"]
             }
             del token_pos_emb_cfg["_token_types_"]
@@ -209,7 +227,7 @@ class _MusicTransformer(Model):
 
     @staticmethod
     def cleanup_config(
-            config: DictConfig | MusicTransformerConfig | None,
+        config: DictConfig | MusicTransformerConfig | None,
     ) -> DictConfig | ModuleConfig | None:
         if config["transformer"].get("token_embeddings", None) is not None:
             config["transformer"]["token_embeddings"].pop("token_values", None)
@@ -223,21 +241,21 @@ class MusicTransformerConfig(_MusicTransformerConfig):
 
 @dataclass
 class MusicTransformerOutput(_MusicTransformerConfig):
-    ...
+    pass
 
 
 class MusicTransformer(_MusicTransformer):
     def __init__(
-            self,
-            num_tokens: dict[str, int],
-            dim: int,
-            transformer: DictConfig | TupleTransformerConfig,
-            mode: str | None = None,
-            context_num_tokens: dict[str, int] | None = None,
-            score_num_tokens: dict[str, int] | None = None,
-            token_keys: list[str] | None = None,
-            value_keys: list[str] | None = None,
-            wrapper_kwargs: dict | None = None
+        self,
+        num_tokens: dict[str, int],
+        dim: int,
+        transformer: DictConfig | TupleTransformerConfig,
+        mode: str | None = None,
+        context_num_tokens: dict[str, int] | None = None,
+        score_num_tokens: dict[str, int] | None = None,
+        token_keys: list[str] | None = None,
+        value_keys: list[str] | None = None,
+        wrapper_kwargs: dict | None = None,
     ):
         super().__init__(
             num_tokens=num_tokens,
@@ -247,7 +265,7 @@ class MusicTransformer(_MusicTransformer):
             score_num_tokens=score_num_tokens,
             token_keys=token_keys,
             value_keys=value_keys,
-            wrapper_kwargs=wrapper_kwargs
+            wrapper_kwargs=wrapper_kwargs,
         )
 
         self.mode = mode
@@ -285,55 +303,62 @@ class MusicTransformer(_MusicTransformer):
         return self._prepare_for_lm(mode=LanguageModelingMode.MixedLM)
 
     def forward(
-            self,
-            tokens: torch.Tensor,
-            values: torch.Tensor | None = None,
-            mask: torch.Tensor | None = None,
-
-            context: torch.Tensor | None = None,
-            context_mask: torch.Tensor | None = None,
-            context_tokens: torch.Tensor | None = None,
-            context_values: torch.Tensor | None = None,
-            score_tokens: torch.Tensor | None = None,
-            score_values: torch.Tensor | None = None,
-
-            labels: torch.Tensor | None = None,
-            targets: torch.Tensor | None = None,
-            full_labels: torch.Tensor | None = None,
-
-            masked_tokens: torch.Tensor | None = None,
-            masked_values: torch.Tensor | None = None,
-
-            type_ids: torch.Tensor | None = None,
-            task_ids: torch.Tensor | None = None,
-            task_tokens: torch.Tensor | None = None,
-            return_cache: bool = False,
-            output_layer: int | None = None
+        self,
+        tokens: torch.Tensor,
+        values: torch.Tensor | None = None,
+        mask: torch.Tensor | None = None,
+        context: torch.Tensor | None = None,
+        context_mask: torch.Tensor | None = None,
+        context_tokens: torch.Tensor | None = None,
+        context_values: torch.Tensor | None = None,
+        score_tokens: torch.Tensor | None = None,
+        score_values: torch.Tensor | None = None,
+        labels: torch.Tensor | None = None,
+        targets: torch.Tensor | None = None,
+        full_labels: torch.Tensor | None = None,
+        masked_tokens: torch.Tensor | None = None,
+        masked_values: torch.Tensor | None = None,
+        type_ids: torch.Tensor | None = None,
+        task_ids: torch.Tensor | None = None,
+        task_tokens: torch.Tensor | None = None,
+        return_cache: bool = False,
+        output_layer: int | None = None,
     ) -> TupleTransformerOutput | TupleTransformerLMOutput:
         out: TupleTransformerOutput | TupleTransformerLMOutput = self.transformer(
-            tokens, values=values, mask=mask,
-            context=context, context_mask=context_mask,
-            context_tokens=context_tokens, context_values=context_values,
-            score_tokens=score_tokens, score_values=score_values,
-            type_ids=type_ids, task_ids=task_ids, task_tokens=task_tokens,
-            labels=labels, targets=targets, full_labels=full_labels,
-            masked_tokens=masked_tokens, masked_values=masked_values,
-            return_cache=return_cache, output_layer=output_layer
+            tokens,
+            values=values,
+            mask=mask,
+            context=context,
+            context_mask=context_mask,
+            context_tokens=context_tokens,
+            context_values=context_values,
+            score_tokens=score_tokens,
+            score_values=score_values,
+            type_ids=type_ids,
+            task_ids=task_ids,
+            task_tokens=task_tokens,
+            labels=labels,
+            targets=targets,
+            full_labels=full_labels,
+            masked_tokens=masked_tokens,
+            masked_values=masked_values,
+            return_cache=return_cache,
+            output_layer=output_layer,
         )
 
         return out
 
     @torch.inference_mode()
     def generate(
-            self,
-            tokens: torch.Tensor,
-            values: torch.Tensor,
-            tokenizer: OctupleM,
-            temperature: float = 1.,
-            top_k: float | int = -1,
-            top_p: float = 0.8,
-            disable_tqdm: bool = False,
-            **kwargs
+        self,
+        tokens: torch.Tensor,
+        values: torch.Tensor,
+        tokenizer: OctupleM,
+        temperature: float = 1.0,
+        top_k: float | int = -1,
+        top_p: float = 0.8,
+        disable_tqdm: bool = False,
+        **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor, None]:
         assert self.mode is not None
 
@@ -343,9 +368,14 @@ class MusicTransformer(_MusicTransformer):
             inference_fn = self.transformer.generate
 
         out_tokens, out_values = inference_fn(
-            tokens, values=values, tokenizer=tokenizer,
-            temperature=temperature, top_k=top_k, top_p=top_p,
-            disable_tqdm=disable_tqdm, **kwargs
+            tokens,
+            values=values,
+            tokenizer=tokenizer,
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+            disable_tqdm=disable_tqdm,
+            **kwargs,
         )
 
         return out_tokens, out_values, None
@@ -367,25 +397,27 @@ class CFMMusicTransformerOutput(_MusicTransformerOutput):
 
 class CFMMusicTransformer(_MusicTransformer):
     def __init__(
-            self,
-            num_tokens: dict[str, int],
-            dim: int,
-            transformer: DictConfig | TupleTransformerConfig,
-            context_num_tokens: dict[str, int] | None = None,
-            score_num_tokens: dict[str, int] | None = None,
-            pedal_stream: bool = False,
-            context_vectors: bool = False,
-            value_mean: list[float] | dict[str, int] | None = None,
-            value_std: list[float] | dict[str, int] | None = None,
-            value_log: list[str] | None = None,
-            value_keys: list[str] | None = None,
-            tokenizer: SyMuPe | None = None,
-            wrapper_kwargs: dict | None = None
+        self,
+        num_tokens: dict[str, int],
+        dim: int,
+        transformer: DictConfig | TupleTransformerConfig,
+        context_num_tokens: dict[str, int] | None = None,
+        score_num_tokens: dict[str, int] | None = None,
+        pedal_stream: bool = False,
+        context_vectors: bool = False,
+        value_mean: list[float] | dict[str, int] | None = None,
+        value_std: list[float] | dict[str, int] | None = None,
+        value_log: list[str] | None = None,
+        value_keys: list[str] | None = None,
+        tokenizer: SyMuPe | None = None,
+        wrapper_kwargs: dict | None = None,
     ):
         value_keys = value_keys or list(num_tokens.keys())
 
         transformer["input_vectors"] = "cat"
-        transformer["input_vectors_dim"] = (int(context_vectors) + 1) * (len(value_keys) + 2 * int(pedal_stream))
+        transformer["input_vectors_dim"] = (int(context_vectors) + 1) * (
+            len(value_keys) + 2 * int(pedal_stream)
+        )
 
         super().__init__(
             num_tokens=num_tokens,
@@ -394,23 +426,23 @@ class CFMMusicTransformer(_MusicTransformer):
             context_num_tokens=context_num_tokens,
             score_num_tokens=score_num_tokens,
             value_keys=value_keys,
-            wrapper_kwargs=wrapper_kwargs
+            wrapper_kwargs=wrapper_kwargs,
         )
 
         value_mean = value_mean or {}
         if isinstance(value_mean, (dict, DictConfig)):
-            value_mean = [value_mean.get(key, 0.) for key in self.value_keys]
+            value_mean = [value_mean.get(key, 0.0) for key in self.value_keys]
 
         value_std = value_std or {}
         if isinstance(value_std, (dict, DictConfig)):
-            value_std = [value_std.get(key, 1.) for key in self.value_keys]
+            value_std = [value_std.get(key, 1.0) for key in self.value_keys]
 
         value_log = value_log or []
         value_log_ids = []
         for i, key in enumerate(self.num_tokens):
             if key in value_log:
                 value_log_ids.append(i)
-                value_mean[i], value_std[i] = 0., 1.
+                value_mean[i], value_std[i] = 0.0, 1.0
 
         self.register_buffer("value_mean", torch.tensor(value_mean))
         self.register_buffer("value_std", torch.tensor(value_std))
@@ -425,108 +457,128 @@ class CFMMusicTransformer(_MusicTransformer):
     def prepare_for_cfm(self) -> CFMMusicTransformer:
         if isinstance(self.transformer, TupleTransformer):
             self.transformer = TupleTransformerCFMWrapper(
-                self.transformer, tokenizer=self.tokenizer,
-                value_mean=self.value_mean, value_std=self.value_std,
+                self.transformer,
+                tokenizer=self.tokenizer,
+                value_mean=self.value_mean,
+                value_std=self.value_std,
                 context_vectors=self.context_vectors,
-                value_log_ids=self.value_log_ids, value_keys=self.value_keys,
-                **self.wrapper_kwargs
+                value_log_ids=self.value_log_ids,
+                value_keys=self.value_keys,
+                **self.wrapper_kwargs,
             )
         return self
 
     def forward(
-            self,
-            tokens: torch.Tensor,
-            values: torch.Tensor,
-            vectors: torch.Tensor,
-            mask: torch.Tensor | None = None,
-
-            context: torch.Tensor | None = None,
-            context_mask: torch.Tensor | None = None,
-            context_tokens: torch.Tensor | None = None,
-            context_values: torch.Tensor | None = None,
-            score_tokens: torch.Tensor | None = None,
-            score_values: torch.Tensor | None = None,
-
-            labels: torch.Tensor | None = None,
-            targets: torch.Tensor | None = None,
-
-            pedals: torch.Tensor | None = None,
-            type_ids: torch.Tensor | None = None,
-            task_ids: torch.Tensor | None = None,
-            task_tokens: torch.Tensor | None = None,
-            return_cache: bool = False,
-            output_layer: int | None = None,
-            ema_model: nn.Module | None = None
+        self,
+        tokens: torch.Tensor,
+        values: torch.Tensor,
+        vectors: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        context: torch.Tensor | None = None,
+        context_mask: torch.Tensor | None = None,
+        context_tokens: torch.Tensor | None = None,
+        context_values: torch.Tensor | None = None,
+        score_tokens: torch.Tensor | None = None,
+        score_values: torch.Tensor | None = None,
+        labels: torch.Tensor | None = None,
+        targets: torch.Tensor | None = None,
+        pedals: torch.Tensor | None = None,
+        type_ids: torch.Tensor | None = None,
+        task_ids: torch.Tensor | None = None,
+        task_tokens: torch.Tensor | None = None,
+        return_cache: bool = False,
+        output_layer: int | None = None,
+        ema_model: nn.Module | None = None,
     ) -> TupleTransformerCFMOutput:
         out: TupleTransformerCFMOutput = self.transformer(
-            tokens, values=values, vectors=vectors, mask=mask,
-            context=context, context_mask=context_mask,
-            context_tokens=context_tokens, context_values=context_values,
-            score_tokens=score_tokens, score_values=score_values,
+            tokens,
+            values=values,
+            vectors=vectors,
+            mask=mask,
+            context=context,
+            context_mask=context_mask,
+            context_tokens=context_tokens,
+            context_values=context_values,
+            score_tokens=score_tokens,
+            score_values=score_values,
             pedals=pedals if self.pedal_stream else None,
-            type_ids=type_ids, task_ids=task_ids, task_tokens=task_tokens,
-            labels=labels, targets=targets,
-            return_cache=return_cache, output_layer=output_layer, ema_model=ema_model
+            type_ids=type_ids,
+            task_ids=task_ids,
+            task_tokens=task_tokens,
+            labels=labels,
+            targets=targets,
+            return_cache=return_cache,
+            output_layer=output_layer,
+            ema_model=ema_model,
         )
 
         return out
 
     def generate(
-            self,
-            tokens: torch.Tensor,
-            values: torch.Tensor,
-            tokenizer: OctupleM,
-
-            steps: int = 4,
-            step_factor: float = 1.,
-            method: str | None = None,
-            x_0: torch.Tensor | None = None,
-
-            context: torch.Tensor | None = None,
-            context_mask: torch.Tensor | None = None,
-            context_tokens: torch.Tensor | None = None,
-            context_values: torch.Tensor | None = None,
-            context_scale: float = 1.,
-            pedals: torch.Tensor | None = None,
-
-            loss_fn: nn.Module | None = None,
-            context_len: int = 0,
-            gamma: float = 1,
-            norm_fn: Callable | None = None,
-            schedule_fn: Callable | None = None,
-            num_resample: int = 1,
-            resample_period: int = 5,
-            resample_fn: Callable = resample,
-
-            disable_tqdm: bool = False,
-            return_intermediates: bool = False,
-            **kwargs
+        self,
+        tokens: torch.Tensor,
+        values: torch.Tensor,
+        tokenizer: OctupleM,
+        steps: int = 4,
+        step_factor: float = 1.0,
+        method: str | None = None,
+        x_0: torch.Tensor | None = None,
+        context: torch.Tensor | None = None,
+        context_mask: torch.Tensor | None = None,
+        context_tokens: torch.Tensor | None = None,
+        context_values: torch.Tensor | None = None,
+        context_scale: float = 1.0,
+        pedals: torch.Tensor | None = None,
+        loss_fn: nn.Module | None = None,
+        context_len: int = 0,
+        gamma: float = 1,
+        norm_fn: Callable | None = None,
+        schedule_fn: Callable | None = None,
+        num_resample: int = 1,
+        resample_period: int = 5,
+        resample_fn: Callable = resample,
+        disable_tqdm: bool = False,
+        return_intermediates: bool = False,
+        **kwargs,
     ) -> (
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-          | tuple[torch.Tensor, torch.Tensor, torch.Tensor, CFMIntermediates]
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        | tuple[torch.Tensor, torch.Tensor, torch.Tensor, CFMIntermediates]
     ):
         self.prepare_for_cfm()
 
         if self.pedal_stream:
             if pedals is None:
-                pedals = torch.full(values.shape[:-1] + (2,), fill_value=-1., device=tokens.device)
+                pedals = torch.full(values.shape[:-1] + (2,), fill_value=-1.0, device=tokens.device)
         else:
             pedals = None
 
         vectors = values[..., self.value_indices] if self.value_indices is not None else values
 
         out_tokens, out_values, out_pedals, intermediates = self.transformer.generate(
-            tokens, values=values, vectors=vectors,
-            steps=steps, step_factor=step_factor, method=method, x_0=x_0,
+            tokens,
+            values=values,
+            vectors=vectors,
+            steps=steps,
+            step_factor=step_factor,
+            method=method,
+            x_0=x_0,
             tokenizer=tokenizer,
-            context=context, context_mask=context_mask,
-            context_tokens=context_tokens, context_values=context_values,
+            context=context,
+            context_mask=context_mask,
+            context_tokens=context_tokens,
+            context_values=context_values,
             context_scale=context_scale,
             pedals=pedals,
-            loss_fn=loss_fn, context_len=context_len,
-            gamma=gamma, norm_fn=norm_fn, schedule_fn=schedule_fn,
-            num_resample=num_resample, resample_period=resample_period, resample_fn=resample_fn,
-            disable_tqdm=disable_tqdm, **kwargs
+            loss_fn=loss_fn,
+            context_len=context_len,
+            gamma=gamma,
+            norm_fn=norm_fn,
+            schedule_fn=schedule_fn,
+            num_resample=num_resample,
+            resample_period=resample_period,
+            resample_fn=resample_fn,
+            disable_tqdm=disable_tqdm,
+            **kwargs,
         )
 
         if return_intermediates:
@@ -534,9 +586,9 @@ class CFMMusicTransformer(_MusicTransformer):
         return out_tokens, out_values, out_pedals
 
     def prepare_inputs(
-            self,
-            inputs: dict | SequenceInputs | Seq2SeqInputs,
-            ema_model: nn.Module | None = None
+        self,
+        inputs: dict | SequenceInputs | Seq2SeqInputs,
+        ema_model: nn.Module | None = None,
     ) -> dict[str, torch.Tensor]:
         inputs_dict = super().prepare_inputs(inputs=inputs, ema_model=ema_model)
 
@@ -556,7 +608,7 @@ class CFMMusicTransformer(_MusicTransformer):
 
 @dataclass
 class DFMMusicTransformerConfig(_MusicTransformerConfig):
-    ...
+    pass
 
 
 @dataclass
@@ -566,15 +618,15 @@ class DFMMusicTransformerOutput(_MusicTransformerOutput):
 
 class DFMMusicTransformer(_MusicTransformer):
     def __init__(
-            self,
-            num_tokens: dict[str, int],
-            dim: int,
-            transformer: DictConfig | TupleTransformerConfig,
-            context_num_tokens: dict[str, int] | None = None,
-            score_num_tokens: dict[str, int] | None = None,
-            token_keys: list[str] | None = None,
-            tokenizer: SyMuPe | None = None,
-            wrapper_kwargs: dict | None = None
+        self,
+        num_tokens: dict[str, int],
+        dim: int,
+        transformer: DictConfig | TupleTransformerConfig,
+        context_num_tokens: dict[str, int] | None = None,
+        score_num_tokens: dict[str, int] | None = None,
+        token_keys: list[str] | None = None,
+        tokenizer: SyMuPe | None = None,
+        wrapper_kwargs: dict | None = None,
     ):
         super().__init__(
             num_tokens=num_tokens,
@@ -583,7 +635,7 @@ class DFMMusicTransformer(_MusicTransformer):
             context_num_tokens=context_num_tokens,
             score_num_tokens=score_num_tokens,
             token_keys=token_keys,
-            wrapper_kwargs=wrapper_kwargs
+            wrapper_kwargs=wrapper_kwargs,
         )
 
         self.tokenizer = tokenizer
@@ -593,84 +645,97 @@ class DFMMusicTransformer(_MusicTransformer):
     def prepare_for_dfm(self) -> DFMMusicTransformer:
         if isinstance(self.transformer, TupleTransformer):
             self.transformer = TupleTransformerDFMWrapper(
-                self.transformer, tokenizer=self.tokenizer,
-                token_keys=self.token_keys, **self.wrapper_kwargs
+                self.transformer,
+                tokenizer=self.tokenizer,
+                token_keys=self.token_keys,
+                **self.wrapper_kwargs,
             )
         self.mode = LanguageModelingMode.DFM
         return self
 
     def forward(
-            self,
-            tokens: torch.Tensor,
-            values: torch.Tensor,
-            mask: torch.Tensor | None = None,
-
-            context: torch.Tensor | None = None,
-            context_mask: torch.Tensor | None = None,
-            context_tokens: torch.Tensor | None = None,
-            context_values: torch.Tensor | None = None,
-            score_tokens: torch.Tensor | None = None,
-            score_values: torch.Tensor | None = None,
-
-            labels: torch.Tensor | None = None,
-            targets: torch.Tensor | None = None,
-            full_labels: torch.Tensor | None = None,
-
-            masked_tokens: torch.Tensor | None = None,
-            masked_values: torch.Tensor | None = None,
-
-            type_ids: torch.Tensor | None = None,
-            task_ids: torch.Tensor | None = None,
-            task_tokens: torch.Tensor | None = None,
-            return_cache: bool = False,
-            output_layer: int | None = None,
-            ema_model: nn.Module | None = None
+        self,
+        tokens: torch.Tensor,
+        values: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        context: torch.Tensor | None = None,
+        context_mask: torch.Tensor | None = None,
+        context_tokens: torch.Tensor | None = None,
+        context_values: torch.Tensor | None = None,
+        score_tokens: torch.Tensor | None = None,
+        score_values: torch.Tensor | None = None,
+        labels: torch.Tensor | None = None,
+        targets: torch.Tensor | None = None,
+        full_labels: torch.Tensor | None = None,
+        masked_tokens: torch.Tensor | None = None,
+        masked_values: torch.Tensor | None = None,
+        type_ids: torch.Tensor | None = None,
+        task_ids: torch.Tensor | None = None,
+        task_tokens: torch.Tensor | None = None,
+        return_cache: bool = False,
+        output_layer: int | None = None,
+        ema_model: nn.Module | None = None,
     ) -> TupleTransformerDFMOutput:
         self.transformer.tokenizer = self.tokenizer
 
         out: TupleTransformerDFMOutput = self.transformer(
-            tokens, values=values,  mask=mask,
-            context=context, context_mask=context_mask,
-            context_tokens=context_tokens, context_values=context_values,
-            score_tokens=score_tokens, score_values=score_values,
-            task_ids=task_ids, task_tokens=task_tokens,
-            labels=labels, targets=targets, full_labels=full_labels,
-            masked_tokens=masked_tokens, masked_values=masked_values,
-            return_cache=return_cache, output_layer=output_layer, ema_model=ema_model
+            tokens,
+            values=values,
+            mask=mask,
+            context=context,
+            context_mask=context_mask,
+            context_tokens=context_tokens,
+            context_values=context_values,
+            score_tokens=score_tokens,
+            score_values=score_values,
+            task_ids=task_ids,
+            task_tokens=task_tokens,
+            labels=labels,
+            targets=targets,
+            full_labels=full_labels,
+            masked_tokens=masked_tokens,
+            masked_values=masked_values,
+            return_cache=return_cache,
+            output_layer=output_layer,
+            ema_model=ema_model,
         )
 
         return out
 
     def generate(
-            self,
-            tokens: torch.Tensor,
-            values: torch.Tensor,
-            tokenizer: OctupleM | None,
-
-            steps: int = 4,
-            step_factor: float = 1.,
-            method: str | None = None,
-
-            context: torch.Tensor | None = None,
-            context_mask: torch.Tensor | None = None,
-            context_tokens: torch.Tensor | None = None,
-            context_values: torch.Tensor | None = None,
-            context_scale: float = 1.,
-
-            disable_tqdm: bool = False,
-            return_intermediates: bool = False,
-            **kwargs
+        self,
+        tokens: torch.Tensor,
+        values: torch.Tensor,
+        tokenizer: OctupleM | None,
+        steps: int = 4,
+        step_factor: float = 1.0,
+        method: str | None = None,
+        context: torch.Tensor | None = None,
+        context_mask: torch.Tensor | None = None,
+        context_tokens: torch.Tensor | None = None,
+        context_values: torch.Tensor | None = None,
+        context_scale: float = 1.0,
+        disable_tqdm: bool = False,
+        return_intermediates: bool = False,
+        **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor] | tuple[torch.Tensor, torch.Tensor, DFMIntermediates]:
         self.prepare_for_dfm()
         tokenizer = tokenizer or self.tokenizer
 
         out_tokens, out_values, intermediates = self.transformer.generate(
-            tokens, values=values,
-            steps=steps, step_factor=step_factor, method=method, tokenizer=tokenizer,
-            context=context, context_mask=context_mask,
-            context_tokens=context_tokens, context_values=context_values,
+            tokens,
+            values=values,
+            steps=steps,
+            step_factor=step_factor,
+            method=method,
+            tokenizer=tokenizer,
+            context=context,
+            context_mask=context_mask,
+            context_tokens=context_tokens,
+            context_values=context_values,
             context_scale=context_scale,
-            disable_tqdm=disable_tqdm, **kwargs
+            disable_tqdm=disable_tqdm,
+            **kwargs,
         )
 
         if return_intermediates:
@@ -678,9 +743,9 @@ class DFMMusicTransformer(_MusicTransformer):
         return out_tokens, out_values
 
     def prepare_inputs(
-            self,
-            inputs: dict | SequenceInputs | Seq2SeqInputs,
-            ema_model: nn.Module | None = None
+        self,
+        inputs: dict | SequenceInputs | Seq2SeqInputs,
+        ema_model: nn.Module | None = None,
     ) -> dict[str, torch.Tensor]:
         inputs_dict = super().prepare_inputs(inputs=inputs, ema_model=ema_model)
 
@@ -708,19 +773,19 @@ class FMMusicTransformerOutput(_MusicTransformerOutput):
 
 class FMMusicTransformer(_MusicTransformer):
     def __init__(
-            self,
-            num_tokens: dict[str, int],
-            dim: int,
-            transformer: DictConfig | TupleTransformerConfig,
-            token_keys: list[str],
-            value_keys: list[str],
-            context_vectors: bool = False,
-            value_mean: list[float] | dict[str, int] | None = None,
-            value_std: list[float] | dict[str, int] | None = None,
-            context_num_tokens: dict[str, int] | None = None,
-            score_num_tokens: dict[str, int] | None = None,
-            tokenizer: SyMuPe | None = None,
-            wrapper_kwargs: dict | None = None
+        self,
+        num_tokens: dict[str, int],
+        dim: int,
+        transformer: DictConfig | TupleTransformerConfig,
+        token_keys: list[str],
+        value_keys: list[str],
+        context_vectors: bool = False,
+        value_mean: list[float] | dict[str, int] | None = None,
+        value_std: list[float] | dict[str, int] | None = None,
+        context_num_tokens: dict[str, int] | None = None,
+        score_num_tokens: dict[str, int] | None = None,
+        tokenizer: SyMuPe | None = None,
+        wrapper_kwargs: dict | None = None,
     ):
         self.token_keys = list(token_keys)
         self.value_keys = list(value_keys)
@@ -731,12 +796,16 @@ class FMMusicTransformer(_MusicTransformer):
             assert key in num_tokens
 
         assert transformer.lm_head is not None
-        transformer.lm_head["num_tokens"] = {key: num for key, num in num_tokens.items() if key in self.token_keys}
+        transformer.lm_head["num_tokens"] = {
+            key: num for key, num in num_tokens.items() if key in self.token_keys
+        }
 
         assert transformer.value_head is not None
         transformer.value_head["num_features"] = len(self.value_keys)
         transformer["input_vectors"] = "cat"
-        transformer["input_vectors_dim"] = (int(context_vectors) + 1) * len(self.value_keys)  # ctx + noisy
+        transformer["input_vectors_dim"] = (int(context_vectors) + 1) * len(
+            self.value_keys
+        )  # ctx + noisy
 
         super().__init__(
             num_tokens=num_tokens,
@@ -746,20 +815,20 @@ class FMMusicTransformer(_MusicTransformer):
             score_num_tokens=score_num_tokens,
             token_keys=token_keys,
             value_keys=value_keys,
-            wrapper_kwargs=wrapper_kwargs
+            wrapper_kwargs=wrapper_kwargs,
         )
 
         self.tokenizer = tokenizer
         self.context_vectors = context_vectors
         self.wrapper_kwargs = wrapper_kwargs or {}
 
-        value_mean = value_mean or [0.]
+        value_mean = value_mean or [0.0]
         if isinstance(value_mean, (dict, DictConfig)):
-            value_mean = [value_mean.get(key, 0.) for key in self.value_keys]
+            value_mean = [value_mean.get(key, 0.0) for key in self.value_keys]
 
-        value_std = value_std or [1.]
+        value_std = value_std or [1.0]
         if isinstance(value_std, (dict, DictConfig)):
-            value_std = [value_std.get(key, 1.) for key in self.value_keys]
+            value_std = [value_std.get(key, 1.0) for key in self.value_keys]
 
         self.register_buffer("value_mean", torch.tensor(value_mean))
         self.register_buffer("value_std", torch.tensor(value_std))
@@ -769,11 +838,14 @@ class FMMusicTransformer(_MusicTransformer):
     def prepare_for_fm(self) -> FMMusicTransformer:
         if isinstance(self.transformer, TupleTransformer):
             self.transformer = TupleTransformerFMWrapper(
-                self.transformer, tokenizer=self.tokenizer,
-                token_keys=self.token_keys, value_keys=self.value_keys,
+                self.transformer,
+                tokenizer=self.tokenizer,
+                token_keys=self.token_keys,
+                value_keys=self.value_keys,
                 context_vectors=self.context_vectors,
-                value_mean=self.value_mean, value_std=self.value_std,
-                **self.wrapper_kwargs
+                value_mean=self.value_mean,
+                value_std=self.value_std,
+                **self.wrapper_kwargs,
             )
         self.mode = LanguageModelingMode.FM
         return self
@@ -787,82 +859,95 @@ class FMMusicTransformer(_MusicTransformer):
         return len(self.value_keys)
 
     def forward(
-            self,
-            tokens: torch.Tensor,
-            values: torch.Tensor,
-            vectors: torch.Tensor,
-            mask: torch.Tensor | None = None,
-
-            context: torch.Tensor | None = None,
-            context_mask: torch.Tensor | None = None,
-            context_tokens: torch.Tensor | None = None,
-            context_values: torch.Tensor | None = None,
-            score_tokens: torch.Tensor | None = None,
-            score_values: torch.Tensor | None = None,
-
-            labels: torch.Tensor | None = None,
-            targets: torch.Tensor | None = None,
-            full_labels: torch.Tensor | None = None,
-
-            masked_tokens: torch.Tensor | None = None,
-            masked_values: torch.Tensor | None = None,
-
-            type_ids: torch.Tensor | None = None,
-            task_ids: torch.Tensor | None = None,
-            task_tokens: torch.Tensor | None = None,
-            return_cache: bool = False,
-            output_layer: int | None = None,
-            ema_model: nn.Module | None = None
+        self,
+        tokens: torch.Tensor,
+        values: torch.Tensor,
+        vectors: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        context: torch.Tensor | None = None,
+        context_mask: torch.Tensor | None = None,
+        context_tokens: torch.Tensor | None = None,
+        context_values: torch.Tensor | None = None,
+        score_tokens: torch.Tensor | None = None,
+        score_values: torch.Tensor | None = None,
+        labels: torch.Tensor | None = None,
+        targets: torch.Tensor | None = None,
+        full_labels: torch.Tensor | None = None,
+        masked_tokens: torch.Tensor | None = None,
+        masked_values: torch.Tensor | None = None,
+        type_ids: torch.Tensor | None = None,
+        task_ids: torch.Tensor | None = None,
+        task_tokens: torch.Tensor | None = None,
+        return_cache: bool = False,
+        output_layer: int | None = None,
+        ema_model: nn.Module | None = None,
     ) -> TupleTransformerFMOutput:
         self.transformer.tokenizer = self.tokenizer
 
         out: TupleTransformerFMOutput = self.transformer(
-            tokens, values=values, vectors=vectors, mask=mask,
-            context=context, context_mask=context_mask,
-            context_tokens=context_tokens, context_values=context_values,
-            score_tokens=score_tokens, score_values=score_values,
-            type_ids=type_ids, task_ids=task_ids, task_tokens=task_tokens,
-            labels=labels, targets=targets, full_labels=full_labels,
-            masked_tokens=masked_tokens, masked_values=masked_values,
-            return_cache=return_cache, output_layer=output_layer, ema_model=ema_model
+            tokens,
+            values=values,
+            vectors=vectors,
+            mask=mask,
+            context=context,
+            context_mask=context_mask,
+            context_tokens=context_tokens,
+            context_values=context_values,
+            score_tokens=score_tokens,
+            score_values=score_values,
+            type_ids=type_ids,
+            task_ids=task_ids,
+            task_tokens=task_tokens,
+            labels=labels,
+            targets=targets,
+            full_labels=full_labels,
+            masked_tokens=masked_tokens,
+            masked_values=masked_values,
+            return_cache=return_cache,
+            output_layer=output_layer,
+            ema_model=ema_model,
         )
 
         return out
 
     def generate(
-            self,
-            tokens: torch.Tensor,
-            values: torch.Tensor,
-            tokenizer: OctupleM | None,
-
-            steps: int = 4,
-            step_factor: float = 1.,
-            method: str | None = None,
-
-            masked_tokens: torch.Tensor | None = None,
-            masked_values: torch.Tensor | None = None,
-
-            context: torch.Tensor | None = None,
-            context_mask: torch.Tensor | None = None,
-            context_tokens: torch.Tensor | None = None,
-            context_values: torch.Tensor | None = None,
-            context_scale: float = 1.,
-
-            disable_tqdm: bool = False,
-            return_intermediates: bool = False,
-            **kwargs
+        self,
+        tokens: torch.Tensor,
+        values: torch.Tensor,
+        tokenizer: OctupleM | None,
+        steps: int = 4,
+        step_factor: float = 1.0,
+        method: str | None = None,
+        masked_tokens: torch.Tensor | None = None,
+        masked_values: torch.Tensor | None = None,
+        context: torch.Tensor | None = None,
+        context_mask: torch.Tensor | None = None,
+        context_tokens: torch.Tensor | None = None,
+        context_values: torch.Tensor | None = None,
+        context_scale: float = 1.0,
+        disable_tqdm: bool = False,
+        return_intermediates: bool = False,
+        **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor] | tuple[torch.Tensor, torch.Tensor, FMIntermediates]:
         self.prepare_for_fm()
         tokenizer = tokenizer or self.tokenizer
 
         out_tokens, out_values, intermediates = self.transformer.generate(
-            tokens, values=values,
-            steps=steps, step_factor=step_factor, method=method, tokenizer=tokenizer,
-            masked_tokens=masked_tokens, masked_values=masked_values,
-            context=context, context_mask=context_mask,
-            context_tokens=context_tokens, context_values=context_values,
+            tokens,
+            values=values,
+            steps=steps,
+            step_factor=step_factor,
+            method=method,
+            tokenizer=tokenizer,
+            masked_tokens=masked_tokens,
+            masked_values=masked_values,
+            context=context,
+            context_mask=context_mask,
+            context_tokens=context_tokens,
+            context_values=context_values,
             context_scale=context_scale,
-            disable_tqdm=disable_tqdm, **kwargs
+            disable_tqdm=disable_tqdm,
+            **kwargs,
         )
 
         if return_intermediates:
@@ -870,13 +955,13 @@ class FMMusicTransformer(_MusicTransformer):
         return out_tokens, out_values
 
     def prepare_inputs(
-            self,
-            inputs: dict | SequenceInputs | Seq2SeqInputs,
-            ema_model: nn.Module | None = None
+        self,
+        inputs: dict | SequenceInputs | Seq2SeqInputs,
+        ema_model: nn.Module | None = None,
     ) -> dict[str, torch.Tensor]:
         inputs_dict = super().prepare_inputs(inputs=inputs, ema_model=ema_model)
 
-        inputs_dict["vectors"] = inputs["full_labels"]["values"][..., self.num_token_features:]
+        inputs_dict["vectors"] = inputs["full_labels"]["values"][..., self.num_token_features :]
 
         for key in ("bars", "beats", "onsets"):
             inputs_dict.pop(key, None)

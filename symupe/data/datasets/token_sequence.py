@@ -1,4 +1,5 @@
-""" Token sequence datasets. """
+"""Token sequence datasets."""
+
 from __future__ import annotations
 
 import os
@@ -13,9 +14,9 @@ from .utils import cache_to_float
 
 
 def load_and_process_token_sequence(
-        path: str | PurePath,
-        load_fn: callable,
-        processing_funcs: list[callable] | None = None
+    path: str | PurePath,
+    load_fn: callable,
+    processing_funcs: list[callable] | None = None,
 ):
     seq = load_fn(path)
     if processing_funcs:
@@ -42,14 +43,14 @@ class TokenSequenceDataset(Dataset):
 
 class LocalTokenSequenceDataset(TokenSequenceDataset):
     def __init__(
-            self,
-            root: str | PurePath,
-            files: list[str | PurePath] | None = None,
-            extension: str = ".json",
-            load_fn: callable = load_json,
-            name_map: callable | None = None,
-            preload: bool = False,
-            cache: bool | float | int = False  # cache can be a bool or a float ratio in [0, 1]
+        self,
+        root: str | PurePath,
+        files: list[str | PurePath] | None = None,
+        extension: str = ".json",
+        load_fn: callable = load_json,
+        name_map: callable | None = None,
+        preload: bool = False,
+        cache: bool | float | int = False,  # cache can be a bool or a float ratio in [0, 1]
     ):
         self.root = root
         self.load_fn = load_fn
@@ -95,7 +96,7 @@ class LocalTokenSequenceDataset(TokenSequenceDataset):
     def __getitem__(self, idx: int) -> TokSequence:
         if self.seqs[idx] is None:
             seq = self.load_sequence(self.paths[idx])
-            if self.cache > 0.:
+            if self.cache > 0.0:
                 if len(self.cache_map) > self.max_cache_size:
                     evict_idx, _ = self.cache_map.popitem(last=False)
                     self.seqs[evict_idx] = None
