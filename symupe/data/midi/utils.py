@@ -215,20 +215,20 @@ def filter_notes_by_pitch_range(notes: NoteTickList, pitch_range: tuple[int, int
 
 def filter_extra_midi_events(
     midi: Score,
-    min_tick: int | None = None,
-    max_tick: int | None = None,
+    min_tick: int | float | None = None,
+    max_tick: int | float | None = None,
     sort: bool = False,
     use_sustain_boundaries: bool = False,
 ):
     if use_sustain_boundaries:
         min_tick, max_tick = compute_global_sustain_control_boundaries(midi)
 
-    min_tick = (
+    min_tick = float(
         min_tick
         if min_tick is not None
         else min(track.notes.numpy()["time"].min() for track in midi.tracks)
     )
-    max_tick = (
+    max_tick = float(
         max_tick
         if max_tick is not None
         else max(
@@ -243,11 +243,9 @@ def filter_extra_midi_events(
             track.pedals.sort(key=lambda p: p.time)
             track.pitch_bends.sort(key=lambda p: p.time)
 
-        track.controls = list(filter(lambda c: min_tick <= c.time <= max_tick, track.controls))
-        track.pedals = list(filter(lambda p: min_tick <= p.time <= max_tick, track.pedals))
-        track.pitch_bends = list(
-            filter(lambda p: min_tick <= p.time <= max_tick, track.pitch_bends)
-        )
+        track.controls.filter(lambda c: min_tick <= c.time <= max_tick, inplace=True)
+        track.pedals.filter(lambda p: min_tick <= p.time <= max_tick, inplace=True)
+        track.pitch_bends.filter(lambda p: min_tick <= p.time <= max_tick, inplace=True)
 
     return midi
 
@@ -490,6 +488,9 @@ def compute_global_sustain_control_boundaries(midi: Score):
 
 
 def clean_controls_in_interval(midi: Score, start: float, end: float, eps: float = 1e-3):
+    ttype = "tick" if isinstance(midi.ttype, Tick) else "second"
+    midi = midi.to("second") if ttype == "tick" else midi
+
     for track in midi.tracks:
         pedal_start, pedal_end = start, end
 
@@ -504,25 +505,27 @@ def clean_controls_in_interval(midi: Score, start: float, end: float, eps: float
             if np.any(mask_on):
                 pedal_end = min(end, sustain_ons[mask_on].max())
 
+        control_soa = track.controls.numpy()
+        control_times = control_soa["time"]
+
         if pedal_start != start:
-            for c in track.controls:
-                if abs(c.time - pedal_start) < eps:
-                    c.time = start - eps
-                    break
+            ids = np.where(np.abs(control_times - pedal_start) < eps)[0]
+            for idx in ids:
+                track.controls[idx].time = start - eps
 
         if pedal_end != end:
-            for c in track.controls:
-                if abs(c.time - pedal_end) < eps:
-                    c.time = end + eps
-                    break
+            ids = np.where(np.abs(control_times - pedal_end) < eps)[0]
+            for idx in ids:
+                track.controls[idx].time = end + eps
 
         if pedal_start < pedal_end:
-            track.controls = list(
-                filter(lambda c: c.time < pedal_start or c.time > pedal_end, track.controls)
+            pedal_start, pedal_end = float(pedal_start), float(pedal_end)
+            track.controls.filter(
+                lambda c: c.time < pedal_start or c.time > pedal_end, inplace=True
             )
-            track.pedals = list(
-                filter(lambda p: p.time < pedal_start or p.time > pedal_end, track.pedals)
-            )
+            track.pedals.filter(lambda p: p.time < pedal_start or p.time > pedal_end, inplace=True)
+
+    midi = midi.to("tick") if ttype == "tick" else midi
 
     return midi
 
