@@ -184,7 +184,6 @@ class ParangonarAligner(Aligner):
             )
         score_short_name = os.path.basename(score_name)
 
-        perf_name = perf_name.replace("_processed", "")
         align_name = f"{perf_name}_{score_short_name}"
 
         # process and save alignment
