@@ -13,7 +13,7 @@ from symusic import Score, TimeSignature, Tempo, ControlChange
 from ..classes import TokSequence
 from ..common import OctupleM
 from ..constants import TICKS_PER_QUARTER, SCORE_KEYS
-from ...midi.sync import sync_performance_midi
+from ...midi.sync import sync_performance_midi, GridLevel
 from ...midi.utils import cut_overlapping_notes, sort_notes
 
 
@@ -324,13 +324,15 @@ class SyMuPeBase(OctupleM):
 
         onset_pairs = np.array(onset_pairs)
 
-        return sync_performance_midi(
+        midi, _ = sync_performance_midi(
             score_midi=score_midi,
             perf_midi=perf_midi,
             onset_pairs=onset_pairs,
-            bar_sync=getattr(self, "_bar_tempos", False),
+            grid_level=GridLevel.BAR if getattr(self, "_bar_tempos", False) else GridLevel.BEAT,
             inplace=False,
+            ticks_per_quarter=TICKS_PER_QUARTER,
         )
+        return midi
 
     @abstractmethod
     def score_tokens_as_performance(

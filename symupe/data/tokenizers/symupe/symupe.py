@@ -29,7 +29,7 @@ from ..constants import (
     PEDAL_OFF_TOKEN,
     TIME_SEGMENT_TOKEN,
 )
-from ...midi.sync import sync_performance_midi
+from ...midi.sync import sync_performance_midi, GridLevel
 from ...midi.timing import MIDITimeMapper
 from ...midi.utils import sort_notes, extract_track_pedals
 from ...music_constants import NOTES_WSHARP
@@ -989,12 +989,13 @@ class SyMuPe(SyMuPeBase):
 
             # Synchronize created MIDI by beats
             if sync_midi:
-                midi = sync_performance_midi(
+                midi, _ = sync_performance_midi(
                     score_midi=midi,
                     perf_midi=midi_s,
                     onset_pairs=onset_pairs[:, :2],
-                    bar_sync=False,
+                    grid_level=GridLevel.BEAT,
                     inplace=True,
+                    ticks_per_quarter=TICKS_PER_QUARTER,
                 )
                 if midi is None:
                     warnings.warn(
