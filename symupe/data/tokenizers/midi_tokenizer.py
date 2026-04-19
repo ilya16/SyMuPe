@@ -32,8 +32,11 @@ from .constants import NOTE_ON_MIDI_EVENT
 
 
 class MusicTokenizer(_MusicTokenizer, ABC):
-    r"""
-    Base music tokenizer class, acting as a common framework.
+    """Base music tokenizer class extending :class:`miditok.MusicTokenizer`.
+
+    Acts as a common framework for SyMuPe-based tokenizers, providing
+    vectorized preprocessing, score building, and MIDI message generation.
+
     See :class:`miditok.MusicTokenizer` for a detailed documentation.
     """
 
@@ -45,24 +48,28 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         quantize_time_signatures: bool = True,
         quantize_tempos: bool = True,
     ) -> Score:
-        r"""
-        Pre-process a ``symusic.Score`` object to resample its time and events values.
+        """Preprocesses a score :class:`symusic.Score` object for the SyMuPe encoding.
+
+        Filters unsupported time signatures, resamples time based on maximum
+        denominator, merges tracks of same program if configured, and quantizes
+        notes, tempos, and control changes.
 
         This method is called before parsing a Score's contents for tokenization.
         Its notes attributes (times, pitches, velocities) will be downsampled and
         sorted, duplicated notes removed, as well as tempos. Empty tracks (with no
-        note) will be removed from the ``symusic.Score`` object. Notes with pitches
-        outside ``self.config.pitch_range`` will be deleted. Tracks with programs not
+        note) will be removed from the :class:`symusic.Score` object. Notes with pitches
+        outside `self.config.pitch_range` will be deleted. Tracks with programs not
         supported by the tokenizer will be deleted.
 
-        This method is **not inplace** and does not alter the provided ``score`` object.
+        Args:
+            score: :class:`symusic.Score` object to process.
+            quantize_times: Resample and quantize note times.
+            quantize_velocities: Quantize velocity of each note.
+            quantize_time_signatures: Resample and quantize time signature times.
+            quantize_tempos: Quantize tempo values.
 
-        :param score: ``symusic.Score`` object to preprocess.
-        :param quantize_times: resample and quantize note times.
-        :param quantize_velocities: quantize velocity of each note.
-        :param quantize_time_signatures: resample and quantize time signature times.
-        :param quantize_tempos: quantize tempo values of each tempo change.
-        :return: the preprocessed ``score``.
+        Returns:
+            Preprocessed :class:`symusic.Score` object.
         """
         # Filter time signatures.
         # We need to do this first to determine the Score's new time division.
@@ -193,33 +200,28 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         quantize_times: bool = True,
         quantize_velocities: bool = True,
     ) -> None:
-        r"""
-        Resample inplace the note velocities, remove notes outside of pitch range.
+        """Resamples note velocities and durations inplace; removes notes out of range.
 
-        Note durations will be clipped to the maximum duration that can be handled by
-        the tokenizer. This is done to prevent having incorrect offset values when
-        computing rests. Notes with pitches outside of self.pitch_range will be
-        deleted.
+        Clips note durations to maximum handled by tokenizer and adjusts
+        timing based on resampling factors for varying time signatures.
 
-        :param track: track containing the notes to resample.
-        :param resampling_factors: sections of resampling factors, when we need to
-            adjust the times of events to a specific ticks/beat value. This is required
-            when the file has time signatures with different denominators. The factors
-            are given as a numpy array of shape ``(N,2)``, for ``N`` changes of ticks
-            per beat, and the second dimension representing the end tick of each
-            section and the number of ticks per beat respectively. (default: ``None``)
-        :param ticks_per_beat: array indicating the number of ticks per beat per time
-            signature denominator section. The numbers of ticks per beat depend on the
-            time signatures of the file being parsed. The array has a shape ``(N,2)``,
-            for ``N`` changes of ticks per beat, and the second dimension representing
-            the end tick of each section and the number of ticks per beat respectively.
-            This argument is not required if
-            ``tokenizer.config.sustain_pedal_duration`` is disabled.
-            (default: ``None``)
-        :param min_duration: minimum duration (in tick) to set to notes that have
-            durations of 0 ticks after resampling. (default: ``1``)
-        :param quantize_times: resample and quantize note times
-        :param quantize_velocities: quantize velocity of each note
+        Args:
+            track: :class:`symusic.Track` containing notes to resample.
+            resampling_factors: Sections of resampling factors, when we need to
+                adjust the times of events to a specific ticks/beat value. This is required
+                when the file has time signatures with different denominators. The factors
+                are given as a numpy array of shape ``(N,2)``, for ``N`` changes of ticks
+                per beat, and the second dimension representing the end tick of each
+                section and the number of ticks per beat respectively.
+            ticks_per_beat: Array indicating the number of ticks per beat per time
+                signature denominator section. The numbers of ticks per beat depend on the
+                time signatures of the file being parsed. The array has a shape ``(N,2)``,
+                for ``N`` changes of ticks per beat, and the second dimension representing
+                the end tick of each section and the number of ticks per beat respectively.
+            min_duration: Minimum duration (in tick) to set to notes that have
+                durations of 0 ticks after resampling.
+            quantize_times: Resample and quantize note times.
+            quantize_velocities: Quantize velocity of each note.
         """
         note_soa = track.notes.numpy()
 
@@ -291,21 +293,23 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         resampling_factors: np.ndarray = None,
         quantize_tempos: bool = True,
     ) -> TempoTickList:
-        r"""
-        Resample the tempo values of tempo change events.
+        """Resamples tempo change events and removes redundant successive changes.
 
-        For tempo changes occurring at the same tick/time, we only keep the last one.
-        Consecutive identical tempo changes will be removed if
-        ``self.config.delete_equal_successive_tempo_changes`` is True.
+        Ensures at least one tempo event exists at tick 0 and applies
+        quantization to tempo values based on tokenizer vocabulary.
 
-        :param tempos: tempo changes to resample.
-        :param resampling_factors: sections of resampling factors, when we need to
-            adjust the times of events to a specific ticks/beat value. This is required
-            when the file has time signatures with different denominators. The factors
-            are given as a numpy array of shape ``(N,2)``, for ``N`` changes of ticks
-            per beat, and the second dimension representing the end tick of each
-            section and the number of ticks per beat respectively. (default: ``None``)
-        :param quantize_tempos: quantize tempo values of each tempo change
+        Args:
+            tempos: Tempo changes to resample.
+            resampling_factors: Sections of resampling factors, when we need to
+                adjust the times of events to a specific ticks/beat value. This is required
+                when the file has time signatures with different denominators. The factors
+                are given as a numpy array of shape ``(N,2)``, for ``N`` changes of ticks
+                per beat, and the second dimension representing the end tick of each
+                section and the number of ticks per beat respectively.
+            quantize_tempos: Whether to quantize tempo values.
+
+        Returns:
+            Processed :class:`symusic.TempoTickList`.
         """
         # If we delete the successive equal tempo changes, we need to sort them by time
         # Fortunately, sorting is already performed by symusic when loading the file.
@@ -380,8 +384,24 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         time_division: int | None = None,
         ttype: str = "tick",
     ) -> Score:
-        r"""
-        Build symusic.Score MIDI from the provided data.
+        """Constructs :class:`symusic.Score` from raw attribute arrays.
+
+        Groups notes into tracks based on program IDs and sets global
+        metrical metadata.
+
+        Args:
+            times: Array of onset times.
+            durations: Array of durations.
+            pitches: Array of MIDI pitches.
+            velocities: Array of MIDI velocities.
+            programs: Array of track programs.
+            time_signatures: List of :class:`symusic.TimeSignature` objects.
+            tempos: List of :class:`symusic.Tempo` objects.
+            time_division: MIDI resolution.
+            ttype: Time type, either 'tick' or 'second'.
+
+        Returns:
+            Reconstructed :class:`symusic.Score` object.
         """
         score = Score(time_division or self.time_division, ttype=ttype)
 
@@ -416,17 +436,14 @@ class MusicTokenizer(_MusicTokenizer, ABC):
     def _ids_to_tokens(
         self, ids: list[int | list[int]], as_str: bool = True
     ) -> list[str | Event | list[str | Event]]:
-        r"""
-        Convert a sequence of ids (int) to their tokens format (str or Event).
+        """Converts sequence of IDs to their tokens format (str or Event).
 
-        **This method will not work with ids encoded with the tokenizer's model. You
-        will need to decode them first (
-        :py:meth:`miditok.MusicTokenizer.decode_token_ids`)**.
+        Args:
+            ids: Sequence of IDs to convert.
+            as_str: If ``True``, returns tokens as strings, otherwise as Events.
 
-        :param ids: sequence of ids (int) to convert.
-        :param as_str: return the tokens as string objects, otherwise Event objects
-            (default: True)
-        :return: the sequence of corresponding tokens (str or Event).
+        Returns:
+            Sequence of corresponding tokens.
         """
         tokens = []
         if len(ids) == 0:
@@ -447,11 +464,7 @@ class MusicTokenizer(_MusicTokenizer, ABC):
 
     @property
     def special_tokens_dict(self) -> dict[str, int]:
-        r"""
-        Return the map of the special tokens to their ids in the vocabulary.
-
-        :return: dictionary of special tokens and their ids
-        """
+        """Mapping of special token names to their respective vocabulary IDs."""
         return {token: self[token] for token in self.special_tokens}
 
     def tokens_to_midi_messages(
@@ -463,6 +476,22 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         note_off_events: bool = True,
         sort: bool = True,
     ):
+        """Converts :class:`TokSequence` into raw MIDI message arrays.
+
+        Facilitates low-level MIDI event processing by returning flat arrays
+        of times, event types, pitches, and velocities.
+
+        Args:
+            tokens: :class:`TokSequence` to convert.
+            context: Optional :class:`TokSequenceContext` for incremental decoding.
+            note_attributes: If ``True``, extracts pitch and velocity values.
+            note_on_events: If ``True``, extracts note-on timing events.
+            note_off_events: If ``True``, extracts note-off timing events.
+            sort: If ``True``, ensures the resulting events are chronologically ordered.
+
+        Returns:
+            Tuple containing array of MIDI messages and updated context.
+        """
         assert note_on_events or note_off_events
         tokens = tokens.numpy()
 
@@ -503,10 +532,19 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         context: TokSequenceContext | None = None,
         note_attributes: bool = True,
     ):
+        """Internal abstract method for decoding tokens into event components."""
         raise NotImplementedError
 
     @staticmethod
     def sort_messages(messages: np.ndarray) -> np.ndarray:
+        """Sorts MIDI message arrays by time, then pitch, then velocity.
+
+        Args:
+            messages: Array of MIDI messages.
+
+        Returns:
+            Sorted NumPy array.
+        """
         if len(messages.shape) == 2:
             return messages[np.lexsort((-messages[:, 3], messages[:, 2], messages[:, 0]))]
         else:
@@ -526,6 +564,22 @@ class MusicTokenizer(_MusicTokenizer, ABC):
         token: str | bool | None,
         **kwargs,
     ) -> MusicTokenizer:
+        """Loads tokenizer from a pretrained configuration on HuggingFace Hub.
+
+        Args:
+            model_id: Repository ID or local path.
+            revision: Specific model version.
+            cache_dir: Path to cache directory.
+            force_download: Whether to force re-download.
+            proxies: Dictionary of proxy servers.
+            resume_download: Whether to resume interrupted download.
+            local_files_only: Whether to skip network calls.
+            token: Authentication token.
+            **kwargs: Additional parameters for loading.
+
+        Returns:
+            Instance of the appropriate :class:`MusicTokenizer` subclass.
+        """
         # Called by `ModelHubMixin.from_pretrained`
         pretrained_path = Path(model_id)
         if pretrained_path.is_file():

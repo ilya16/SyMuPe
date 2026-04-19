@@ -10,16 +10,17 @@ The tokenizer is based on the OctupleM encoding. It supports:
 from __future__ import annotations
 
 import warnings
-from dataclasses import replace
+from dataclasses import replace, dataclass
+from pathlib import Path
 
 import numpy as np
+from miditok.constants import TIME_SIGNATURE
 from miditok.utils.utils import tempo_qpm_to_mspq
 from symusic import Score, Tempo, TimeSignature, ControlChange
 
 from symupe.utils import find_closest, forward_fill, backward_fill
-from .base import SyMuPeBase
-from ..classes import TokSequence, SequenceType, EncodingType, TokSequenceContext, backend
-from ..constants import (
+from .classes import TokSequence, SequenceType, EncodingType, TokSequenceContext, backend
+from .constants import (
     TICKS_PER_QUARTER,
     SPECIAL_TOKENS_VALUE,
     TIME_PERFORMANCE_KEYS,
@@ -28,52 +29,87 @@ from ..constants import (
     PEDAL_ON_TOKEN,
     PEDAL_OFF_TOKEN,
     TIME_SEGMENT_TOKEN,
+    SCORE_KEYS,
 )
-from ...midi.sync import sync_performance_midi, GridLevel
-from ...midi.timing import MIDITimeMapper
-from ...midi.utils import sort_notes, extract_track_pedals
-from ...music_constants import NOTES_WSHARP
+from .octuple_m import OctupleM
+from ..midi.sync import sync_performance_midi, GridLevel
+from ..midi.timing import MIDITimeMapper
+from ..midi.utils import sort_notes, extract_track_pedals, cut_overlapping_notes
+from ..music_constants import NOTES_WSHARP
 
 
-class SyMuPe(SyMuPeBase):
-    r"""
-    SyMuPe: a Symbolic Music Performance encoding.
+@dataclass
+class SyMuPeTokSequence(TokSequence):
+    score_to_perf_token: np.ndarray | None = None
 
-    An evolved SPMuple encoding from ScorePerformer originally based on the modified OctupleM encoding.
 
-    Utilizes OctupleM encoding for score MIDI sequences and adds performance tokens for performance MIDI sequences.
-    In the score-aligned encoding, all tokens are used.
-    In the time-only encoding, only performance tokens are used.
+class SyMuPe(OctupleM):
+    """Symbolic Music Performance (SyMuPe) encoding.
 
-    Each compound token is a tuple of the form (index: Token type):
-    * 0: Bar
-    * 1: Position
-    * 2: Pitch
-    * 3: Duration
-    * 4: Velocity
-    * (+ Optional) Tempo
-    * (+ Optional) TimeSignature / (BeatDuration, BeatsInBar / MaxBarPosition)
-    * (+ Optional) Program
-    * (+ Optional, score) PositionShift
-    * (+ Optional, score) NotesInOnset
-    * (+ Optional, score) PositionInOnset
-    * (+ Optional, performance) (Relative)OnsetDeviation
-    * (+ Optional, performance) (Relative)PerformedDuration
-    * (+ Optional, performance) TimeShift
-    * (+ Optional, performance) TimeDuration
-    * (+ Optional, performance) TimePosition
-    * (+ Optional, performance) TimeDurationSustain
-    * (+ Optional, performance) Sustained
+    Introduced in "SyMuPe: Affective and Controllable Symbolic Music Performance" [1]
+    (https://arxiv.org/abs/2511.03425), this class implements a multi-dimensional
+    compound encoding for music.
+
+    It evolves the SPMuple encoding from ScorePerformer [2], building upon a modified OctupleM
+    encoding (:class:`symupe.data.tokenizers.OctupleM`) to support both score-metrical
+    and fine-grained performance features.
+
+    The tokenizer supports three primary encoding modes:
+    1. **Score**: Encodes score MIDI sequence.
+    2. **Score-Aligned Performance**: Encodes performance nuances relative to a score-metrical grid.
+    3. **Time-Only Performance**: Encodes performance using absolute temporal intervals,
+       bypassing metrical structures.
+
+    The tokenizer outputs both **real-valued features** and **discrete tokens**,
+    which can be used for regression and categorical prediction of score and performance features.
+
+    Each compound token is a tuple containing the following dimensions (if enabled):
+
+    **Base Dimensions (OctupleM):**
+    * 0: `Bar`
+    * 1: `Position`
+    * 2: `Pitch`
+    * 3: `Duration`
+    * 4: `Velocity`
+    * (+ Optional) `Tempo`
+    * (+ Optional) `TimeSignature` or (`BeatDuration`, `BeatsInBar` / `MaxBarPosition`)
+    * (+ Optional) `Program`
+
+    **Universal / Note Attribute Extensions:**
+    * (+ Optional) `PitchClass`: Chroma or pitch class of the note (0–11).
+    * (+ Optional) `PitchOctave`: MIDI octave index of the note.
+
+    **Score-Side Auxiliary Dimensions:**
+    * (+ Optional) `PositionShift`: Metrical delta between onsets.
+    * (+ Optional) `NotesInOnset`: Polyphony count at current onset.
+    * (+ Optional) `PositionInOnset`: Index of the note within a chord.
+
+    **Performance-Side Dimensions:**
+    * (+ Optional) `OnsetDev` / `RelOnsetDev`: Timing deviation from score onset.
+    * (+ Optional) `PerfDuration` / `RelPerfDuration`: Actual duration/articulation.
+    * (+ Optional) `TimeShift`: Absolute time between performance onsets (seconds).
+    * (+ Optional) `TimeDuration`: Absolute performance duration (seconds).
+    * (+ Optional) `TimePosition`: Cyclic temporal position within a segment.
+    * (+ Optional) `TimeDurationSustain`: Duration considering sustain pedal state.
+    * (+ Optional) `Sustained`: Boolean indicator for active sustain.
 
     References:
-        [1]: Borovik I., Viro V. "ScorePerformer: Expressive Piano Performance Rendering with Fine-Grained Control."
-        ISMIR 2023
+        [1]: Borovik, I., Gavrilev, D., and Viro, V. (2025). "SyMuPe: Affective and
+        Controllable Symbolic Music Performance." In Proceedings of the 33rd ACM International
+        Conference on Multimedia (ACM MM).
+        [2]: Borovik, I., & Viro, V. (2023). "ScorePerformer: Expressive Piano Performance
+        Rendering with Fine-Grained Control." In Proceedings of the 24th International Society
+        for Music Information Retrieval Conference (ISMIR).
     """
 
     def _tweak_config_before_creating_voc(self):
+        """Tweaks default :class:`TokenizerConfig`."""
         super()._tweak_config_before_creating_voc()
 
         additional_params = self.config.additional_params
+
+        # midi postprocessing
+        additional_params["cut_overlapping_notes"] = True
 
         # optional compound pitch tokens
         additional_params["use_pitch_classes"] = additional_params.get("use_pitch_classes", False)
@@ -128,15 +164,80 @@ class SyMuPe(SyMuPeBase):
 
         assert additional_params["use_onset_tokens"] or additional_params["use_time_tokens"]
 
-    def encode_score(self, midi: Score) -> TokSequence:
-        r"""
-        Tokenize a score MIDI file into :class:`miditok.TokSequence` using OctupleM encoding
-        with optional PositionShift, NotesInOnset, and PositionInOnset tokens.
+    def preprocess_score(
+        self,
+        midi: Score,
+        quantize_times: bool = True,
+        quantize_velocities: bool = False,
+        quantize_time_signatures: bool = True,
+        quantize_tempos: bool = False,
+    ) -> Score:
+        """Preprocesses a score :class:`symusic.Score` object for the SyMuPe encoding.
 
-        :param midi: the MIDI objet to convert
-        :return: the scores token representation, i.e. tracks converted into sequences of tokens
+        Args:
+            midi: :class:`symusic.Score` object to process.
+            quantize_times: Resample and quantize note times.
+            quantize_velocities: Quantize velocity of each note.
+            quantize_time_signatures: Resample and quantize time signature times.
+            quantize_tempos: Quantize tempo values.
+
+        Returns:
+            Preprocessed :class:`symusic.Score` object.
         """
-        tokens: TokSequence = super().encode_score(midi)
+        return super().preprocess_score(
+            midi,
+            quantize_times=quantize_times,
+            quantize_velocities=quantize_velocities,
+            quantize_time_signatures=quantize_time_signatures,
+            quantize_tempos=quantize_tempos,
+        )
+
+    def preprocess_performance(self, midi: Score) -> Score:
+        """Preprocesses a performance :class:`symusic.Score` object for the SyMuPe encoding.
+
+        Does not quantize any of the timing attributes.
+
+        Args:
+            midi: :class:`symusic.Score` object representing the performance.
+
+        Returns:
+            Preprocessed :class:`symusic.Score` object with maintained micro-timing.
+        """
+        return self.preprocess_score(
+            midi,
+            quantize_times=False,
+            quantize_velocities=False,
+            quantize_time_signatures=False,
+            quantize_tempos=False,
+        )
+
+    def encode_score(self, midi: Score) -> TokSequence:
+        """Converts a score MIDI into a sequence of score SyMuPe tokens.
+
+        Adds optional score-side features like `PitchClass`/`PitchOctave`,
+        `PositionShift` and `NotesInOnset`/`PositionInOnset`.
+
+        Args:
+            midi: :class:`symusic.Score` object to convert.
+
+        Returns:
+            :class:`TokSequence` containing the score representation and note alignments.
+        """
+        # Preprocess the MIDI file
+        midi = self.preprocess_score(midi)
+
+        # Sort notes and compute note order change
+        token_to_note_alignments = []
+        for track in midi.tracks:
+            track.notes, track_token_to_note = sort_notes(track.notes)
+            token_to_note_alignments.append(track_token_to_note)
+        token_to_note = np.concatenate(token_to_note_alignments)  # note: incorrect when tracks > 1
+
+        # Tokenize it
+        tokens = self._score_to_tokens(midi)
+
+        # Add alignment between notes and tokens
+        tokens.token_to_note = token_to_note
 
         num_new_tokens = 2 * int(self.config.additional_params["use_pitch_classes"])
         num_new_tokens += int(self.config.additional_params["use_position_shifts"])
@@ -174,6 +275,14 @@ class SyMuPe(SyMuPeBase):
         return tokens
 
     def fill_pitch_tokens(self, tokens: TokSequence) -> TokSequence:
+        """Populates `Pitch` tokens from `PitchClass` and `PitchOctave` components.
+
+        Args:
+            tokens: :class:`TokSequence` object to update.
+
+        Returns:
+            Updated :class:`TokSequence` object.
+        """
         if self.has_token_types(tokens, "Pitch"):
             return tokens
 
@@ -211,6 +320,15 @@ class SyMuPe(SyMuPeBase):
         return tokens
 
     def fill_extra_pitch_tokens(self, tokens: TokSequence, force: bool = False) -> TokSequence:
+        """Decomposes standard `Pitch` tokens into `PitchClass` and `PitchOctave` components.
+
+        Args:
+            tokens: :class:`TokSequence` object to update.
+            force: If ``True``, forces recomputation of existing pitch component tokens.
+
+        Returns:
+            Updated :class:`TokSequence` object.
+        """
         new_values = {}
 
         if self.config.additional_params["use_pitch_classes"] and (
@@ -233,6 +351,16 @@ class SyMuPe(SyMuPeBase):
         return tokens
 
     def fill_extra_score_tokens(self, tokens: TokSequence, force: bool = False) -> TokSequence:
+        """Computes auxiliary score tokens (`PositionShift`, `NotesInOnset`, `PositionInOnset`)
+        from existing Bar and Position information.
+
+        Args:
+            tokens: :class:`TokSequence` object to update.
+            force: If ``True``, forces recomputation of existing pitch component tokens.
+
+        Returns:
+            Updated :class:`TokSequence` object.
+        """
         # Add new score tokens if they are present in the encoding
         new_values = {}
 
@@ -275,22 +403,108 @@ class SyMuPe(SyMuPeBase):
 
         return tokens
 
+    def encode_performance(
+        self,
+        midi: Score,
+        *,
+        score_tokens: TokSequence | None,
+        note_alignment: np.ndarray | None = None,
+    ) -> TokSequence:
+        """Converts a performance MIDI into a sequence of performance SyMuPe tokens,
+        optionally aligned to a score.
+
+        Supports two distinct encoding modes:
+
+        1. **Score-aligned** (`score_tokens` is not ``None``):
+            Uses score and performance tokens (`symupe.data.tokenizers.constants.PERFORMANCE_KEYS`).
+            If `config.additional_params["use_onset_tokens"]` is ``True``, the encoding also includes
+            relative performance tokens (`symupe.data.tokenizers.constants.REL_PERFORMANCE_KEYS`)
+
+            `note_alignment` should be used to provide the MIDI-level mapping between
+            the score and performance notes. The alignment on the token level is computed inside
+            using `score_tokens.token_to_note` (alignment between score tokens and notes)
+            and is returned as a token sequence metadata.
+
+        2. **Time-only** (`score_tokens` is ``None``):
+            Uses performance-only tokens (`symupe.data.tokenizers.constants.TIME_PERFORMANCE_KEYS`).
+            Score and relative performance tokens/values are set to `IGNORE_TOKEN`/`IGNORE_VALUE`
+
+        Args:
+            midi: Performance :class:`symusic.Score` object.
+            score_tokens: Optional reference score tokens for aligned encoding.
+            note_alignment: Optional precomputed mapping between score and performance notes.
+
+        Returns:
+            :class:`TokSequence` object containing performance features.
+        """
+        # Preprocess the MIDI file
+        self.preprocess_performance(midi)
+
+        # Sort notes and compute note order change
+        token_to_note_alignments = []
+        for track in midi.tracks:
+            track.notes, track_token_to_note = sort_notes(track.notes)
+            token_to_note_alignments.append(track_token_to_note)
+        perf_token_to_perf_note = np.concatenate(token_to_note_alignments)
+
+        score_token_to_perf_token = None
+        if score_tokens is not None:
+            # Compute the token-level alignment using the note-level alignment
+            # and token-to-note alignments for the score and performance sequences
+            #
+            # Given: `alignment` = `score_note_to_perf_note`,
+            #        `score_token_to_score_note`,
+            #        `perf_note_to_perf_token`
+            # Find:  `score_token_to_perf_token` alignment
+            # Transitivity Rule: A->B = C->B[A->C]
+
+            score_note_to_perf_note = (
+                np.arange(len(score_tokens)) if note_alignment is None else note_alignment
+            )
+            score_token_to_score_note = score_tokens.token_to_note
+            perf_note_to_perf_token = np.argsort(perf_token_to_perf_note)
+
+            if score_token_to_score_note is not None:
+                score_token_to_perf_note = score_note_to_perf_note[score_token_to_score_note]
+            else:
+                score_token_to_perf_note = score_note_to_perf_note
+            score_token_to_perf_token = perf_note_to_perf_token[score_token_to_perf_note]
+
+            perf_token_to_perf_note = score_token_to_perf_note
+
+        # Tokenize it
+        tokens = self._encode_performance(midi, score_tokens, score_token_to_perf_token)
+
+        # Add alignment between notes and tokens
+        tokens = vars(tokens)
+        tokens.update(
+            token_to_note=perf_token_to_perf_note,
+            score_to_perf_token=score_token_to_perf_token,
+        )
+        tokens["meta"] = tokens.get("meta", {})
+        tokens["meta"].update(time_division=midi.ticks_per_quarter)
+        tokens = TokSequence(**tokens)
+
+        return tokens
+
     def _encode_performance(
         self,
         midi: Score,
         score_tokens: TokSequence | None,
         note_alignment: np.ndarray | None = None,
     ) -> TokSequence:
-        r"""
-        Tokenize a performance MIDI file into :class:`miditok.TokSequence`
-        with score tokens plus (Relative)OnsetDeviation and (Relative)PerformedDuration tokens.
-        Converts a MIDI file to a performance tokens representation, a sequence of "time steps"
-        of score tokens stacked with performance specific features (e.g., OnsetDeviation).
+        """Internal implementation of performance encoding logic.
 
-        :param midi: the MIDI object to convert.
-        :param score_tokens: corresponding score tokens :class:`miditok.TokSequence`.
-        :param note_alignment: optional alignment between performance and score tokens.
-        :return: the performance token representation, i.e. tracks converted into sequences of tokens
+        Calculates onset deviations and performance durations relative to the score grid
+        or uses `self._encode_time_only_performance` to create a time-only encoding.
+
+        Args:
+            midi: Performance :class:`symusic.Score` object.
+            score_tokens: Optional reference score tokens for aligned encoding.
+            note_alignment: Optional precomputed mapping between score and performance notes.
+
+        Returns:
+            :class:`TokSequence` object containing performance features.
         """
         self._current_midi_metadata = {
             "time_division": midi.ticks_per_quarter,
@@ -298,7 +512,7 @@ class SyMuPe(SyMuPeBase):
         }
 
         if score_tokens is None:
-            return self._performance_midi_to_time_only_tokens(midi)
+            return self._encode_time_only_performance(midi)
 
         additional_params = self.config.additional_params
 
@@ -504,13 +718,15 @@ class SyMuPe(SyMuPeBase):
 
         return tokens
 
-    def _performance_midi_to_time_only_tokens(self, midi: Score) -> TokSequence:
-        r"""
-        Tokenize a performance MIDI file into :class:`miditok.TokSequence`
-        with performance-only (Pitch, Velocity, TimeShift, TimeDuration) tokens.
+    def _encode_time_only_performance(self, midi: Score) -> TokSequence:
+        """Tokenizes a performance :class:`symusic.Score` into :class:`TokSequence`
+        with performance-only (`Pitch`, `Velocity`, TimeShift, TimeDuration) tokens.
 
-        :param midi: the MIDI object to convert.
-        :return: the performance token representation, i.e. tracks converted into sequences of tokens
+        Args:
+            midi: performance :class:`symusic.Score` object.
+
+        Returns:
+            :class:`TokSequence` object containing performance features.
         """
         additional_params = self.config.additional_params
         assert additional_params["use_time_tokens"], (
@@ -571,11 +787,15 @@ class SyMuPe(SyMuPeBase):
         )
 
     def _extract_pedals(self, midi: Score) -> np.ndarray | None:
-        r"""
-        Extract sustain pedals from a MIDI file.
+        """Extracts sustain pedal (CC64) events from a MIDI file.
 
-        :param midi: the MIDI object to process.
-        :return: an array of pedals (token_id, time)
+        Converts pedals into a standardized token-compatible array format.
+
+        Args:
+            midi: :class:`symusic.Score` object to process.
+
+        Returns:
+            Array of pedals (token_id, time)
         """
         controls = midi.tracks[0].controls
         for track in midi.tracks[1:]:
@@ -614,13 +834,15 @@ class SyMuPe(SyMuPeBase):
         minimal: bool = False,
         token_types: list[str] | None = None,
     ) -> TokSequence:
-        r"""
-        Compress token sequence :class:`miditok.TokSequence` into its minimal representation.
+        """Reduces :class:`TokSequence` object to its minimal representation.
 
-        :param tokens: the token sequence to compress.
-        :param minimal: compress the minimal form, removing redundant/recomputable tokens
-        :param token_types: (optional) a list of token types to apply compression
-        :return: the compressed token sequence
+        Args:
+            tokens: :class:`TokSequence` object to compress.
+            minimal: If ``True``, removes all compressible/recomputable tokens.
+            token_types: Specific token types to keep, if ``None``, uses defaults based on sequence type.
+
+        Returns:
+            Compressed :class:`TokSequence` object.
         """
         seq_type = tokens.type
         assert seq_type is not None
@@ -653,11 +875,15 @@ class SyMuPe(SyMuPeBase):
         return tokens
 
     def decompress(self, tokens: TokSequence) -> TokSequence:
-        r"""
-        Decompress token sequence :class:`miditok.TokSequence` into a full-token representation.
+        """Restores a compressed :class:`TokSequence` object to the full-token representation.
 
-        :param tokens: the token sequence to decompress.
-        :return: the decompressed token sequence
+        Recomputes missing values (like Pitch components or extra score tokens) where possible.
+
+        Args:
+            tokens: :class:`TokSequence` object to decompress.
+
+        Returns:
+            Decompressed :class:`TokSequence` object.
         """
         seq_type = tokens.type
         assert seq_type is not None
@@ -706,12 +932,45 @@ class SyMuPe(SyMuPeBase):
 
         return tokens
 
+    def decode_score(
+        self,
+        tokens: TokSequence | list[list[int]] | np.ndarray,
+        programs: list[tuple[int, bool]] | None = None,
+        output_path: str | None = None,
+    ) -> Score:
+        """Decodes a sequence of score tokens into a ``symusic.Score``.
+
+        Args:
+            tokens: Sequence of tokens to convert.
+            programs: Programs of the tracks. If ``None``, will default to piano (program 0).
+            output_path: Path to save the MIDI file.
+
+        Returns:
+            :class:`symusic.Score` object.
+        """
+        return super().decode(tokens, programs=programs, output_path=output_path)
+
     def decode_note_positions(
         self,
         tokens: TokSequence,
         context: TokSequenceContext | None = None,
         time_division: int = TICKS_PER_QUARTER,
     ) -> tuple[dict[str, any], TokSequenceContext]:
+        """Decodes temporal metadata from a token sequence to determine note onsets/offsets.
+
+        Extracts `Bar`, `Position`, and `TimeShift` information to calculate absolute
+        ticks and seconds. If `use_onset_tokens` is active, it applies
+        `RelOnsetDev` and `RelPerfDuration` to the score-metrical grid.
+
+        Args:
+            tokens: :class:`TokSequence` object to decode.
+            context: Optional :class:`TokSequenceContext` for incremental decoding.
+            time_division: MIDI time division / resolution, in ticks/beat.
+
+        Returns:
+            Tuple containing a dictionary of position data (ticks, times, tempos)
+            and the updated :class:`TokSequenceContext` object.
+        """
         additional_params = self.config.additional_params
         time_division = time_division or self.time_division
         ticks_per_sample = time_division // self.config.max_num_pos_per_beat
@@ -853,27 +1112,88 @@ class SyMuPe(SyMuPeBase):
 
         return position_data, new_context
 
+    def decode_performance(
+        self,
+        tokens: TokSequence | list[list[int]] | np.ndarray,
+        programs: list[tuple[int, bool]] | None = None,
+        time_division: int = TICKS_PER_QUARTER,
+        output_path: str | None = None,
+        **kwargs,
+    ) -> Score:
+        """Decodes a sequence of performance tokens into a ``symusic.Score``.
+
+        Args:
+            tokens: Sequence of tokens to convert.
+            programs: Programs of the tracks. If ``None``, will default to piano (program 0).
+            time_division: MIDI time division / resolution, in ticks/beat.
+            output_path: Path to save the MIDI file.
+
+        Returns:
+            :class`symusic.Score` object.
+        """
+        if not isinstance(tokens, (TokSequence, list)) or (
+            isinstance(tokens, list) and any(not isinstance(seq, TokSequence) for seq in tokens)
+        ):
+            tokens = self._convert_sequence_to_tokseq(tokens)
+
+        # Preprocess TokSequence(s)
+        if isinstance(tokens, TokSequence):
+            self._preprocess_tokseq_before_decoding(tokens)
+        else:  # list[TokSequence]
+            for seq in tokens:
+                self._preprocess_tokseq_before_decoding(seq)
+
+        midi = self._decode_performance(tokens, programs, time_division, **kwargs)
+
+        # Create controls for pedals
+        # This is required so that they are saved when the MIDI is dumped, as symusic
+        # will only write the control messages.
+        if self.config.use_sustain_pedals:
+            for track in midi.tracks:
+                for pedal in track.pedals:
+                    track.controls.append(ControlChange(pedal.time, 64, 127))
+                    track.controls.append(ControlChange(pedal.end, 64, 0))
+                if len(track.pedals) > 0:
+                    track.controls.sort()
+
+        # Set default tempo and time signatures at tick 0 if not present
+        if len(midi.tempos) == 0 or midi.tempos[0].time != 0:
+            midi.tempos.insert(0, Tempo(0, self.default_tempo))
+        if len(midi.time_signatures) == 0 or midi.time_signatures[0].time != 0:
+            midi.time_signatures.insert(0, TimeSignature(0, *TIME_SIGNATURE))
+
+        if self.config.additional_params["cut_overlapping_notes"]:
+            for track in midi.tracks:
+                track.notes = cut_overlapping_notes(track.notes, sort=True)
+
+        # Write MIDI file
+        if output_path:
+            Path(output_path).mkdir(parents=True, exist_ok=True)
+            midi.dump_midi(output_path)
+        return midi
+
     def _decode_performance(
         self,
         tokens: TokSequence,
         context: TokSequenceContext | None = None,
-        programs: list[tuple[int, bool]] | None = None,
         time_division: int = TICKS_PER_QUARTER,
-        initial_tempo: int | None = None,
         sync_midi: bool = True,
-        **kwargs,
     ) -> Score:
-        r"""
-        Convert performance tokens (:class:`miditok.TokSequence`) into a ``symusic.Score``.
+        """Internal logic for performance decoding.
 
-        :param tokens: tokens to convert. Can be either a list of
-            :class:`miditok.TokSequence` or a list of :class:`miditok.TokSequence`s.
-        :param context: token sequence context from the preceding notes.
-        :param programs: programs of the tracks. If none is given, will default to
-            piano, program 0. (default: ``None``)
-        :param time_division: MIDI time division / resolution, in ticks/beat (of the MIDI to create).
-        :param initial_tempo: starting/average performance tempo
-        :return: the ``symusic.Score`` object.
+        Reconstructs note events, tempos, and control changes, optionally synchronizing to a metrical grid.
+
+        Calculates onset deviations and performance durations relative to the score grid
+        or uses `self._encode_time_only_performance` to create a time-only encoding.
+
+        Args:
+            tokens: Sequence of tokens to convert.
+            context: :class:`TokSequenceContext` from the preceding notes.
+            time_division: MIDI time division / resolution, in ticks/beat.
+            sync_midi: If ``True``, synchronizes performance MIDI to score beat grid.
+
+        Returns:
+            :class:`symusic.Score` object.
         """
         additional_params = self.config.additional_params
 
@@ -1011,10 +1331,58 @@ class SyMuPe(SyMuPeBase):
 
         return midi.to("tick")
 
+    def synchronize_performance_midi(
+        self,
+        perf_midi: Score,
+        score_midi: Score,
+        note_alignment: np.ndarray,
+    ) -> Score:
+        """Synchronizes a performance MIDI with a score metrical grid (Bar or Beat).
+
+        Updates ticks based on bar/beat-level tempo estimation.
+
+        Args:
+            perf_midi: Raw performance :class:`symusic.Score` object.
+            score_midi: Reference score :class:`symusic.Score` object.
+            note_alignment: Note-level mapping indices.
+
+        Returns:
+            Synchronized performance :class:`symusic.Score` object.
+        """
+        score_note_soa = score_midi.tracks[0].notes.numpy()
+        perf_midi_s = perf_midi.to("second")
+        perf_note_soa = perf_midi_s.tracks[0].notes.numpy()
+
+        score_ticks = score_note_soa["time"]
+        perf_times = perf_note_soa["time"][note_alignment]
+
+        onset_pairs = []
+        for onset_tick in np.unique(score_ticks):
+            onset_pairs.append((onset_tick, perf_times[score_ticks == onset_tick].mean()))
+
+        onset_pairs = np.array(onset_pairs)
+
+        midi, _ = sync_performance_midi(
+            score_midi=score_midi,
+            perf_midi=perf_midi,
+            onset_pairs=onset_pairs,
+            grid_level=GridLevel.BAR if getattr(self, "_bar_tempos", False) else GridLevel.BEAT,
+            inplace=False,
+            ticks_per_quarter=TICKS_PER_QUARTER,
+        )
+        return midi
+
     def score_tokens_as_performance(self, score_tokens: TokSequence) -> TokSequence:
-        r"""
-        Convert a sequence of score tokens into a sequence of performance tokens,
-        the tokens corresponding to a deadpan performance with no variation from score notes.
+        """Generates 'deadpan' performance tokens from score tokens.
+
+        Converts a sequence of score tokens into a sequence of performance tokens.
+        All onset deviations are set to zero and durations are set to the exact score length.
+
+        Args:
+            score_tokens: Score :class:`TokSequence` object to convert.
+
+        Returns:
+            Deadpan performance :class:`TokSequence` object.
         """
         if len(score_tokens.ids[0]) == len(self.performance_sizes):
             score_tokens = self.compress(score_tokens)
@@ -1149,17 +1517,23 @@ class SyMuPe(SyMuPeBase):
         subsequence: bool = False,
         returns_sort_ids: bool = False,
     ) -> TokSequence | tuple[TokSequence, np.ndarray]:
-        r"""
-        Sort token sequence :class:`miditok.TokSequence`.
+        """Sorts :class:`TokSequence` object and recomputes relative temporal shifts.
 
-        :param tokens: token sequence to sort
-        :param by_time: whether to sort sequence by time tokens or not
-        :param sort_ids: optional precomputed sort indices
-        :param ordered_shifts: whether to update the position/time shift tokens
-            such that they are computed relative to the previous note in the sequence
-        :param subsequence: whether the token sequences is a subsequence from a
-        :param returns_sort_ids: whether to return the sorting indices
-        :return: the sorted token sequence
+        Ensures that `TimeShift` or `PositionShift` tokens accurately reflect
+        the intervals between notes in their new order.
+
+        Args:
+            tokens: :class:`TokSequence` object to sort.
+            by_time: If ``True``, sorts primarily by `TimeShift` (seconds);
+                otherwise, sorts by `Bar` and `Position`.
+            sort_ids: Optional precomputed sorting indices.
+            ordered_shifts: If ``True``, updates the shift tokens relative
+                to the preceding note in the sorted sequence.
+            subsequence: Set to ``True`` if processing a partial sequence.
+            returns_sort_ids: If ``True``, also returns the indices used for sorting.
+
+        Returns:
+            Sorted :class:`TokSequence` object.
         """
         additional_params = self.config.additional_params
         vocab = tokens.vocab or self.vocab_types_idx
@@ -1251,10 +1625,10 @@ class SyMuPe(SyMuPeBase):
         return tokens
 
     def _create_base_vocabulary(self) -> list[list[str]]:
-        r"""
-        Create the vocabulary, as a list of string tokens.
+        """Creates vocabulary, as a list of lists of string token names.
 
-        :return: the vocabulary as a list of string.
+        Returns:
+            Stacked vocabulary of token names.
         """
         vocab = super()._create_base_vocabulary()
 
@@ -1332,11 +1706,13 @@ class SyMuPe(SyMuPeBase):
             if self.config.additional_params["use_sustain_tokens"]:
                 vocab.append([f"TimeDuration_{i:.3f}" for i in self.time_durations])
                 vocab.append(["Sustained_On", "Sustained_Off"])
+                # vocab.append([f"PedalOnTimeShift_{i:.3f}" for i in self.time_shifts])
+                # vocab.append([f"PedalOffTimeShift_{i:.3f}" for i in self.time_shifts])
 
         return vocab
 
     def _get_token_types(self) -> list[str]:
-        r"""Create an ordered list of available token types."""
+        """Creates an ordered list of available token types."""
         token_types = super()._get_token_types()
 
         # Universal tokens
@@ -1374,12 +1750,13 @@ class SyMuPe(SyMuPeBase):
         return token_types
 
     def _create_position_shifts(self) -> np.ndarray:
-        r"""
-        Create the possible position shifts in `max_bet_res`, an array of integers.
+        """Creates possible position shifts in `max_bet_res`, an array of integers.
+
         Reuses duration tokens with fine-grained beat resolution defined in config.
         The more beats the position shift occupies, the smaller the resolution of position shift.
 
-        :return: the position shift bins
+        Returns:
+            Position shift bins.
         """
         pos_shifts = self.duration_values * self.config.max_num_pos_per_beat
 
@@ -1393,11 +1770,13 @@ class SyMuPe(SyMuPeBase):
         return pos_shifts
 
     def _create_relative_onset_deviations(self) -> np.ndarray:
-        r"""
-        Create the relative onset deviation bins based on some heuristics.
-        The larger the factor, the smaller the resolution.
+        """Creates relative onset deviation bins based on some heuristics.
 
-        :return: the relative onset deviation bins
+        The larger the number of deviations (`self.config.additional_params["num_onset_devs"]`),
+        the higher the resolution.
+
+        Returns:
+            Relative onset deviation bins.
         """
         onset_dev_quant = (self.config.additional_params["num_onset_devs"] - 1) // 8
 
@@ -1425,11 +1804,13 @@ class SyMuPe(SyMuPeBase):
         return rel_onset_devs
 
     def _create_relative_performed_durations(self) -> np.ndarray:
-        r"""
-        Create the relative performed duration bins based on some heuristics.
-        The larger the factor, the smaller the resolution.
+        """Creates relative performed duration bins based on some heuristics.
 
-        :return: the relative onset deviation bins
+        The larger the number of deviations (`self.config.additional_params["num_perf_durations"]`),
+        the higher the resolution.
+
+        Returns:
+            Relative onset deviation bins.
         """
         perf_dur_quant = (self.config.additional_params["num_perf_durations"] - 1) // 4
 
@@ -1454,10 +1835,10 @@ class SyMuPe(SyMuPeBase):
         return rel_performed_durations
 
     def _create_time_tokens(self, negative: bool = False) -> np.ndarray:
-        r"""
-        Create the time shift/duration bins.
+        """Creates time shift/duration bins.
 
-        :return: the time token bins in ms
+        Returns:
+            Time token bins (milliseconds).
         """
         points = [-400, -200, -100, -50, 250, 500, 1000, 2000, 5000, 10000 + 1]
         steps = [10, 5, 2, 1, 2, 5, 10, 50, 100]
@@ -1476,10 +1857,10 @@ class SyMuPe(SyMuPeBase):
         )
 
     def _create_time_positions(self) -> np.ndarray:
-        r"""
-        Create the time positions bins.
+        """Creates time positions bins.
 
-        :return: the time shift bins in ms
+        Returns:
+            Time position bins (milliseconds).
         """
         time_segment = self.config.additional_params["time_position_segment"]
         time_step = self.config.additional_params["time_position_step"]
@@ -1488,11 +1869,14 @@ class SyMuPe(SyMuPeBase):
     def compute_position_shifts(
         self, score_positions: np.ndarray, onset_shift: bool | None = None
     ) -> np.ndarray:
-        r"""Computes absolute position shifts between onsets from score positions.
+        """Computes absolute position shifts between onsets from score positions.
 
-        :param score_positions: score positions in ticks/beats
-        :param onset_shift: if provided, overwrites tokenizer setting for onset_shift position shift
-        :return: the position shifts
+        Args:
+            score_positions: Array of score positions (ticks/beats).
+            onset_shift: If ``True``, overwrites tokenizer setting for onset_shift position shift.
+
+        Returns:
+            Array of position shits.
         """
         onset_shift = (
             self.config.additional_params["onset_position_shifts"]
@@ -1504,10 +1888,15 @@ class SyMuPe(SyMuPeBase):
     def compute_onset_values(
         self, score_positions: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        r"""Computes number of notes and positions of notes in onsets.
+        """Computes the number of notes and positions of notes in onsets.
 
-        :param score_positions: score positions in ticks/beats
-        :return: the number of notes and positions of notes in onsets
+        Used to built `NotesInOnset` and `PositionInOnset` tokens.
+
+        Args:
+            score_positions: Array of score positions (ticks/beats).
+
+        Returns:
+            Tuple of (score_position_indices, number_of_notes_in_onset, note_position_in_onset).
         """
         unique_score_pos, score_pos_counts = np.unique(score_positions, return_counts=True)
         score_pos_ids = np.arange(len(unique_score_pos)).repeat(score_pos_counts)
@@ -1528,12 +1917,15 @@ class SyMuPe(SyMuPeBase):
     def compute_time_bar_beat_onset_indices(
         self, tokens: TokSequence
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        r"""
-        Compute time bar, beat and onset indices for each note in the sequence
-        using 120 BPM as "tempo" and 4/4 as time "signature".
+        """Estimated time bar, beat and onset indices for each note in the token sequence.
 
-        :param tokens: a token sequence
-        :return: a dictionary of ticks data
+        Uses a tempo of 120 BPM and a time signature of 4/4.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+
+        Returns:
+            Tuple of (bar, beat, onset) indices.
         """
         additional_params = self.config.additional_params
         assert additional_params["use_time_tokens"], (
@@ -1554,6 +1946,15 @@ class SyMuPe(SyMuPeBase):
 
     @staticmethod
     def compute_onset_pairs(score_ticks: np.ndarray, perf_times: np.ndarray) -> np.ndarray:
+        """Calculates a mapping between unique score onset ticks and their mean performance times.
+
+        Args:
+            score_ticks: Array of score ticks.
+            perf_times: Array of performance times.
+
+        Returns:
+            Array of unique (score_tick, perf_time) pairs.
+        """
         # Get unique performed score onsets
         sort_ids = np.argsort(score_ticks)
         score_onsets, onset_un_idx, onset_counts = np.unique(
@@ -1579,6 +1980,18 @@ class SyMuPe(SyMuPeBase):
         normalized_values: bool = False,
         shift_to_zero: bool = False,
     ) -> tuple[TokSequence, dict[str, int | float]]:
+        """Applies a global temporal shift (`Bar` or `Time`) to a token sequence.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+            shifts: Dictionary containing 'Bar' and 'Time' offsets.
+            inverse_shifts: If ``True``, subtracts the shifts instead of adding.
+            normalized_values: If ``True``, processes values in normalized space.
+            shift_to_zero: If ``True``, shifts the first note of the sequence to zero.
+
+        Returns:
+            Shifted :class:`TokSequence` object and the shift values used.
+        """
         assert not shift_to_zero or shifts is None
 
         vocab = tokens.vocab or self.vocab_types_idx
@@ -1652,6 +2065,15 @@ class SyMuPe(SyMuPeBase):
     def add_tempo_tokens(
         self, tokens: TokSequence, window: tuple[float, float] = (-2, 1)
     ) -> TokSequence:
+        """Estimates local tempo from timing and injects `Tempo` tokens into the token sequence.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+            window: Temporal window size in seconds.
+
+        Returns:
+            :class:`TokSequence` object with updated `Tempo` tokens.
+        """
         vocab = tokens.vocab or self.vocab_types_idx
         if "Tempo" not in vocab or not self.has_token_types(tokens, "TimeShift"):
             return tokens
@@ -1667,6 +2089,15 @@ class SyMuPe(SyMuPeBase):
     def compute_local_tempos(
         self, tokens: TokSequence, window: tuple[float, float] = (-2, 1)
     ) -> np.ndarray:
+        """Calculates local BPM for each note using a sliding window of performance onsets.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+            window: Temporal window size in seconds.
+
+        Returns:
+            Array of local tempos.
+        """
         position_data, _ = self.decode_note_positions(tokens, time_division=self.time_division)
 
         score_ticks = position_data["ticks_data"]["note_on"]
@@ -1700,6 +2131,16 @@ class SyMuPe(SyMuPeBase):
         return tempos
 
     def add_bar_line_tokens(self, tokens: TokSequence, start: bool = True) -> TokSequence:
+        """Injects `BAR_LINE` special tokens at the boundaries of each bar.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+            start: If ``True``, `BAR_LINE` tokens are inserted at the beginning of each bar.
+                If ``False``, `BAR_LINE` tokens are inserted at the end of each bar.
+
+        Returns:
+            :class:`TokSequence` object with injected `BAR_LINE` tokens.
+        """
         if (
             tokens.type in (SequenceType.TIME_PERFORMANCE, SequenceType.TIME_PERFORMANCE_SUSTAIN)
             or BAR_LINE_TOKEN not in self.special_tokens
@@ -1724,6 +2165,14 @@ class SyMuPe(SyMuPeBase):
         return tokens
 
     def remove_bar_line_tokens(self, tokens: TokSequence) -> TokSequence:
+        """Removes `BAR_LINE` special tokens and recomputes surrounding position shifts.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+
+        Returns:
+            :class:`TokSequence` object with deleted `BAR_LINE` tokens.
+        """
         if BAR_LINE_TOKEN not in self.special_tokens:
             return tokens
 
@@ -1755,6 +2204,17 @@ class SyMuPe(SyMuPeBase):
         return tokens
 
     def add_pedal_tokens(self, tokens: TokSequence, ignore_redundant: bool = True) -> TokSequence:
+        """Injects sustain pedal events as tokens into the sequence.
+
+        Updates note durations to reflect sustain state if sustain tokens are enabled.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+            ignore_redundant: If ``True``, redundant pedal events are ignored.
+
+        Returns:
+            :class:`TokSequence` object with injected sustain pedal events.
+        """
         if PEDAL_ON_TOKEN not in self.special_tokens or PEDAL_OFF_TOKEN not in self.special_tokens:
             return tokens
 
@@ -1864,9 +2324,9 @@ class SyMuPe(SyMuPeBase):
             tokens,
             ids=self.encode_tokens(new_values),
             values=new_values,
-            interpolated=_backend.zeros_like(new_values[:, 0])
-            if tokens.interpolated is not None
-            else None,
+            interpolated=(
+                _backend.zeros_like(new_values[:, 0]) if tokens.interpolated is not None else None,
+            ),
         )
         tokens = tokens + new_tokens
 
@@ -1909,6 +2369,16 @@ class SyMuPe(SyMuPeBase):
         return tokens
 
     def remove_pedal_tokens(self, tokens: TokSequence, save_pedals: bool = True) -> TokSequence:
+        """Removes special pedal tokens and recomputes surrounding time shifts.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+            save_pedals: If ``True``, pedals are saved as an array inside :class:`TokSequence` object
+                `pedals` attribute.
+
+        Returns:
+            :class:`TokSequence` object with deleted pedal tokens.
+        """
         if PEDAL_ON_TOKEN not in self.special_tokens and PEDAL_OFF_TOKEN not in self.special_tokens:
             return tokens
 
@@ -1953,6 +2423,8 @@ class SyMuPe(SyMuPeBase):
             pedals = pedals[np.lexsort((-pedals[:, 0], pedals[:, 1]))]
             if pedals[0, 0] == 0:
                 pedals = np.concatenate([np.array([[1, 0.0]]), pedals], axis=0)
+            # if pedals[-1, 0] == 1:
+            #     pedals = np.concatenate([pedals, np.array([[0, note_times.max()]])], axis=0)
             pedals = np.concatenate([pedals[:1], pedals[1:][np.diff(pedals[:, 0]) != 0.0]])
             tokens.pedals = pedals
         elif save_pedals:
@@ -1981,6 +2453,16 @@ class SyMuPe(SyMuPeBase):
     def add_artificial_pedal_on(
         self, tokens: TokSequence, position_tokens: bool = False
     ) -> TokSequence:
+        """Ensures a sequence starting with a pedal-off has a preceding pedal-on
+        to maintain logical consistency for generative models.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+            position_tokens: If ``True``, zero position tokens are added.
+
+        Returns:
+            :class:`TokSequence` object with added pedal tokens.
+        """
         if PEDAL_ON_TOKEN not in self.special_tokens and PEDAL_OFF_TOKEN not in self.special_tokens:
             return tokens
 
@@ -2029,6 +2511,16 @@ class SyMuPe(SyMuPeBase):
         wrap: bool = False,
         segment_tokens: bool = False,
     ) -> TokSequence:
+        """Calculates and injects cyclic `TimePosition` tokens and `Time_Segment` special tokens.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+            wrap: If ``True``, wrap around the time position tokens.
+            segment_tokens: If ``True``, wrap around the `Time_Segment` special token markers.
+
+        Returns:
+            :class:`TokSequence` object with added time position tokens.
+        """
         if (
             not self.config.additional_params["use_time_positions"]
             or tokens.type == SequenceType.SCORE
@@ -2079,9 +2571,9 @@ class SyMuPe(SyMuPeBase):
             tokens,
             ids=self.encode_tokens(new_values),
             values=new_values,
-            interpolated=_backend.zeros_like(new_values[:, 0])
-            if tokens.interpolated is not None
-            else None,
+            interpolated=(
+                _backend.zeros_like(new_values[:, 0]) if tokens.interpolated is not None else None
+            ),
         )
         tokens = tokens + new_tokens
 
@@ -2122,6 +2614,14 @@ class SyMuPe(SyMuPeBase):
         return tokens
 
     def remove_time_segment_tokens(self, tokens: TokSequence) -> TokSequence:
+        """Removes `Time_Segment` special tokens used to denote the start of temporal segments.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+
+        Returns:
+            :class:`TokSequence` object with deleted time segment tokens.
+        """
         if TIME_SEGMENT_TOKEN not in self.special_tokens:
             return tokens
 
@@ -2132,6 +2632,15 @@ class SyMuPe(SyMuPeBase):
         return self.remove_notes(tokens, mask=mask)
 
     def remove_notes(self, tokens: TokSequence, mask: np.ndarray) -> TokSequence:
+        """Removes notes from a sequence based on a mask and recomputes relative shifts.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+            mask: Mask to apply to the tokens.
+
+        Returns:
+            :class:`TokSequence` object with notes removed.
+        """
         if tokens.interpolated is None or tokens.interpolated.sum() == 0:
             return tokens
 
@@ -2177,6 +2686,15 @@ class SyMuPe(SyMuPeBase):
         return tokens
 
     def fill_bar_and_time_signature_tokens(self, tokens: TokSequence):
+        """Infers and populates metrical tokens (`Bar`, `MaxPosition`, `BeatDuration`)
+        from `BAR_LINE` tokens and existing positions.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+
+        Returns:
+            :class:`TokSequence` object with bar and time signature tokens.
+        """
         if self.has_token_types(tokens, ["Bar", "MaxPosition", "BeatDuration"]):
             return tokens
 
@@ -2235,15 +2753,18 @@ class SyMuPe(SyMuPeBase):
         denormalize: bool = False,
         clip: bool = False,
     ) -> np.ndarray:
-        r"""
-        Encode tokens from values for a given token_type.
-        Private method used by `encode_tokens`.
+        """Encodes tokens from values for a specific `token_type`.
 
-        :param values: a sequence of values
-        :param token_type: tokens' dimension to compute tokens
-        :param denormalize: denormalize values before encoding
-        :param clip: clip values to their quantized boundaries
-        :return: a sequence of encoded tokens for provided type
+        Internal method used by `encode_tokens`.
+
+        Args:
+            values: Array of values to encode.
+            token_type: Type of tokens (name) to encode.
+            denormalize: Denormalize values before encoding.
+            clip: Clip values to their quantized boundaries.
+
+        Returns:
+            Array of encoded tokens for provided `token_type`.
         """
         if denormalize:
             values = self._denormalize_values(values, token_type)
@@ -2295,15 +2816,18 @@ class SyMuPe(SyMuPeBase):
         clip: bool = False,
         normalize: bool = False,
     ) -> np.ndarray:
-        r"""
-        Decode values from tokens for a given token_type.
-        Private method used by `decode_values`.
+        """Decodes values from tokens for a specific `token_type`.
 
-        :param tokens: a sequence of values
-        :param token_type: tokens' dimension to compute tokens
-        :param clip: clip values to their quantized boundaries
-        :param normalize: normalize decoded values
-        :return: a sequence of decoded values for provided type
+        Internal method used by `decode_values`.
+
+        Args:
+            tokens: Array of tokens to decode.
+            token_type: Type of tokens (name) to decode.
+            clip: Clip values to their quantized boundaries.
+            normalize: normalize values after decoding.
+
+        Returns:
+            Array of decoded values for provided `token_type`.
         """
         is_special = tokens < self.zero_token
         special_tokens = tokens[is_special]
@@ -2349,6 +2873,15 @@ class SyMuPe(SyMuPeBase):
         return values
 
     def _clip_values(self, values: np.ndarray, token_type: str) -> np.ndarray:
+        """Clamps values to the valid range for a specific `token_type`.
+
+        Args:
+            values: Array of values to clamp.
+            token_type: Type of tokens (name) to clamp.
+
+        Returns:
+            Array of clamped values for provided `token_type`.
+        """
         is_special = values <= SPECIAL_TOKENS_VALUE
         special_values = values[is_special]
 
@@ -2388,6 +2921,15 @@ class SyMuPe(SyMuPeBase):
         return values
 
     def _normalize_values(self, values: np.ndarray, token_type: str) -> np.ndarray:
+        """Scales values to a defined range for a specific `token_type`.
+
+        Args:
+            values: Array of values to normalize.
+            token_type: Type of tokens (name) to normalize.
+
+        Returns:
+            Array of normalized values for provided `token_type`.
+        """
         is_special = values <= SPECIAL_TOKENS_VALUE
         special_values = values[is_special]
 
@@ -2424,6 +2966,15 @@ class SyMuPe(SyMuPeBase):
         return values
 
     def _denormalize_values(self, values: np.ndarray, token_type: str) -> np.ndarray:
+        """Rescales values back to their original units for a specific `token_type`.
+
+        Args:
+            values: Array of values to denormalize.
+            token_type: Type of tokens (name) to denormalize.
+
+        Returns:
+            Array of denormalized values for provided `token_type`.
+        """
         is_special = values <= SPECIAL_TOKENS_VALUE
         special_values = values[is_special]
 
@@ -2458,15 +3009,50 @@ class SyMuPe(SyMuPeBase):
         return values
 
     @property
+    def score_sizes(self):
+        """The vocabulary sizes for token types specific to score encoding.
+
+        Filters the main vocabulary sizes to include only keys defined in
+        `symupe.data.tokenizers.constants.SCORE_KEYS`.
+
+        Returns:
+            Dictionary mapping score-side token names to their vocabulary sizes.
+        """
+        return {key: value for key, value in self.sizes.items() if key in SCORE_KEYS}
+
+    @property
+    def performance_sizes(self):
+        """The complete dictionary of vocabulary sizes for all supported token types."""
+        return self.sizes
+
+    @property
     def time_performance_sizes(self) -> dict[str, int]:
+        """The vocabulary sizes for token types used in time-only performance encoding.
+
+        Includes keys defined in `symupe.data.tokenizers.constants.TIME_PERFORMANCE_KEYS`,
+        such as `Pitch`, `Velocity`, and absolute time tokens.
+
+        Returns:
+            Dictionary mapping time-performance token names to their vocabulary sizes.
+        """
         return {key: value for key, value in self.sizes.items() if key in TIME_PERFORMANCE_KEYS}
 
     @property
     def onset_deviation_token(self) -> str:
+        """The string name of the active onset deviation token.
+
+        Determines whether the tokenizer is configured for relative (`RelOnsetDev`)
+        or absolute (`OnsetDev`) timing deviations.
+        """
         return "RelOnsetDev" if self.config.additional_params["rel_onset_dev"] else "OnsetDev"
 
     @property
     def performed_duration_token(self) -> str:
+        """The string name of the active performance duration token.
+
+        Determines whether the tokenizer is configured for relative (`RelPerfDuration`)
+        or absolute (`PerfDuration`) articulation/duration.
+        """
         return (
             "RelPerfDuration"
             if self.config.additional_params["rel_perf_duration"]
@@ -2475,6 +3061,11 @@ class SyMuPe(SyMuPeBase):
 
     @property
     def score_only_tokens(self) -> list[str]:
+        """A list of token types that are exclusive to score-metrical representations.
+
+        This includes metrical indices like `Bar` and `Position`, as well as
+        score-side auxiliary tokens like `PositionShift` and `NotesInOnset`.
+        """
         token_types = ["Bar", "Position", "Duration"] + self.time_signature_tokens
         if self.config.additional_params["use_position_shifts"]:
             token_types.append("PositionShift")
@@ -2484,12 +3075,23 @@ class SyMuPe(SyMuPeBase):
 
     @property
     def bar_line_id(self) -> int | None:
+        """The vocabulary ID associated with the `BAR_LINE` special token.
+
+        Returns:
+            Integer ID if the token exists in the vocabulary, otherwise ``None``.
+        """
         if BAR_LINE_TOKEN in self.special_tokens:
             return self[0, BAR_LINE_TOKEN]
         return None
 
     @property
     def pedal_ids(self) -> tuple[int | None, int | None]:
+        """The vocabulary IDs for sustain pedal events.
+
+        Returns:
+            Tuple containing the IDs for (`PEDAL_ON`, `PEDAL_OFF`).
+            Elements are ``None`` if the respective tokens are not in the vocabulary.
+        """
         if PEDAL_ON_TOKEN in self.special_tokens:
             return self[0, PEDAL_ON_TOKEN], self[0, PEDAL_OFF_TOKEN]
         return None, None

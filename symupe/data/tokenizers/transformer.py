@@ -7,8 +7,8 @@ from collections.abc import Sequence
 import numpy as np
 
 from .symupe import SyMuPe
-from ..classes import TokSequence, SequenceType, EncodingType, SEQUENCE_TRANSFORMS
-from ..constants import (
+from .classes import TokSequence, SequenceType, EncodingType, SEQUENCE_TRANSFORMS
+from .constants import (
     SCORE_KEYS,
     PLAIN_SCORE_KEYS,
     REL_PERFORMANCE_KEYS,
@@ -22,7 +22,18 @@ from ..constants import (
 
 
 class SyMuPeTransformer:
+    """Utility class to transform :class:`TokSequence` objects between different encoding types.
+
+    Facilitates conversion between metrical score representations and various performance-aligned
+    formats by masking irrelevant dimensions and injecting deadpan timing when necessary.
+    """
+
     def __init__(self, tokenizer: SyMuPe):
+        """Initializes transformer with a specific SyMuPe tokenizer instance.
+
+        Args:
+            tokenizer: :class:`SyMuPe` tokenizer used for encoding/decoding logic.
+        """
         self.tokenizer = tokenizer
 
     def __call__(
@@ -32,6 +43,20 @@ class SyMuPeTransformer:
         seq_type: SequenceType | None = None,
         clean_tokens: bool = True,
     ) -> TokSequence:
+        """Transforms sequence to target encoding and sequence type.
+
+        Handles decompression, conversion of score tokens to deadpan performance
+        representations, and selective removal of special tokens.
+
+        Args:
+            seq: :class:`TokSequence` to transform.
+            encoding: Target :class:`EncodingType`.
+            seq_type: Optional override for :class:`SequenceType`.
+            clean_tokens: If ``True``, removes special tokens irrelevant to target encoding.
+
+        Returns:
+            Transformed :class:`TokSequence` object.
+        """
         seq_type = seq_type or seq.type
         assert encoding in SEQUENCE_TRANSFORMS[seq_type]
 
@@ -67,6 +92,17 @@ class SyMuPeTransformer:
         return seq
 
     def _to_sub_encoding(self, seq: TokSequence, enc_keys: list[str]) -> TokSequence:
+        """Internal helper to mask dimensions not present in specified key list.
+
+        Sets IDs and values of excluded dimensions to ignore tokens/values.
+
+        Args:
+            seq: :class:`TokSequence` to mask.
+            enc_keys: List of dimension names to preserve.
+
+        Returns:
+            Masked :class:`TokSequence`.
+        """
         for key in self.tokenizer.performance_sizes:
             if key not in enc_keys:
                 seq.ids[:, self.tokenizer.vocab_types_idx[key]] = self.tokenizer.ignore_token
@@ -76,32 +112,89 @@ class SyMuPeTransformer:
         return seq
 
     def to_score_encoding(self, seq: TokSequence) -> TokSequence:
+        """Converts sequence to standard score-metrical representation.
+
+        Args:
+            seq: :class:`TokSequence` to convert.
+
+        Returns:
+            Score-encoded :class:`TokSequence`.
+        """
         return self._to_sub_encoding(seq, enc_keys=SCORE_KEYS)
 
     def to_plain_score_encoding(self, seq: TokSequence) -> TokSequence:
+        """Converts sequence to plain score representation (without `Tempo` and `Velocity`).
+
+        Args:
+            seq: :class:`TokSequence` to convert.
+
+        Returns:
+            Plain-score-encoded :class:`TokSequence`.
+        """
         return self._to_sub_encoding(seq, enc_keys=PLAIN_SCORE_KEYS)
 
     def to_deadpan_performance_encoding(self, seq: TokSequence) -> TokSequence:
+        """Generates performance representation with zero timing/articulation deviations.
+
+        Args:
+            seq: :class:`TokSequence` to convert.
+
+        Returns:
+            Deadpan performance :class:`TokSequence`.
+        """
         score_seq = self.to_score_encoding(seq)
         score_seq = self.tokenizer.compress(score_seq)
         return self.tokenizer.score_tokens_as_performance(score_seq)
 
     def to_relative_performance_encoding(self, seq: TokSequence) -> TokSequence:
+        """Converts sequence to relative performance representation (`OnsetDev`/`PerfDuration`).
+
+        Args:
+            seq: :class:`TokSequence` to convert.
+
+        Returns:
+            Relative-performance-encoded :class:`TokSequence`.
+        """
         assert self.tokenizer.config.additional_params["use_onset_tokens"]
 
         return self._to_sub_encoding(seq, enc_keys=REL_PERFORMANCE_KEYS)
 
     def to_time_performance_encoding(self, seq: TokSequence) -> TokSequence:
+        """Converts sequence to absolute time performance representation (`TimeShift`/`TimeDuration`).
+
+        Args:
+            seq: :class:`TokSequence` to convert.
+
+        Returns:
+            Time-performance-encoded :class:`TokSequence`.
+        """
         assert self.tokenizer.config.additional_params["use_time_tokens"]
 
         return self._to_sub_encoding(seq, enc_keys=TIME_PERFORMANCE_KEYS)
 
     def to_score_time_performance_encoding(self, seq: TokSequence) -> TokSequence:
+        """Converts sequence to a hybrid score and absolute time performance representation.
+
+        Args:
+            seq: :class:`TokSequence` to convert.
+
+        Returns:
+            Score-time-performance-encoded :class:`TokSequence`.
+        """
         assert self.tokenizer.config.additional_params["use_time_tokens"]
 
         return self._to_sub_encoding(seq, enc_keys=list(set(SCORE_KEYS + TIME_PERFORMANCE_KEYS)))
 
     def remove_special_tokens(self, seq: TokSequence, force: bool = False):
+        """Removes `PEDAL_ON/OFF` or `BAR_LINE` special tokens based on current encoding requirements.
+
+        Args:
+            seq: :class:`TokSequence` to clean.
+            force: If ``True``, removes both pedal and bar line tokens regardless of encoding.
+
+        Returns:
+            Cleaned :class:`TokSequence`.
+        """
         if force or seq.encoding in (
             EncodingType.SCORE,
             EncodingType.PLAIN_SCORE,
@@ -125,6 +218,19 @@ class SyMuPeTransformer:
         offset: int = 0,
         seq_len: int = 256,
     ):
+        """Calculates required sequence length to contain a specific number of notes.
+
+        Accounts for special tokens (pedals, bar lines) which vary by encoding.
+
+        Args:
+            seq: :class:`TokSequence` to analyze.
+            encodings: Optional list of :class:`EncodingType` values to check.
+            offset: Starting index in sequence.
+            seq_len: Target number of musical notes.
+
+        Returns:
+            Dictionary mapping :class:`EncodingType` to total sequence length (in tokens).
+        """
         encodings = encodings or (seq.encoding,)
 
         pitches = seq.ids[:, seq.vocab["Pitch"]][offset:]
@@ -173,6 +279,21 @@ class SyMuPeTransformer:
         full_ignore: bool = True,
         minimal: bool = False,
     ):
+        """Generates template tokens (placeholders) for a specific encoding.
+
+        Useful for creating masked prompts or initializing generation buffers.
+
+        Args:
+            encoding: Target :class:`EncodingType` for template.
+            token_types: Optional list of dimensions to keep after compression.
+            bar_line_token: Whether to include bar line placeholder.
+            pedal_token: Whether to include pedal placeholders.
+            full_ignore: If ``True``, uses ignore tokens for irrelevant dimensions.
+            minimal: If ``True``, omits placeholder special tokens if not required by encoding.
+
+        Returns:
+            :class:`TokSequence` containing template tokens.
+        """
         vocab = self.tokenizer.vocab_types_idx
 
         tokens = []
