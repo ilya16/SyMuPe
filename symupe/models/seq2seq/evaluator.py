@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 
 from symupe.data.collators import LMScorePerformanceInputs
-from symupe.data.tokenizers import SyMuPeBase
+from symupe.data.tokenizers import SyMuPe
 from symupe.modules.tuple_transformer import TupleTransformerOutput, TupleTransformerFMOutput
 from .model import Seq2SeqMusicTransformerOutput, Seq2SeqFMMusicTransformerOutput
 from ..music_transformer.evaluator import MusicTransformerEvaluator, FMMusicTransformerEvaluator
@@ -15,7 +15,7 @@ class Seq2SeqMusicTransformerEvaluator(MusicTransformerEvaluator):
     def __init__(
         self,
         model,
-        tokenizer: SyMuPeBase,
+        tokenizer: SyMuPe,
         label_pad_token_id: int = -100,
         normalized_targets: bool = True,
         ignore_keys: list[str] | None = None,
@@ -36,7 +36,7 @@ class Seq2SeqFMMusicTransformerEvaluator(FMMusicTransformerEvaluator):
     def __init__(
         self,
         model,
-        tokenizer: SyMuPeBase,
+        tokenizer: SyMuPe,
         label_pad_token_id: int = -100,
         normalized_targets: bool = True,
         ignore_keys: list[str] | None = None,

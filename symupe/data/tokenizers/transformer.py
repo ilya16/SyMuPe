@@ -7,8 +7,8 @@ from collections.abc import Sequence
 import numpy as np
 
 from .symupe import SyMuPe
-from ..classes import TokSequence, SequenceType, EncodingType, SEQUENCE_TRANSFORMS
-from ..constants import (
+from .classes import TokSequence, SequenceType, EncodingType, SEQUENCE_TRANSFORMS
+from .constants import (
     SCORE_KEYS,
     PLAIN_SCORE_KEYS,
     REL_PERFORMANCE_KEYS,

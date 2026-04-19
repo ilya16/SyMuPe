@@ -9,20 +9,21 @@ from .classes import (
     ENCODING_SORTING,
     SEQUENCE_DEFAULT_ENCODING,
 )
-from .common import OctupleM
 from .midi_tokenizer import MusicTokenizer
-from .symupe import (
-    SyMuPeBase,
-    SyMuPe,
-    SyMuPeLocal,
-    SyMuPeTransformer,
-    # derivatives
+from .octuple_m import OctupleM
+from .symupe import SyMuPe
+from .symupe_local import SyMuPeLocal
+from .symupe_variants import (
     SyMuPeOnset,
     SyMuPeBeat,
     SyMuPeBar,
     SyMuPeWindow,
     SyMuPeWindowRecompute,
 )
+from .transformer import SyMuPeTransformer
+
+AutoTokenizer = MusicTokenizer
+SyMuPeTokenizer = SyMuPe
 
 
 class TokenizerType(ExplicitEnum):
@@ -48,3 +49,34 @@ TOKENIZERS = {
     TokenizerType.SyMuPeWindow: SyMuPeWindow,
     TokenizerType.SyMuPeWindowRecompute: SyMuPeWindowRecompute,
 }
+
+
+__all__ = [
+    # classes
+    "SequenceType",
+    "EncodingType",
+    "SortingType",
+    "TokSequence",
+    "TokSequenceContext",
+    "TokenizerConfig",
+    "ENCODING_SORTING",
+    "SEQUENCE_DEFAULT_ENCODING",
+    # tokenizers
+    "TokenizerType",
+    "TOKENIZERS",
+    # core
+    "MusicTokenizer",
+    "AutoTokenizer",
+    # main tokenizers
+    "OctupleM",
+    "SyMuPe",
+    "SyMuPeTokenizer",
+    "SyMuPeLocal",
+    "SyMuPeTransformer",
+    # derivative tokenizers
+    "SyMuPeOnset",
+    "SyMuPeBeat",
+    "SyMuPeBar",
+    "SyMuPeWindow",
+    "SyMuPeWindowRecompute",
+]

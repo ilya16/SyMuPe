@@ -78,6 +78,7 @@ class TokSequence(MidiTokTokSequence):
     vocab: dict[str, int] | None = None
     meta: dict[str, ...] | None = None
     token_to_note: np.ndarray | None = None
+    score_to_perf_token: np.ndarray | None = None
 
     def __getitem__(self, val: int | slice) -> int | str | Event | TokSequence:
         """

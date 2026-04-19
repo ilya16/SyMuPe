@@ -11,18 +11,18 @@ from miditok.constants import TEMPO
 from symusic import Score
 
 from symupe.utils import find_closest
+from .classes import TokSequence, SequenceType, EncodingType, TokSequenceContext
+from .constants import TICKS_PER_QUARTER
 from .symupe import SyMuPe
-from ..classes import TokSequence, SequenceType, EncodingType, TokSequenceContext
-from ..constants import TICKS_PER_QUARTER
-from ...midi.timing import MIDITimeMapper
-from ...midi.utils import sort_notes
+from ..midi.timing import MIDITimeMapper
+from ..midi.utils import sort_notes
 
 
 class SyMuPeLocal(SyMuPe):
     r"""
     SyMuPeLocal: a Symbolic Music Performance encoding with local window tempos.
 
-    A mix of SyMuPe encoding and local window tempos from the SPMuple encoding [1].
+    A mix of SyMuPe encoding [1] and local window tempos from the SPMuple encoding [2].
 
     Each compound token is a tuple of the form (index: Token type):
     * 0: Bar
@@ -45,8 +45,12 @@ class SyMuPeLocal(SyMuPe):
     * (+ Optional, performance) Sustained
 
     References:
-        [1]: Borovik I., Viro V. "ScorePerformer: Expressive Piano Performance Rendering with Fine-Grained Control."
-        ISMIR 2023
+        [1]: Borovik, I., Gavrilev, D., and Viro, V. (2025). "SyMuPe: Affective and
+        Controllable Symbolic Music Performance." In Proceedings of the 33rd ACM International
+        Conference on Multimedia (ACM MM).
+        [2]: Borovik, I., & Viro, V. (2023). "ScorePerformer: Expressive Piano Performance
+        Rendering with Fine-Grained Control." In Proceedings of  the 24th International Society
+        for Music Information Retrieval Conference (ISMIR).
     """
 
     def _tweak_config_before_creating_voc(self):

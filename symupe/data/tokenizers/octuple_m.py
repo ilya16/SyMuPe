@@ -20,8 +20,8 @@ from miditok.utils.utils import tempo_qpm_to_mspq
 from symusic import Score, Note, Tempo, TimeSignature
 
 from symupe.utils import find_closest, forward_fill, backward_fill
-from ..classes import TokSequence, SequenceType, EncodingType, TokSequenceContext, backend
-from ..constants import (
+from .classes import TokSequence, SequenceType, EncodingType, TokSequenceContext, backend
+from .constants import (
     TICKS_PER_QUARTER,
     SPECIAL_TOKENS_VALUE,
     MASK_TOKEN,
@@ -30,9 +30,9 @@ from ..constants import (
     IGNORE_TOKEN,
     BAR_LINE_TOKEN,
 )
-from ..midi_tokenizer import MusicTokenizer
-from ...midi.beats import get_bar_beat_ticks
-from ...midi.utils import sort_notes, UNPERFORMED_TRACK_NAME, create_unperformed_notes_track
+from .midi_tokenizer import MusicTokenizer
+from ..midi.beats import get_bar_beat_ticks
+from ..midi.utils import sort_notes, UNPERFORMED_TRACK_NAME, create_unperformed_notes_track
 
 
 class OctupleM(MusicTokenizer):
