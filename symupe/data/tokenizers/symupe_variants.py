@@ -3,7 +3,7 @@ from .symupe_local import SyMuPeLocal
 
 
 class SyMuPeOnset(SyMuPeLocal):
-    r"""SyMuPeOnset: a SyMuPe tokenizer with inter-onset tempos."""
+    """SyMuPeOnset: a SyMuPe tokenizer with inter-onset tempos."""
 
     def _tweak_config_before_creating_voc(self):
         super()._tweak_config_before_creating_voc()
@@ -15,7 +15,7 @@ class SyMuPeOnset(SyMuPeLocal):
 
 
 class SyMuPeBeat(SyMuPe):
-    r"""SyMuPeBeat: a SyMuPe tokenizer with inter-beat tempos."""
+    """SyMuPeBeat: a SyMuPe tokenizer with inter-beat tempos."""
 
     def _tweak_config_before_creating_voc(self):
         super()._tweak_config_before_creating_voc()
@@ -29,7 +29,7 @@ class SyMuPeBeat(SyMuPe):
 
 
 class SyMuPeBar(SyMuPe):
-    r"""SyMuPeBar: a SyMuPe tokenizer with inter-bar tempos."""
+    """SyMuPeBar: a SyMuPe tokenizer with inter-bar tempos."""
 
     def _tweak_config_before_creating_voc(self):
         super()._tweak_config_before_creating_voc()
@@ -43,7 +43,7 @@ class SyMuPeBar(SyMuPe):
 
 
 class SyMuPeWindow(SyMuPeLocal):
-    r"""SyMuPeBeat: a SyMuPe tokenizer with local window onset tempos."""
+    """SyMuPeBeat: a SyMuPe tokenizer with local window onset tempos."""
 
     def _tweak_config_before_creating_voc(self):
         super()._tweak_config_before_creating_voc()
@@ -58,7 +58,7 @@ class SyMuPeWindow(SyMuPeLocal):
 
 
 class SyMuPeWindowRecompute(SyMuPeLocal):
-    r"""SyMuPeBeat: a SyMuPe tokenizer with local window onset tempo recomputed from the tokens directly."""
+    """SyMuPeBeat: a SyMuPe tokenizer with local window onset tempo recomputed from the tokens directly."""
 
     def _tweak_config_before_creating_voc(self):
         super()._tweak_config_before_creating_voc()

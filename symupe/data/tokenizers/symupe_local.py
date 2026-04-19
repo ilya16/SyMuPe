@@ -1,7 +1,9 @@
 """
 SyMuPeLocal encoding.
 
-Adapts the ideas of the SPMuple encoding from ScorePerformer with local window tempos to SyMuPe encoding.
+Adapts the ideas of the SPMuple encoding
+from ScorePerformer (https://archives.ismir.net/ismir2023/paper/000069.pdf)
+with local window tempos to SyMuPe encoding.
 """
 
 from __future__ import annotations
@@ -19,41 +21,57 @@ from ..midi.utils import sort_notes
 
 
 class SyMuPeLocal(SyMuPe):
-    r"""
-    SyMuPeLocal: a Symbolic Music Performance encoding with local window tempos.
+    """SyMuPeLocal: a Symbolic Music Performance (SyMuPe) encoding with local window tempos.
 
-    A mix of SyMuPe encoding [1] and local window tempos from the SPMuple encoding [2].
+    A mix of SyMuPe encoding [1] and local window tempos from the SPMuple encoding [2]
+    (https://archives.ismir.net/ismir2023/paper/000069.pdf).
 
-    Each compound token is a tuple of the form (index: Token type):
-    * 0: Bar
-    * 1: Position
-    * 2: Pitch
-    * 3: Duration
-    * 4: Velocity
-    * (+ Optional) Tempo
-    * (+ Optional) TimeSignature / (BeatDuration, BeatsInBar / MaxBarPosition)
-    * (+ Optional) Program
-    * (+ Optional, score) PositionShift
-    * (+ Optional, score) NotesInOnset
-    * (+ Optional, score) PositionInOnset
-    * (+ performance) RelativeOnsetDeviation
-    * (+ performance) RelativePerformedDuration
-    * (+ Optional, performance) TimeShift
-    * (+ Optional, performance) TimeDuration
-    * (+ Optional, performance) TimePosition
-    * (+ Optional, performance) TimeDurationSustain
-    * (+ Optional, performance) Sustained
+    Unlike standard SyMuPe which uses score-metrical grid tempos, SyMuPeLocal estimates
+    tempo dynamically using a sliding temporal window of performance onsets.
+
+    Each compound token follows the SyMuPe structure but primarily uses
+    `RelOnsetDev` and `RelPerfDuration` tokens for micro-timing,
+    calculated against a locally-weighted BPM.
+
+    **Base Dimensions (OctupleM):**
+    * 0: `Bar`
+    * 1: `Position`
+    * 2: `Pitch`
+    * 3: `Duration`
+    * 4: `Velocity`
+    * (+ Optional) `Tempo`
+    * (+ Optional) `TimeSignature` or (`BeatDuration`, `BeatsInBar` / `MaxBarPosition`)
+    * (+ Optional) `Program`
+
+    **Universal / Note Attribute Extensions:**
+    * (+ Optional) `PitchClass`: Chroma or pitch class of the note (0–11).
+    * (+ Optional) `PitchOctave`: MIDI octave index of the note.
+
+    **Score-Side Auxiliary Dimensions:**
+    * (+ Optional) `PositionShift`: Metrical delta between onsets.
+    * (+ Optional) `NotesInOnset`: Polyphony count at current onset.
+    * (+ Optional) `PositionInOnset`: Index of the note within a chord.
+
+    **Performance-Side Dimensions:**
+    * (+ Optional) `RelOnsetDev`: Timing deviation from score onset.
+    * (+ Optional) `RelPerfDuration`: Actual duration/articulation.
+    * (+ Optional) `TimeShift`: Absolute time between performance onsets (seconds).
+    * (+ Optional) `TimeDuration`: Absolute performance duration (seconds).
+    * (+ Optional) `TimePosition`: Cyclic temporal position within a segment.
+    * (+ Optional) `TimeDurationSustain`: Duration considering sustain pedal state.
+    * (+ Optional) `Sustained`: Boolean indicator for active sustain.
 
     References:
         [1]: Borovik, I., Gavrilev, D., and Viro, V. (2025). "SyMuPe: Affective and
         Controllable Symbolic Music Performance." In Proceedings of the 33rd ACM International
         Conference on Multimedia (ACM MM).
         [2]: Borovik, I., & Viro, V. (2023). "ScorePerformer: Expressive Piano Performance
-        Rendering with Fine-Grained Control." In Proceedings of  the 24th International Society
+        Rendering with Fine-Grained Control." In Proceedings of the 24th International Society
         for Music Information Retrieval Conference (ISMIR).
     """
 
     def _tweak_config_before_creating_voc(self):
+        """Tweaks default :class:`TokenizerConfig`."""
         additional_params = self.config.additional_params
 
         # default parameters
@@ -91,19 +109,21 @@ class SyMuPeLocal(SyMuPe):
         score_tokens: TokSequence,
         note_alignment: np.ndarray | None = None,
     ) -> TokSequence:
-        r"""
-        Tokenize a performance MIDI file into :class:`miditok.TokSequence`
-        with score tokens plus RelativeOnsetDeviation and RelativePerformedDuration tokens.
-        Converts a MIDI file to a performance tokens representation, a sequence of "time steps"
-        of score tokens stacked with performance specific features (e.g., OnsetDeviation).
+        """Internal implementation of performance encoding logic.
 
-        :param midi: the MIDI object to convert.
-        :param score_tokens: corresponding score tokens :class:`miditok.TokSequence`.
-        :param note_alignment: optional alignment between performance and score tokens.
-        :return: the performance token representation, i.e. tracks converted into sequences of tokens
+        Calculates onset deviations and performance durations relative to a
+        dynamic tempo calculated from neighboring performance onsets.
+
+        Args:
+            midi: The performance :class:`symusic.Score` object.
+            score_tokens: The reference score tokens for aligned encoding.
+            note_alignment: Optional precomputed mapping between score and performance notes.
+
+        Returns:
+            :class:`TokSequence` object containing performance features.
         """
         if score_tokens is None:
-            return self._performance_midi_to_time_only_tokens(midi)
+            return self._encode_time_only_performance(midi)
 
         additional_params = self.config.additional_params
 
@@ -357,6 +377,19 @@ class SyMuPeLocal(SyMuPe):
         context: TokSequenceContext | None = None,
         time_division: int = TICKS_PER_QUARTER,
     ) -> tuple[dict[str, any], TokSequenceContext]:
+        """Decodes temporal metadata from a token sequence to determine note onsets/offsets.
+
+        Applies `RelOnsetDev` and `RelPerfDuration` to the score-metrical grid.
+
+        Args:
+            tokens: The :class:`TokSequence` object to decode.
+            context: Optional :class:`TokSequenceContext` for incremental decoding.
+            time_division: MIDI resolution (Ticks Per Quarter).
+
+        Returns:
+            Tuple containing a dictionary of position data (ticks, times, tempos)
+            and the updated :class:`TokSequenceContext` object.
+        """
         additional_params = self.config.additional_params
         time_division = time_division or self.time_division
 
@@ -569,11 +602,13 @@ class SyMuPeLocal(SyMuPe):
         return position_data, new_context
 
     def _create_relative_onset_deviations(self) -> np.ndarray:
-        r"""
-        Create the relative onset deviation bins.
-        The larger the factor, the smaller the resolution.
+        """Creates relative onset deviation bins based on some heuristics.
 
-        :return: the relative onset deviation bins
+        The larger the number of deviations (`self.config.additional_params["num_onset_devs"]`),
+        the higher the resolution.
+
+        Returns:
+            Relative onset deviation bins.
         """
         onset_dev_quant = (self.config.additional_params["num_onset_devs"] - 1) // 10
 
@@ -609,11 +644,13 @@ class SyMuPeLocal(SyMuPe):
         return rel_onset_devs
 
     def _create_relative_performed_durations(self) -> np.ndarray:
-        r"""
-        Create the relative performed duration bins based on some heuristics.
-        The larger the factor, the smaller the resolution.
+        """Creates relative performed duration bins based on some heuristics.
 
-        :return: the relative onset deviation bins
+        The larger the number of deviations (`self.config.additional_params["num_perf_durations"]`),
+        the higher the resolution.
+
+        Returns:
+            Relative onset deviation bins.
         """
         perf_dur_quant = (self.config.additional_params["num_perf_durations"] - 1) // 5
 
@@ -636,12 +673,14 @@ class SyMuPeLocal(SyMuPe):
         return rel_performed_durations
 
     def filter_onsets_in_window(self, onset_time: float, onset_pairs: np.ndarray) -> np.ndarray:
-        r"""
-        Select onsets in the local window for the specified onset.
+        """Selects historical onsets within a local temporal window for tempo estimation.
 
-        :param onset_time: current onset time
-        :param onset_pairs: all onset (tick, time) pairs
-        :return: the subset of onset pairs in the local window
+        Args:
+            onset_time: Current performance onset time in seconds.
+            onset_pairs: Array of pre-calculated (tick, time) pairs.
+
+        Returns:
+            Subset of onset pairs falling within configured window.
         """
         additional_params = self.config.additional_params
 
@@ -675,13 +714,18 @@ class SyMuPeLocal(SyMuPe):
         eps: float = 1e-2,
         tempo_scale: float | None = None,
     ) -> float:
-        r"""
-        Compute weighted local tempo from the tick and time distances.
+        """Calculates weighted local BPM from tick and time intervals.
 
-        :param distances: all onset (tick, time) distance pairs
-        :param eps: small added value for the weighting function
-        :param tempo_scale: tempo scaling factor
-        :return: the computed local tempo
+        Applies a weighting function that gives more importance to onsets
+        closer to the current position.
+
+        Args:
+            distances: Array of (tick_distance, time_distance) pairs.
+            eps: Small epsilon for weighting stability.
+            tempo_scale: Scaling factor for BPM calculation.
+
+        Returns:
+            Estimated local tempo in BPM.
         """
         tempo_scale = tempo_scale or 60 / self.time_division
 
@@ -705,13 +749,15 @@ class SyMuPeLocal(SyMuPe):
         prev_onset_pair: np.ndarray,
         tempo_scale: float | None = None,
     ) -> float:
-        r"""
-        Compute onset tempo from the tick and time distance for current and previous onsets.
+        """Calculates instantaneous tempo between two specific onset pairs.
 
-        :param onset_pair: current pair onset (tick, time)
-        :param prev_onset_pair: previous onset pair (tick, time)
-        :param tempo_scale: tempo scaling factor
-        :return: the computed local tempo
+        Args:
+            onset_pair: Current (tick, time) pair.
+            prev_onset_pair: Previous (tick, time) pair.
+            tempo_scale: Scaling factor for BPM calculation.
+
+        Returns:
+            Calculated BPM between the two points.
         """
         tempo_scale = tempo_scale or 60 / self.time_division
 

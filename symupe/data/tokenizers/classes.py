@@ -18,6 +18,12 @@ from .constants import SPECIAL_TOKENS
 
 
 class SequenceType(ExplicitEnum):
+    """Constants defining high-level music data categories.
+
+    Used to distinguish between raw metrical scores, expressive performances,
+    and synchronized/time-based representations.
+    """
+
     SCORE = "score"
     PERFORMANCE = "performance"
     SYNC_PERFORMANCE = "sync_performance"
@@ -28,6 +34,12 @@ class SequenceType(ExplicitEnum):
 
 
 class EncodingType(ExplicitEnum):
+    """Constants defining specific mathematical representations for token dimensions.
+
+    Determines which features (e.g., `OnsetDev` vs `TimeShift`) are present in
+    the compound tokens.
+    """
+
     SCORE = "score"  # S - s
     PLAIN_SCORE = "plain_score"  # S - s
     PERFORMANCE = "performance"  # SRT - st
@@ -37,6 +49,8 @@ class EncodingType(ExplicitEnum):
 
 
 class SortingType(ExplicitEnum):
+    """Constants defining sorting methods supported by the encoding types."""
+
     SCORE = "score"
     TIME = "time"
     ANY = "any"
@@ -69,6 +83,25 @@ SEQUENCE_DEFAULT_ENCODING = {
 
 @dataclass
 class TokSequence(MidiTokTokSequence):
+    """Data container for tokenized music sequences.
+
+    Extends :class:`miditok.TokSequence` to support real-valued features,
+    interpolation masks, sustain pedal events, and metadata for
+    performance-aligned tasks.
+
+    Attributes:
+        ids: Array or tensor of discrete token IDs.
+        values: Array or tensor of decoded real-valued features.
+        interpolated: Boolean mask indicating which values were interpolated.
+        pedals: Array containing sustain pedal events (type, time).
+        type: Category of the music sequence.
+        encoding: Dimensional representation used for tokens.
+        vocab: Dictionary mapping dimension names to indices.
+        meta: Optional dictionary for temporal and metrical metadata.
+        token_to_note: Alignment mapping from tokens to MIDI note indices.
+        score_to_perf_token: Alignment mapping from score tokens to performance tokens.
+    """
+
     ids: np.ndarray | torch.Tensor | list[int | list[int]] | None = None
     values: np.ndarray | torch.Tensor | None = None
     interpolated: np.ndarray | torch.Tensor | None = None
@@ -81,13 +114,16 @@ class TokSequence(MidiTokTokSequence):
     score_to_perf_token: np.ndarray | None = None
 
     def __getitem__(self, val: int | slice) -> int | str | Event | TokSequence:
-        """
-        Return the ``idx``th element or slice of the sequence.
+        """Retrieves specific element or slice from sequence.
 
-        If an integer is providing, it checks by order: ids, tokens, values, events, bytes, interpolated.
+        Checks attributes in order of priority:
+        `ids`, `tokens`, `values`, `events`, `bytes`, `interpolated`.
 
-        :param val: index of the element to retrieve.
-        :return: ``idx``th element.
+        Args:
+            val: Index or slice object.
+
+        Returns:
+            Element at specified index or new sliced :class:`TokSequence`.
         """
         if isinstance(val, slice):
             return self.__slice(val)
@@ -102,11 +138,13 @@ class TokSequence(MidiTokTokSequence):
         raise ValueError(msg)
 
     def __slice(self, sli: slice) -> TokSequence:
-        """
-        Slice the ``TokSequence``.
+        """Internal logic for slicing all sequence data attributes.
 
-        :param sli: slice object.
-        :return: the slice of the self ``TokSequence``.
+        Args:
+            sli: Slice object defining range.
+
+        Returns:
+            New :class:`TokSequence` containing sliced data.
         """
         seq = replace(self)
         attributes = ["tokens", "ids", "values", "bytes", "events", "interpolated"]
@@ -117,13 +155,15 @@ class TokSequence(MidiTokTokSequence):
         return seq
 
     def __iadd__(self, other: TokSequence) -> TokSequence:
-        """
-        Concatenate the self ``TokSequence`` to another one.
+        """Concatenates another :class:`TokSequence` to current instance.
 
-        The `ìds``, ``tokens``, ``values``, ``interpolated``, ``events`` and ``bytes`` will be concatenated.
+        Combines IDs, tokens, values, and other attributes along the temporal dimension.
 
-        :param other: other ``TokSequence``.
-        :return: the two sequences concatenated.
+        Args:
+            other: :class:`TokSequence` to append.
+
+        Returns:
+            Concatenated :class:`TokSequence`.
         """
         if not isinstance(other, TokSequence):
             msg = (
@@ -147,12 +187,12 @@ class TokSequence(MidiTokTokSequence):
         return self
 
     def numpy(self) -> TokSequence:
-        """
-        Convert ``TokSequence`` `torch.Tensor` attributes into `np.ndarray`.
+        """Converts internal Torch tensors to NumPy arrays.
 
-        The `ìds``, ``values`` and ``interpolated`` will be transformed.
+        The `ìds`, `values` and `interpolated` might be transformed.
 
-        :return: the sequence with converted attributes.
+        Returns:
+            :class:`TokSequence` with NumPy-backed attributes.
         """
         seq = replace(self)
         attributes = ["ids", "values", "interpolated"]
@@ -163,12 +203,15 @@ class TokSequence(MidiTokTokSequence):
         return seq
 
     def torch(self, device: str | torch.device = None) -> TokSequence:
-        """
-        Convert ``TokSequence`` `np.ndarray` attributes into `torch.Tensor`.
+        """Converts internal NumPy arrays to Torch tensors.
 
-        The `ìds``, ``values`` and ``interpolated`` will be transformed.
+        The `ìds`, `values` and `interpolated` might be transformed.
 
-        :return: the sequence with converted attributes.
+        Args:
+            device: Target hardware device for tensors.
+
+        Returns:
+            :class:`TokSequence` with Torch-backed attributes.
         """
         seq = replace(self)
         attributes = ["ids", "values", "interpolated"]
@@ -182,12 +225,13 @@ class TokSequence(MidiTokTokSequence):
         return seq
 
     def repeat(self, batch_size: int = 1):
-        """
-        Repeat ``TokSequence`` attributes across batch dimension.
+        """Expands sequence attributes across a new batch dimension.
 
-        The `ìds``, ``values`` and ``interpolated`` will be repeated.
+        Args:
+            batch_size: Number of times to repeat data.
 
-        :return: the sequence with batch attributes.
+        Returns:
+            :class:`TokSequence` with batched attributes.
         """
         seq = replace(self)
         attributes = ["ids", "values", "interpolated"]
@@ -205,11 +249,14 @@ class TokSequence(MidiTokTokSequence):
 
 
 class TokenizerConfig(MidiTokTokenizerConfig):
-    r"""
-    MIDI tokenizer base class, containing common methods and attributes for all tokenizers.
-    :param special_tokens: list of special tokens. This must be given as a list of strings given
-            only the names of the tokens. (default: ``["PAD", "MASK", "BOS", "EOS"]``\)
-    :param **kwargs: additional parameters that will be saved in `config.additional_params`.
+    """Configuration container for SyMuPe tokenizers.
+
+    Extends :class:`miditok.TokenizerConfig` with support for custom
+    performance features and local tempo windowing.
+
+    Args:
+        special_tokens: List of special token names (["PAD", "MASK", "BOS", "EOS"]).
+        **kwargs: Additional parameters stored in `additional_params`.
     """
 
     def __init__(
@@ -262,6 +309,21 @@ SEQUENCE_TRANSFORMS = {
 
 @dataclass
 class TokSequenceContext:
+    """State container for incremental decoding.
+
+    Maintains temporal and metrical continuity across sequential tokenization/decoding steps.
+
+    Attributes:
+        time_signatures: Tuple of (numerator/denominator, ticks).
+        tempos: Tuple of (BPM, ticks, times).
+        score_ticks: Cumulative metrical tick positions.
+        note_on_ticks: Absolute onset ticks.
+        note_on_times: Absolute onset times in seconds.
+        initial_tempo: Starting BPM for performance estimation.
+        onset_pairs: Mapping of unique score ticks to performance times.
+        pedals: Buffer of active sustain pedal events.
+    """
+
     time_signatures: tuple[np.ndarray, np.ndarray] | None = None
     tempos: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
     score_ticks: np.ndarray | None = None
@@ -273,6 +335,14 @@ class TokSequenceContext:
 
 
 def backend(data: TokSequence | np.ndarray | torch.Tensor):
+    """Detects appropriate computational backend (NumPy or Torch) for input data.
+
+    Args:
+        data: Object to inspect.
+
+    Returns:
+        ``numpy`` or ``torch`` module.
+    """
     if isinstance(data, TokSequence):
         data = data.ids if data.ids is not None else data.values
     return torch if isinstance(data, torch.Tensor) else np

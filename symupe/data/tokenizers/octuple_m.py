@@ -36,21 +36,25 @@ from ..midi.utils import sort_notes, UNPERFORMED_TRACK_NAME, create_unperformed_
 
 
 class OctupleM(MusicTokenizer):
-    r"""
-    OctupleM: a modified and fast Octuple encoding method based on vectorized array operations.
+    r"""OctupleM: A modified and fast Octuple encoding method based on vectorized array operations.
 
-    Each token is list of the form:
-    * 0: Bar
-    * 1: Position
-    * 2: Pitch
-    * 3: Duration
-    * 4: Velocity
-    * (+ Optional) Tempo
-    * (+ Optional) TimeSignature / (BeatDuration, BeatsInBar / MaxBarPosition)
-    * (+ Optional) Program
+    Introduced as a variation of the Octuple encoding from MusicBERT (https://arxiv.org/abs/2106.05630),
+    this class reimplements the logic using NumPy/vectorized operations for significant
+    performance gains over standard iterative tokenizers.
+
+    **Dimensions:**
+    * 0: `Bar`
+    * 1: `Position`
+    * 2: `Pitch`
+    * 3: `Duration`
+    * 4: `Velocity`
+    * (+ Optional) `Tempo`
+    * (+ Optional) `TimeSignature` or (`BeatDuration`, `BeatsInBar` / `MaxBarPosition`)
+    * (+ Optional) `Program`
     """
 
     def _tweak_config_before_creating_voc(self):
+        """Tweaks default :class:`TokenizerConfig`."""
         self.config.use_chords = False
         self.config.use_rests = False
         self.config.use_sustain_pedals = False
@@ -89,27 +93,30 @@ class OctupleM(MusicTokenizer):
 
         self._duration_values = None
 
-    def fill_unperformed_notes(self, midi: Score) -> Score:
-        r"""
-        Adds unperformed notes encoded as markers on a separate track
+    def fill_unperformed_notes(self, score: Score) -> Score:
+        """Adds unperformed notes encoded as markers on a separate track
         unless these notes are already added to MIDI object.
 
-        :param midi: MIDI object to preprocess
+        Args:
+            score: :class:`symusic.Score` object to process.
+
+        Returns:
+            Modified :class:`symusic.Score` object with unperformed notes track added.
         """
         if (
             self.config.additional_params["fill_unperformed_notes"]
-            and midi.tracks[-1].name != UNPERFORMED_TRACK_NAME
+            and score.tracks[-1].name != UNPERFORMED_TRACK_NAME
         ):
             notes = []
-            for m in midi.markers:
+            for m in score.markers:
                 if m.text.startswith("NoteS"):
                     pitch, start, duration = map(int, m.text.split("_")[1:])
                     notes.append(Note(time=start, duration=duration, pitch=pitch, velocity=0))
             if notes:
-                midi.tracks.append(create_unperformed_notes_track())
-                midi.tracks[-1].notes = notes
+                score.tracks.append(create_unperformed_notes_track())
+                score.tracks[-1].notes = notes
 
-        return midi
+        return score
 
     def preprocess_score(
         self,
@@ -119,14 +126,17 @@ class OctupleM(MusicTokenizer):
         quantize_time_signatures: bool = True,
         quantize_tempos: bool = True,
     ) -> Score:
-        r"""
-        Pre-process a ``symusic.Score`` to be used by OctupleM encoding.
+        """Preprocesses a score :class:`symusic.Score` object for the OctupleM encoding.
 
-        :param score: `symusic.Score`` object to preprocess.
-        :param quantize_times: resample and quantize note times
-        :param quantize_velocities: quantize velocity of each note
-        :param quantize_time_signatures: resample and quantize time signature times
-        :param quantize_tempos: quantize tempo values of each tempo change
+        Args:
+            score: :class:`symusic.Score` object to process.
+            quantize_times: Resample and quantize note times.
+            quantize_velocities: Quantize velocity of each note.
+            quantize_time_signatures: Resample and quantize time signature times.
+            quantize_tempos: Quantize tempo values.
+
+        Returns:
+            Preprocessed :class:`symusic.Score` object.
         """
         # Insert unperformed notes on a new track
         score = self.fill_unperformed_notes(score)
@@ -141,36 +151,31 @@ class OctupleM(MusicTokenizer):
         )
 
     def _add_time_events(self, events: list[Event], time_division: int) -> list[list[Event]]:
-        r"""
-        Create the time events from a list of global and track events.
+        """Creates the time events from a list of global and track events.
 
         Left as a plug in since we override `_score_to_tokens` directly.
 
-        :param events: sequence of global and track events to create tokens time from.
-        :param time_division: time division in ticks per quarter of the MIDI being tokenized.
-        :return: the same events, with time events inserted.
+        Args:
+            events: Sequence of global and track events to create tokens time from.
+            time_division: MIDI time division / resolution, in ticks/beat.
+
+        Returns:
+            Sequence of events with time events inserted.
         """
         ...
 
-    def midi_to_tokens(
-        self,
-        midi: Score,
-        apply_bpe: bool = True,
-    ) -> TokSequence | list[TokSequence]:
-        r"""
-        Tokenize a MIDI file.
+    def encode(self, score: Score, **kwargs) -> TokSequence | list[TokSequence]:
+        """Converts a MIDI into a sequence of OctupleM tokens.
 
-        This method returns a (list of) :class:`miditok.TokSequence`.
+        Args:
+            score: :class:`symusic.Score` object to convert.
 
-        :param midi: the MIDI object to convert.
-        :param apply_bpe: will apply BPE if the tokenizer's vocabulary was trained
-            with. (default: ``True``)
-        :return: a :class:`miditok.TokSequence` if ``tokenizer.one_token_stream`` is
-            ``True``, else a list of :class:`miditok.TokSequence` objects.
+        Returns:
+            :class:`TokSequence` object.
         """
         # Preprocess the MIDI file
-        midi = self.preprocess_score(
-            midi,
+        score = self.preprocess_score(
+            score,
             quantize_times=False,
             quantize_velocities=False,
             quantize_tempos=False,
@@ -178,13 +183,13 @@ class OctupleM(MusicTokenizer):
 
         # Sort notes and compute note order change
         token_to_note_alignments = []
-        for track in midi.tracks:
+        for track in score.tracks:
             track.notes, track_token_to_note = sort_notes(track.notes)
             token_to_note_alignments.append(track_token_to_note)
         token_to_note = np.concatenate(token_to_note_alignments)
 
         # Tokenize it
-        tokens = self._score_to_tokens(midi)
+        tokens = self._score_to_tokens(score)
 
         # Add alignment between notes and tokens
         tokens = vars(tokens)
@@ -198,12 +203,15 @@ class OctupleM(MusicTokenizer):
         score: Score,
         attribute_controls_indexes: Mapping[int, Mapping[int, Sequence[int] | bool]] | None = None,
     ) -> TokSequence | list[TokSequence]:
-        r"""
-        Convert a **preprocessed** file object to a sequence of tokens.
+        """Converts a **preprocessed** file object to a sequence of tokens.
 
-        :param score: the MIDI :class:`symusic.Score` object to convert.
-        :return: a :class:`miditok.TokSequence` if ``tokenizer.one_token_stream`` is
-            ``True``, else a list of :class:`miditok.TokSequence` objects.
+        Args:
+            score: {The p}reprocessed :class:`symusic.Score` object.
+            attribute_controls_indexes: Indices of the attribute controls to compute
+                and associated tracks and bars.
+
+        Returns:
+            :class:`TokSequence` representing the score.
         """
         ticks_per_sample = score.ticks_per_quarter / self.config.max_num_pos_per_beat
         bar_ticks, _ = get_bar_beat_ticks(score)
@@ -334,6 +342,20 @@ class OctupleM(MusicTokenizer):
         context: TokSequenceContext | None = None,
         time_division: int | None = TICKS_PER_QUARTER,
     ) -> tuple[dict[str, any], TokSequenceContext]:
+        """Decodes temporal metadata from a token sequence to determine note onsets/offsets.
+
+        Extracts `Bar`, `Position`, and `TimeShift` information to calculate absolute
+        ticks and seconds.
+
+        Args:
+            tokens: :class:`TokSequence` object to decode.
+            context: Optional :class:`TokSequenceContext` for incremental decoding.
+            time_division: MIDI resolution (Ticks Per Quarter).
+
+        Returns:
+            Tuple containing a dictionary of position data (ticks, times, tempos)
+            and the updated :class:`TokSequenceContext` object.
+        """
         time_division = time_division or self.time_division
 
         context = context or TokSequenceContext()
@@ -408,7 +430,21 @@ class OctupleM(MusicTokenizer):
         beat_ticks: np.ndarray,
         score_ticks: np.ndarray,
         time_division: int | None = None,
-    ):
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Internal logic to decode tempo changes into absolute ticks and seconds.
+
+        Args:
+            tempo_values: Array of tempo values from tokens.
+            prev_tempos: Tempos from previous context.
+            prev_tempo_ticks: Ticks from previous context.
+            prev_tempo_times: Times from previous context.
+            beat_ticks: Array of beat positions in ticks.
+            score_ticks: Array of note onsets in ticks.
+            time_division: MIDI time division / resolution, in ticks/beat.
+
+        Returns:
+            Tuple of (tempos, tempo_ticks, tempo_times).
+        """
         time_division = time_division or self.time_division
 
         # Process Tempo changes
@@ -456,7 +492,20 @@ class OctupleM(MusicTokenizer):
         tempo_ticks: np.ndarray,
         tempo_times: np.ndarray,
         time_division: int | None = None,
-    ):
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Converts absolute tick positions to performance times in seconds.
+
+        Args:
+            note_on_ticks: Onsets in ticks.
+            note_off_ticks: Offsets in ticks.
+            tempos: Decoded tempo values.
+            tempo_ticks: Decoded tempo change ticks.
+            tempo_times: Decoded tempo change times.
+            time_division: MIDI time division / resolution, in ticks/beat.
+
+        Returns:
+            Tuple of (note_on_times, note_off_times) in seconds.
+        """
         time_division = time_division or self.time_division
 
         note_ticks = np.concatenate([note_on_ticks, note_off_ticks])
@@ -472,8 +521,21 @@ class OctupleM(MusicTokenizer):
         return note_on_times, note_off_times
 
     @staticmethod
-    def _filter_equal_tempos(tempos: np.ndarray, tempo_ticks: np.ndarray, tempo_times: np.ndarray):
-        # remove duplicates by ticks and tempos
+    def _filter_equal_tempos(
+        tempos: np.ndarray,
+        tempo_ticks: np.ndarray,
+        tempo_times: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Removes redundant successive tempo changes at the same tick or with the same value.
+
+        Args:
+            tempos: Array of tempo values.
+            tempo_ticks: Array of ticks.
+            tempo_times: Array of times.
+
+        Returns:
+            Tuple of cleaned arrays of tempos, ticks, and times.
+        """
         _tempo_ticks = np.concatenate([tempo_ticks, [-1]])
         mask = (_tempo_ticks[1:] - _tempo_ticks[:-1]) != 0
         tempos, tempo_ticks, tempo_times = map(
@@ -493,14 +555,14 @@ class OctupleM(MusicTokenizer):
         tokens: TokSequence | list[TokSequence],
         programs: list[tuple[int, bool]] | None = None,
     ) -> Score:
-        r"""
-        Convert tokens (:class:`miditok.TokSequence`) into a ``symusic.Score``.
+        """Internal logic to convert :class:`TokSequence` object back into a :class:`symusic.Score`.
 
-        :param tokens: token sequence to convert. Can be either a list of
-            :class:`miditok.TokSequence` or a list of :class:`miditok.TokSequence`s.
-        :param programs: programs of the tracks. If none is given, will default to
-            piano, program 0. (default: ``None``)
-        :return: the ``symusic.Score`` object.
+        Args:
+            tokens: Token sequence to convert.
+            programs: Optional list of (program, is_drum) for tracks.
+
+        Returns:
+            Reconstructed :class:`symusic.Score` object.
         """
         tokens.meta = tokens.meta or {}
         time_division = tokens.meta.get("time_division", self.time_division)
@@ -570,7 +632,23 @@ class OctupleM(MusicTokenizer):
         note_on_events: bool = True,
         note_off_events: bool = True,
         sort: bool = True,
-    ):
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, TokSequenceContext]:
+        """Decodes :class:`TokSequence` into raw MIDI event attributes and temporal metadata.
+
+        This internal method decomposes the compound tokens into their constituent
+        performance data, facilitating the reconstruction of MIDI tracks.
+
+        Args:
+            tokens: :class:`TokSequence` to convert.
+            context: Optional :class:`TokSequenceContext` for incremental decoding.
+            note_attributes: If ``True``, extracts pitch and velocity values.
+            note_on_events: If ``True``, extracts note-on timing events.
+            note_off_events: If ``True``, extracts note-off timing events.
+            sort: If ``True``, ensures the resulting events are chronologically ordered.
+
+        Returns:
+            Tuple containing (note_on_times, note_off_times, pitches, velocities, new_context).
+        """
         position_data, new_context = self.decode_note_positions(tokens=tokens, context=context)
 
         note_on_times = position_data["note_on_times"]
@@ -584,11 +662,13 @@ class OctupleM(MusicTokenizer):
         return note_on_times, note_off_times, pitches, velocities, new_context
 
     def sort_tokens(self, tokens: TokSequence) -> TokSequence:
-        r"""
-        Sort token sequence :class:`miditok.TokSequence`.
+        """Sorts :class:`TokSequence` object by `Bar`, then `Position`, then `Pitch`.
 
-        :param tokens: the token sequence to sort
-        :return: the sorted token sequence
+        Args:
+            tokens: :class:`TokSequence` object to sort.
+
+        Returns:
+            Sorted :class:`TokSequence` object.
         """
         vocab = tokens.vocab or self.vocab_types_idx
 
@@ -609,17 +689,10 @@ class OctupleM(MusicTokenizer):
         return tokens
 
     def _create_base_vocabulary(self) -> list[list[str]]:
-        r"""
-        Create the vocabulary, as a list of string tokens.
+        """Creates vocabulary, as a list of lists of string token names.
 
-        Each token is given as the form ``"Type_Value"``, with its type and value
-        separated with an underscore. Example: ``Pitch_58``.
-        The :class:`miditok.MusicTokenizer` main class will then create the "real"
-        vocabulary as a dictionary. Special tokens have to be given when creating the
-        tokenizer, and will be added to the vocabulary by
-        :class:`miditok.MusicTokenizer`.
-
-        :return: the vocabulary as a list of string.
+        Returns:
+            Stacked vocabulary of token names.
         """
         vocab = []
 
@@ -693,7 +766,7 @@ class OctupleM(MusicTokenizer):
         return vocab
 
     def _get_token_types(self) -> list[str]:
-        r"""Create an ordered list of available token types."""
+        """Creates an ordered list of available token types."""
         token_types = ["Bar", "Position", "Pitch", "Duration", "Velocity"]
 
         if self.config.use_tempos:
@@ -708,14 +781,14 @@ class OctupleM(MusicTokenizer):
         return token_types
 
     def _create_token_types_graph(self) -> dict[str, list[str]]:
-        r"""
-        Return a graph (as a dictionary) of the possible token
-        types successions.
+        """Returns a graph (as a dictionary) of the possible token types successions.
+
         Not relevant for Octuple.
 
-        :return: the token types transitions dictionary
+        Returns:
+            Empty dictionary.
         """
-        return {}  # not relevant for Octuple
+        return {}
 
     def has_token_types(
         self,
@@ -723,6 +796,16 @@ class OctupleM(MusicTokenizer):
         token_types: str | list[str],
         check_values: bool = True,
     ) -> bool:
+        """Checks if :class:`TokSequence` object contains specific token dimensions.
+
+        Args:
+            tokens: Sequence to check.
+            token_types: Single name or list of dimension names.
+            check_values: If ``True``, also checks if values are valid (not ignored).
+
+        Returns:
+            ``True`` if all types are present and valid, else ``False``.
+        """
         token_types = [token_types] if isinstance(token_types, str) else token_types
         vocab = tokens.vocab or self.vocab_types_idx
         if any(token_type not in vocab for token_type in token_types):
@@ -742,6 +825,16 @@ class OctupleM(MusicTokenizer):
         token_type: str | list[str] | None,
         from_ids: bool = False,
     ):
+        """Extracts real-valued features from :class:`TokSequence` object.
+
+        Args:
+            tokens: :class:`TokSequence` to extract from.
+            token_type: Token name (dimension) to retrieve.
+            from_ids: If ``True``, decodes values from IDs instead of using precomputed values.
+
+        Returns:
+            NumPy array of values for the requested dimension(s).
+        """
         assert tokens.ids is not None or tokens.values is not None
         from_ids = (from_ids and tokens.ids is not None) or tokens.values is None
         vocab = tokens.vocab or self.vocab_types_idx
@@ -771,6 +864,17 @@ class OctupleM(MusicTokenizer):
         token_type: str | list[str] | None = None,
         vocab: dict[str, int] | None = None,
     ) -> np.ndarray | torch.Tensor | TokSequence:
+        """Internal method for universal conversion between tokens and values
+
+        Args:
+            tokens_or_values: Tokens or values or :class:`TokSequence` to convert.
+            transform_func: Function to apply to tokens or values.
+            token_type: Optional token name or list of dimension names.
+            vocab: Optional token vocabulary for token type indexing.
+
+        Returns:
+            Array or :class:`TokSequence` with clamped values.
+        """
         is_array = isinstance(tokens_or_values, (np.ndarray, torch.Tensor))
         is_torch = isinstance(tokens_or_values, torch.Tensor)
 
@@ -811,15 +915,17 @@ class OctupleM(MusicTokenizer):
         denormalize: bool = False,
         clip: bool = False,
     ) -> np.ndarray | torch.Tensor:
-        r"""
-        Encode tokens from values for all or a provided `token_type`.
+        """Encodes tokens from values for all or a specific `token_type`.
 
-        :param values: a sequence of values of shape (N,) or (N, D)
-        :param token_type: optional type (dimension) to compute tokens
-        :param vocab: optional token vocabulary for token type indexing
-        :param denormalize: denormalize values before encoding
-        :param clip: clip values to their quantized boundaries
-        :return: a sequence of encoded tokens
+        Args:
+            values: Array of values to encode.
+            token_type: Optional type of tokens (name) to encode.
+            vocab: Optional token vocabulary for token type indexing.
+            denormalize: Denormalize values before encoding.
+            clip: Clip values to their quantized boundaries.
+
+        Returns:
+            Array of encoded tokens.
         """
         is_tok_seq = isinstance(values, TokSequence)
         tokens = self._transform_tokens_or_values(
@@ -837,15 +943,18 @@ class OctupleM(MusicTokenizer):
         denormalize: bool = False,
         clip: bool = False,
     ) -> np.ndarray:
-        r"""
-        Encode tokens from values for a given token_type.
-        Private method used by `encode_tokens`.
+        """Encodes tokens from values for a specific `token_type`.
 
-        :param values: a sequence of values
-        :param token_type: tokens' dimension to compute tokens
-        :param denormalize: denormalize values before encoding
-        :param clip: clip values to their quantized boundaries
-        :return: a sequence of encoded tokens for provided type
+        Internal method used by `encode_tokens`.
+
+        Args:
+            values: Array of values to encode.
+            token_type: Type of tokens (name) to encode.
+            denormalize: Denormalize values before encoding.
+            clip: Clip values to their quantized boundaries.
+
+        Returns:
+            Array of encoded tokens for provided `token_type`.
         """
         if denormalize:
             values = self._denormalize_values(values, token_type)
@@ -900,15 +1009,17 @@ class OctupleM(MusicTokenizer):
         clip: bool = False,
         normalize: bool = False,
     ) -> np.ndarray | torch.Tensor:
-        r"""
-        Decode values from tokens for all or a provided `token_type`.
+        """Decodes values from tokens for all or a specific `token_type`.
 
-        :param tokens: a sequence of tokens of shape (N,) or (N, D)
-        :param token_type: optional type (dimension) to compute values
-        :param vocab: optional token vocabulary for token type indexing
-        :param clip: clip values to their quantized boundaries
-        :param normalize: normalize decoded values
-        :return: a sequence of decoded values
+        Args:
+            tokens: Array of tokens to decode.
+            token_type: Optional type of tokens (name) to decode.
+            vocab: Optional token vocabulary for token type indexing.
+            clip: Clip values to their quantized boundaries.
+            normalize: normalize values after decoding.
+
+        Returns:
+            Array of decoded values.
         """
         is_tok_seq = isinstance(tokens, TokSequence)
         values = self._transform_tokens_or_values(
@@ -926,15 +1037,18 @@ class OctupleM(MusicTokenizer):
         clip: bool = False,
         normalize: bool = False,
     ) -> np.ndarray:
-        r"""
-        Decode values from tokens for a given token_type.
-        Private method used by `decode_values`.
+        """Decodes values from tokens for a specific `token_type`.
 
-        :param tokens: a sequence of values
-        :param token_type: tokens' dimension to compute tokens
-        :param clip: clip values to their quantized boundaries
-        :param normalize: normalize decoded values
-        :return: a sequence of decoded values for provided type
+        Internal method used by `decode_values`.
+
+        Args:
+            tokens: Array of tokens to decode.
+            token_type: Type of tokens (name) to decode.
+            clip: Clip values to their quantized boundaries.
+            normalize: normalize values after decoding.
+
+        Returns:
+            Array of decoded values for provided `token_type`.
         """
         is_special = tokens < self.zero_token
         special_tokens = tokens[is_special]
@@ -976,6 +1090,16 @@ class OctupleM(MusicTokenizer):
         token_type: str | list[str] | None = None,
         vocab: dict[str, int] | None = None,
     ) -> np.ndarray | torch.Tensor | TokSequence:
+        """Clamps values to the valid range for all or a specific `token_type`.
+
+        Args:
+            values: Array of values or :class:`TokSequence` with values to clamp.
+            token_type: Type of tokens (name) to clamp.
+            vocab: Optional token vocabulary for token type indexing.
+
+        Returns:
+            Array or :class:`TokSequence` with clamped values.
+        """
         if isinstance(values, TokSequence):
             if token_type is not None:
                 token_type = [token_type] if isinstance(token_type, str) else token_type
@@ -995,6 +1119,15 @@ class OctupleM(MusicTokenizer):
             )
 
     def _clip_values(self, values: np.ndarray, token_type: str) -> np.ndarray:
+        """Clamps values to the valid range for a specific `token_type`.
+
+        Args:
+            values: Array of values to clamp.
+            token_type: Type of tokens (name) to clamp.
+
+        Returns:
+            Array of clamped values for provided `token_type`.
+        """
         is_special = values <= SPECIAL_TOKENS_VALUE
         special_values = values[is_special]
 
@@ -1020,6 +1153,16 @@ class OctupleM(MusicTokenizer):
         token_type: str | list[str] | None = None,
         vocab: dict[str, int] | None = None,
     ) -> np.ndarray | torch.Tensor | TokSequence:
+        """Scales values to a defined range for all or a specific `token_type`.
+
+        Args:
+            values: Array of values or :class:`TokSequence` with values to normalize.
+            token_type: Type of tokens (name) to normalize.
+            vocab: Optional token vocabulary for token type indexing.
+
+        Returns:
+            Array or :class:`TokSequence` with normalized values.
+        """
         if isinstance(values, TokSequence):
             values.values = self._transform_tokens_or_values(
                 values.values, transform_func=self._normalize_values, vocab=values.vocab
@@ -1031,6 +1174,15 @@ class OctupleM(MusicTokenizer):
             )
 
     def _normalize_values(self, values: np.ndarray, token_type: str) -> np.ndarray:
+        """Scales values to a defined range for a specific `token_type`.
+
+        Args:
+            values: Array of values to clamp.
+            token_type: Type of tokens (name) to clamp.
+
+        Returns:
+            Array of normalized values for provided `token_type`.
+        """
         is_special = values <= SPECIAL_TOKENS_VALUE
         special_values = values[is_special]
 
@@ -1064,6 +1216,16 @@ class OctupleM(MusicTokenizer):
         token_type: str | list[str] | None = None,
         vocab: dict[str, int] | None = None,
     ) -> np.ndarray | torch.Tensor | TokSequence:
+        """Rescales values back to their original units for all or a specific `token_type`.
+
+        Args:
+            values: Array of values or :class:`TokSequence` with values to denormalize.
+            token_type: Type of tokens (name) to denormalize.
+            vocab: Optional token vocabulary for token type indexing.
+
+        Returns:
+            Array or :class:`TokSequence` with denormalized values.
+        """
         if isinstance(values, TokSequence):
             values.values = self._transform_tokens_or_values(
                 values.values, transform_func=self._denormalize_values, vocab=values.vocab
@@ -1075,6 +1237,15 @@ class OctupleM(MusicTokenizer):
             )
 
     def _denormalize_values(self, values: np.ndarray, token_type: str) -> np.ndarray:
+        """Rescales values back to their original units for a specific `token_type`.
+
+        Args:
+            values: Array of values to denormalize.
+            token_type: Type of tokens (name) to denormalize.
+
+        Returns:
+            Array of denormalized values for provided `token_type`.
+        """
         is_special = values <= SPECIAL_TOKENS_VALUE
         special_values = values[is_special]
 
@@ -1097,11 +1268,14 @@ class OctupleM(MusicTokenizer):
         return values
 
     def token_values(self, normalize: bool | list[str] = False) -> dict[str, np.ndarray]:
-        r"""
-        Return a dictionary of all values associated with all token indices for each token type.
+        """Returns the real values associated with every possible token ID for each type.
 
-        :param normalize: whether to normalize token values
-        :return: dictionary of token types values
+        Args:
+            normalize: If ``True``, returns normalized values for all types.
+                If a list, normalizes only specified types.
+
+        Returns:
+            Dictionary mapping dimension names to arrays of all possible values.
         """
         if isinstance(normalize, bool):
             normalize = list(self.vocab_types_idx.keys()) if normalize else []
@@ -1120,13 +1294,15 @@ class OctupleM(MusicTokenizer):
         context: TokSequenceContext | None = None,
         time_division: int | None = None,
     ) -> dict[str, np.ndarray | tuple[np.ndarray, np.ndarray]]:
-        r"""
-        Compute tick positions for time signatures, note onsets, bars and beats.
+        """Calculates absolute tick positions for notes, bars, and beats from tokens.
 
-        :param tokens: a token sequence
-        :param context: context of the preceding tokens
-        :param time_division: MIDI time division / resolution, in ticks/beat
-        :return: a dictionary of ticks data
+        Args:
+            tokens: :class:`TokSequence` to analyze.
+            context: Optional preceding context for relative timing.
+            time_division: MIDI time division / resolution, in ticks/beat.
+
+        Returns:
+            Dictionary containing 'note_on', 'duration', 'bar', 'beat', and 'time_sig' ticks.
         """
         time_division = time_division or self.time_division
         ticks_per_sample = time_division / self.config.max_num_pos_per_beat
@@ -1282,12 +1458,15 @@ class OctupleM(MusicTokenizer):
         ticks_data: dict[str, np.ndarray | tuple[np.ndarray, np.ndarray]] | None = None,
         shift_to_zero: bool = False,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        r"""
-        Compute bar, beat and onset indices for each note in the sequence.
+        """Estimated bar, beat and onset indices for each note in the token sequence.
 
-        :param tokens: (optional) a token sequence
-        :param ticks_data: (optional) a precomputed dictionary of ticks data
-        :return: a dictionary of ticks data
+        Args:
+            tokens: :class:`TokSequence` object to process.
+            ticks_data: Dictionary returned by `self.compute_ticks`.
+            shift_to_zero: If ``True``, the indices start from 0.
+
+        Returns:
+            Tuple of (bar, beat, onset) indices.
         """
         if ticks_data is None:
             assert tokens is not None
@@ -1310,12 +1489,14 @@ class OctupleM(MusicTokenizer):
     def compute_position_shifts(
         self, positions: np.ndarray, onset_shift: bool = False
     ) -> np.ndarray:
-        r"""
-        Compute absolute position shifts between onsets from positions.
+        """Computes absolute position shifts between onsets from positions.
 
-        :param positions: score positions in ticks/beats
-        :param onset_shift: if provided, overwrites tokenizer setting for onset_shift position shift
-        :return: the position shifts
+        Args:
+            positions: Array of positions (ticks/beats).
+            onset_shift: If ``True``, overwrites tokenizer setting for onset_shift position shift.
+
+        Returns:
+            Array of position shits.
         """
         if onset_shift:
             unique_score_pos, score_pos_counts = np.unique(positions, return_counts=True)
@@ -1334,6 +1515,18 @@ class OctupleM(MusicTokenizer):
         normalized_values: bool = False,
         shift_to_zero: bool = False,
     ) -> tuple[TokSequence, dict[str, int | float]]:
+        """Applies a global metrical shift (Bar offset) to the entire sequence.
+
+        Args:
+            tokens: :class:`TokSequence` to shift.
+            shifts: Dictionary containing 'Bar' offset.
+            inverse_shifts: If ``True``, subtracts the shift.
+            normalized_values: Whether values are currently normalized.
+            shift_to_zero: If ``True``, shifts the sequence so the first bar is 0.
+
+        Returns:
+            Tuple of (shifted_sequence, applied_shifts).
+        """
         assert not shift_to_zero or shifts is None
 
         vocab = tokens.vocab or self.vocab_types_idx
@@ -1373,6 +1566,14 @@ class OctupleM(MusicTokenizer):
         return tokens, shifts
 
     def add_sos_token(self, tokens: TokSequence) -> TokSequence:
+        """Prepends a Start-Of-Sequence (SOS) token to the sequence.
+
+        Args:
+            tokens: :class:`TokSequence` object to update.
+
+        Returns:
+            Updated :class:`TokSequence` object.
+        """
         assert SOS_TOKEN in self.special_tokens
 
         _backend = backend(tokens)
@@ -1393,6 +1594,14 @@ class OctupleM(MusicTokenizer):
         return tokens
 
     def add_eos_token(self, tokens: TokSequence, token_name: str | None = None) -> TokSequence:
+        """Appends an End-Of-Sequence (EOS) token to the sequence.
+
+        Args:
+            tokens: :class:`TokSequence` object to update.
+
+        Returns:
+            Updated :class:`TokSequence` object.
+        """
         token_name = token_name or EOS_TOKEN
         assert token_name in self.special_tokens
 
@@ -1414,6 +1623,16 @@ class OctupleM(MusicTokenizer):
         return tokens
 
     def add_bar_line_tokens(self, tokens: TokSequence, start: bool = True) -> TokSequence:
+        """Injects `BAR_LINE` special tokens at the boundaries of each bar.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+            start: If ``True``, `BAR_LINE` tokens are inserted at the beginning of each bar.
+                If ``False``, `BAR_LINE` tokens are inserted at the end of each bar.
+
+        Returns:
+            :class:`TokSequence` with injected `BAR_LINE` tokens.
+        """
         if BAR_LINE_TOKEN not in self.special_tokens:
             return tokens
 
@@ -1465,6 +1684,14 @@ class OctupleM(MusicTokenizer):
         return tokens
 
     def remove_bar_line_tokens(self, tokens: TokSequence) -> TokSequence:
+        """Removes `BAR_LINE` special tokens and recomputes surrounding position shifts.
+
+        Args:
+            tokens: :class:`TokSequence` object to process.
+
+        Returns:
+            :class:`TokSequence` with deleted `BAR_LINE` tokens.
+        """
         if BAR_LINE_TOKEN not in self.special_tokens:
             return tokens
 
@@ -1480,6 +1707,7 @@ class OctupleM(MusicTokenizer):
 
     @property
     def sizes(self) -> dict[str, int]:
+        """The complete dictionary of vocabulary sizes for all supported token types."""
         sizes = {k: len(v) for k, v in zip(self.vocab_types_idx, self.vocab)}
         sizes["Bar"] -= (
             self.config.additional_params["real_max_bar_embedding"]
@@ -1489,18 +1717,22 @@ class OctupleM(MusicTokenizer):
 
     @property
     def zero_token(self) -> int:
+        """The vocabulary ID offset where the non-special vocabulary begins."""
         return len(self.special_tokens)
 
     @property
     def ignore_token(self) -> int:
+        """The vocabulary ID used for ignoring a dimension."""
         return self.vocab[0].get(IGNORE_TOKEN, self.vocab[0].get(MASK_TOKEN, 0))
 
     @property
     def ignore_value(self) -> float:
+        """The real-value equivalent of the ignore token."""
         return SPECIAL_TOKENS_VALUE - self.ignore_token
 
     @property
     def duration_values(self) -> np.ndarray:
+        """An array of all possible metrical duration values in quarter notes."""
         if self._duration_values is None:
             self._duration_values = np.array(
                 [(beat * res + pos) / res if res > 0 else 0 for beat, pos, res in self.durations]
@@ -1509,6 +1741,7 @@ class OctupleM(MusicTokenizer):
 
     @property
     def time_signature_tokens(self) -> list[str]:
+        """A list of dimension names used to represent time signatures in the tokenizer."""
         if self.config.use_time_signatures:
             if self.config.additional_params["compound_time_signature"]:
                 return [
