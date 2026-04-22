@@ -119,7 +119,7 @@ class PianoFlow(CFMMusicTransformer):
         context_values: torch.Tensor | None = None,
         context_scale: float = 1.0,
         pedals: torch.Tensor | None = None,
-        disable_tqdm: bool = False,
+        show_progress: bool = True,
         return_intermediates: bool = False,
         **kwargs,
     ):
@@ -137,6 +137,6 @@ class PianoFlow(CFMMusicTransformer):
             context_values=context_values,
             context_scale=context_scale,
             pedals=pedals,
-            disable_tqdm=disable_tqdm,
+            show_progress=show_progress,
             return_intermediates=return_intermediates,
         )

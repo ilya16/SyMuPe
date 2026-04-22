@@ -216,7 +216,7 @@ class Seq2SeqMusicTransformerGenerator(Generator):
         cond_seq_control: dict[str, float] | None = None,
         interpolated: bool = False,
         group_onset_notes: bool = True,
-        disable_tqdm: bool = True,
+        show_progress: bool = False,
         **model_kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         init_seq, gen_seq = self.data.init_seq, self.data.gen_seq
@@ -252,7 +252,8 @@ class Seq2SeqMusicTransformerGenerator(Generator):
         )
 
         # generate all notes till the end
-        if not disable_tqdm:
+        pbar = None
+        if show_progress:
             pbar = tqdm(total=len(init_seq))
             pbar.update(all_gen_tokens.shape[1])
         while not self.data.reached_eos:
@@ -353,7 +354,7 @@ class Seq2SeqMusicTransformerGenerator(Generator):
                 dec_score_tokens=score_tokens,
                 dec_score_values=score_values,
                 context_tokens_dropout=1.0 if cond_seq_control is None else 0.0,
-                disable_tqdm=disable_tqdm,
+                show_progress=False,  # do not log steps inside the model wrapper
                 context_len=known_input_len,
                 type_ids=torch.ones_like(input_tokens[..., 0]) if interpolated else None,
                 tokenizer=self.tokenizer,
@@ -382,7 +383,7 @@ class Seq2SeqMusicTransformerGenerator(Generator):
             current_note_idx += num_new_notes
             known_input_len += num_new_notes
 
-            if not disable_tqdm:
+            if pbar is not None:
                 pbar.update(num_new_notes)
 
         self.data.reached_eos = self.data.reached_eos and (

@@ -127,7 +127,7 @@ class ScorePerformerGenerator:
         temperature: float = 1.0,
         top_k: float | int = -1,
         top_p: float = 0.8,
-        disable_tqdm: bool = True,
+        show_progress: bool = True,
         disable_cache: bool = False,
     ) -> tuple[TokSequence | None, list | np.ndarray]:
         init_seq, gen_seq = self.data.init_seq, self.data.gen_seq
@@ -291,7 +291,7 @@ class ScorePerformerGenerator:
                     top_k=top_k,
                     top_p=top_p,
                     tokenizer=self.tokenizer,
-                    disable_tqdm=disable_tqdm,
+                    show_progress=show_progress,
                 )
 
                 # shift back inplace for `input_tokens/values`
@@ -617,7 +617,7 @@ class ScorePerformerInpainter:
         top_k: float | int = 1,
         top_p: float = 1.0,
         filter_key_ids: dict[str, list] | None = None,
-        disable_tqdm: bool = False,
+        show_progress: bool = True,
         verbose: bool = False,
     ) -> torch.Tensor:
         # silent note related data
@@ -712,7 +712,7 @@ class ScorePerformerInpainter:
                     top_p=top_p,
                     filter_key_ids=filter_key_ids,
                     tokenizer=self.tokenizer,
-                    disable_tqdm=disable_tqdm,
+                    show_progress=show_progress,
                 )
 
                 # move bars back to absolute values

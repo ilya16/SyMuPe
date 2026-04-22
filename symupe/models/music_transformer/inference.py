@@ -307,7 +307,7 @@ class MusicTransformerGenerator(Generator):
         context_values: torch.Tensor | None = None,
         score_tokens: torch.Tensor | None = None,
         score_values: torch.Tensor | None = None,
-        disable_tqdm: bool = True,
+        show_progress: bool = False,
         **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
         gen_tokens, gen_values, gen_pedals = self.model.generate(
@@ -319,7 +319,7 @@ class MusicTransformerGenerator(Generator):
             score_tokens=score_tokens,
             score_values=score_values,
             tokenizer=self.tokenizer,
-            disable_tqdm=disable_tqdm,
+            show_progress=show_progress,
             return_intermediates=False,
             **kwargs,
         )
@@ -341,7 +341,7 @@ class MusicTransformerGenerator(Generator):
         force_keep_cached_notes: bool = False,
         drop_known_seq: bool = False,
         sort_messages: bool = False,
-        disable_tqdm: bool = True,
+        show_progress: bool = False,
         **model_kwargs,
     ) -> tuple[TokSequence | None, list | np.ndarray, NoteMetadata]:
         init_seq, gen_seq = self.data.init_seq, self.data.gen_seq
@@ -523,7 +523,7 @@ class MusicTransformerGenerator(Generator):
                 context_tokens_dropout=1.0 if cond_seq_control is None else 0.0,
                 score_tokens=score_tokens,
                 score_values=score_values,
-                disable_tqdm=disable_tqdm,
+                show_progress=show_progress,
                 context_len=known_input_len,
                 type_ids=torch.ones_like(input_tokens[..., 0]) if interpolated else None,
                 **model_kwargs,
@@ -624,7 +624,7 @@ class MusicTransformerGenerator(Generator):
         cond_seq_control: dict[str, float] | None = None,
         interpolated: bool = False,
         group_onset_notes: bool = True,
-        disable_tqdm: bool = True,
+        show_progress: bool = False,
         **model_kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         init_seq, gen_seq = self.data.init_seq, self.data.gen_seq
@@ -668,7 +668,8 @@ class MusicTransformerGenerator(Generator):
         )
 
         # generate all notes till the end
-        if not disable_tqdm:
+        pbar = None
+        if show_progress:
             pbar = tqdm(total=len(init_seq))
             pbar.update(all_gen_tokens.shape[1])
         while not self.data.reached_eos:
@@ -782,7 +783,7 @@ class MusicTransformerGenerator(Generator):
                 score_tokens=score_tokens,
                 score_values=score_values,
                 context_tokens_dropout=1.0 if cond_seq_control is None else 0.0,
-                disable_tqdm=disable_tqdm,
+                show_progress=False,  # do not log steps inside the model wrapper
                 context_len=known_input_len,
                 type_ids=torch.ones_like(input_tokens[..., 0]) if interpolated else None,
                 **model_kwargs,
@@ -821,7 +822,7 @@ class MusicTransformerGenerator(Generator):
             current_note_idx += num_new_notes
             known_input_len += num_new_notes
 
-            if not disable_tqdm:
+            if pbar is not None:
                 pbar.update(num_new_notes)
 
         self.data.reached_eos = self.data.reached_eos and (
@@ -934,7 +935,7 @@ class CFMMusicTransformerGenerator(MusicTransformerGenerator):
         num_resample: int = 1,
         resample_period: int = 5,
         resample_fn: Callable = resample,
-        disable_tqdm: bool = True,
+        show_progress: bool = False,
         **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
         gen_tokens, gen_values, gen_pedals = self.model.generate(
@@ -954,7 +955,7 @@ class CFMMusicTransformerGenerator(MusicTransformerGenerator):
             num_resample=num_resample,
             resample_period=resample_period,
             resample_fn=resample_fn,
-            disable_tqdm=disable_tqdm,
+            show_progress=show_progress,
             return_intermediates=False,
             **kwargs,
         )
