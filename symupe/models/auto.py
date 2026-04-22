@@ -11,11 +11,17 @@ from .base import Model, Evaluator
 
 
 class AutoModel:
+    """Factory class to initialize models from pretrained weights or checkpoints."""
+
     MODELS: dict[str, type[Model]] = {}
 
     @classmethod
     def register(cls, model_cls: type[Model]):
-        """Registers a class into the AutoModel registry."""
+        """Registers class into :class:`AutoModel` registry.
+
+        Args:
+            model_cls: Model class to register.
+        """
         cls.MODELS[model_cls.__name__] = model_cls
 
     @classmethod
@@ -26,14 +32,16 @@ class AutoModel:
         load_weights: bool = True,
         strict: bool = True,
     ) -> Model:
-        """
-        Load a model from a monolithic training checkpoint (.pt).
+        """Initializes model from monolithic training checkpoint (.pt).
 
-        :param checkpoint_path: path to checkpoint file
-        :param from_ema: whether to load the model from an EMA checkpoint
-        :param load_weights: whether to load the weights from the checkpoint or only initialize the model
-        :param strict: whether to strictly enforce that the model keys match the keys in the checkpoint
-        :return: loaded model
+        Args:
+            checkpoint_path: Path to checkpoint file.
+            from_ema: Whether to load model from EMA checkpoint.
+            load_weights: Whether to load weights or only initialize architecture.
+            strict: Whether to strictly match checkpoint keys.
+
+        Returns:
+            Initialized model instance.
         """
         checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
 
@@ -49,15 +57,21 @@ class AutoModel:
 
     @classmethod
     def from_pretrained(
-        cls, pretrained_path: str, strict: bool = True, device: str = "cpu", **kwargs
+        cls,
+        pretrained_path: str,
+        strict: bool = True,
+        device: str | torch.device | None = None,
+        **kwargs,
     ) -> Model:
-        """
-        Load a model from the Hugging Face Hub or a local directory.
+        """Initializes model from Hugging Face Hub or local path using config name.
 
-        :param pretrained_path: path to pretrained model
-        :param strict: whether to strictly enforce that the model keys match the keys in the checkpoint
-        :param device: device to load the model
-        :return: loaded model
+        Args:
+            pretrained_path: Path or Hub repo ID for pretrained model.
+            strict: Whether to strictly match checkpoint keys.
+            device: Target device for model loading.
+
+        Returns:
+            Initialized model instance.
         """
         if os.path.isdir(pretrained_path):
             config_path = os.path.join(pretrained_path, Model.CONFIG_NAME)
@@ -75,7 +89,14 @@ class AutoModel:
 
     @classmethod
     def _get_model_class(cls, model_name: str | None) -> type[Model]:
-        """Internal helper to route config names to Python classes."""
+        """Routes configuration names to registered Python classes.
+
+        Args:
+            model_name: Name of model class.
+
+        Returns:
+            Registered model class type.
+        """
         if model_name in cls.MODELS:
             return cls.MODELS[model_name]
 
@@ -86,9 +107,15 @@ class AutoModel:
 
 
 class AutoEvaluator:
+    """Factory class to manage model evaluators."""
+
     EVALUATORS: dict[str, type[Evaluator]] = {}
 
     @classmethod
     def register(cls, evaluator_cls: type[Evaluator]):
-        """Registers a class into the AutoEvaluator registry."""
+        """Registers class into AutoEvaluator registry.
+
+        Args:
+            evaluator_cls: Evaluator class to register.
+        """
         cls.EVALUATORS[evaluator_cls.__name__] = evaluator_cls

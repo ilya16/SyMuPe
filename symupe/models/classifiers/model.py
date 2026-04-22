@@ -13,6 +13,7 @@ from omegaconf import MISSING, DictConfig, OmegaConf
 
 from symupe.data.collators import SequenceInputs
 from symupe.data.datasets import SequenceDataset
+from symupe.inference.classification import MusicClassifier
 from symupe.models import Model, AutoModel
 from symupe.modules.constructor import Registry, ModuleConfig, VariableModuleConfig
 from symupe.modules.metrics import masked_batch_mean
@@ -282,8 +283,12 @@ class SequenceClassifierConfig(ModuleConfig):
     detach_inputs: bool | float = True
     label_smoothing: float = 0.0
 
+    labels: dict[int, str] | None = None
+
 
 class SequenceClassifier(Model):
+    CLASSIFIER_CLASS = MusicClassifier
+
     def __init__(
         self,
         num_classes: int,
@@ -303,6 +308,7 @@ class SequenceClassifier(Model):
         backbone_output_layer: int | None = None,
         detach_inputs: bool | float = True,
         label_smoothing: float = 0.0,
+        labels: dict[int, str] | None = None,
     ):
         super().__init__()
 
@@ -365,6 +371,8 @@ class SequenceClassifier(Model):
         )
 
         self.label_smoothing = label_smoothing
+
+        self.labels = {int(idx): label for idx, label in (labels or {}).items()}
 
     def forward(
         self,

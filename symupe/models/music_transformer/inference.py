@@ -12,11 +12,18 @@ import torch.nn as nn
 from tqdm.auto import tqdm
 
 from symupe.data.datasets import SequenceDataset, SequenceTask
-from symupe.data.tokenizers import TokSequence, TokSequenceContext, EncodingType, SyMuPe
+from symupe.data.tokenizers import (
+    TokSequence,
+    TokSequenceContext,
+    EncodingType,
+    SequenceType,
+    SyMuPe,
+)
 from symupe.data.tokenizers.constants import SOS_TOKEN, EOS_TOKEN, MASK_TOKEN, SPECIAL_TOKENS_VALUE
+from symupe.inference.base import GeneratorData
+from symupe.inference.performance import PerformanceGenerator
 from symupe.modules.tuple_transformer.flow_matching import resample
 from .model import MusicTransformer, CFMMusicTransformer
-from ..base import Generator
 
 
 @dataclass
@@ -90,27 +97,30 @@ class NoteMetadata:
 
 
 @dataclass
-class SequenceData:
+class SequenceData(GeneratorData):
     seq: TokSequence | None = None
     init_seq: TokSequence | None = None
+    gen_seq: TokSequence | None = None
+
     cond_embeddings: torch.Tensor | None = None
     cond_seq: TokSequence | None = None
     score_seq: TokSequence | None = None
-    gen_seq: TokSequence | None = None
     seq_context: TokSequenceContext | None = None
     cached_note_times: list[float] | None = None
+
     task: SequenceTask | str | None = None
     context_len: int = 0
     onset_token_dims: list[int] | None = None
     has_sos_eos: bool = False
     reached_eos: bool = False
+
     note_meta: NoteMetadata | None = None
     ticks_data: dict | None = None
     beat_ids: np.ndarray | None = None
     tempos: np.ndarray | None = None
 
 
-class MusicTransformerGenerator(Generator):
+class MusicTransformerGenerator(PerformanceGenerator):
     def __init__(
         self,
         model: MusicTransformer | CFMMusicTransformer,
@@ -126,6 +136,10 @@ class MusicTransformerGenerator(Generator):
             model=model,
             tokenizer=tokenizer,
             dataset=dataset,
+            used_token_types=used_token_types,
+            mask_token_dims=mask_token_dims,
+            used_context_token_types=used_context_token_types,
+            used_score_token_types=used_score_token_types,
             device=device,
         )
 
@@ -137,11 +151,6 @@ class MusicTransformerGenerator(Generator):
         self.eos_token_id = self.tokenizer[0, EOS_TOKEN]
         self.mask_token_id = self.tokenizer[0, MASK_TOKEN]
         self.mask_token_value = SPECIAL_TOKENS_VALUE - self.mask_token_id
-
-        self.used_token_types = used_token_types
-        self.mask_token_dims = mask_token_dims or {}
-        self.used_context_token_types = used_context_token_types
-        self.used_score_token_types = used_score_token_types
 
     def reset(self):
         self.data = SequenceData()
@@ -297,6 +306,15 @@ class MusicTransformerGenerator(Generator):
             self.data.onset_token_dims = [init_seq.vocab["PositionShift"]]
 
         return self.data
+
+    def _prepare_generator_kwargs(self, **kwargs) -> dict[str, object]:
+        return {
+            "top_k": kwargs.get("top_k", kwargs.get("mlm_top_k", -1.0)),
+            "top_p": kwargs.get("top_p", kwargs.get("mlm_top_p", 0.95)),
+            "filter_key_ids": {
+                key: list(range(self.tokenizer.zero_token)) for key in self.used_token_types
+            },
+        }
 
     def _generate(
         self,
@@ -864,18 +882,13 @@ class MusicTransformerGenerator(Generator):
         self,
         postprocess: bool = True,
         encoding: EncodingType | str | None = None,
+        seq_type: SequenceType | str | None = None,
     ) -> TokSequence:
-        gen_seq = self.data.gen_seq[int(self.data.has_sos_eos) :].numpy()
-        gen_seq.type = "performance"
-
-        if postprocess:
-            gen_seq = self.tokenizer.denormalize_values(gen_seq)
-            gen_seq = self.tokenizer.decompress(copy.deepcopy(gen_seq))
-
-            if encoding is not None:
-                gen_seq = self.token_transformer(gen_seq, encoding)
-
-        return gen_seq
+        return super().generated_sequence(
+            postprocess=postprocess,
+            encoding=encoding,
+            seq_type=SequenceType.PERFORMANCE,
+        )
 
     def reset_position(
         self,
@@ -917,7 +930,18 @@ class MusicTransformerGenerator(Generator):
         return note_idx
 
 
+MusicTransformer.GENERATOR_CLASS = MusicTransformerGenerator
+
+
 class CFMMusicTransformerGenerator(MusicTransformerGenerator):
+    @staticmethod
+    def _prepare_generator_kwargs(**kwargs) -> dict[str, object]:
+        return {
+            "steps": kwargs.get("steps", kwargs.get("cfm_steps", 10)),
+            "top_p": kwargs.get("step_factor", kwargs.get("cfm_step_factor", 0.75)),
+            "method": kwargs.get("method", "euler"),
+        }
+
     def _generate(
         self,
         input_tokens: torch.Tensor,
@@ -961,3 +985,6 @@ class CFMMusicTransformerGenerator(MusicTransformerGenerator):
         )
 
         return gen_tokens, gen_values, gen_pedals
+
+
+CFMMusicTransformer.GENERATOR_CLASS = CFMMusicTransformerGenerator
