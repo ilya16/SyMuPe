@@ -24,6 +24,7 @@ from omegaconf import DictConfig
 from symupe.data.collators import SequenceInputs, Seq2SeqInputs
 from symupe.data.datasets import SequenceDataset
 from symupe.data.tokenizers import OctupleM, SyMuPe
+from symupe.inference.embeddings import MusicEmbedder
 from symupe.modules.classes import LanguageModelingMode, ModelWrapper
 from symupe.modules.constructor import ModuleConfig
 from symupe.modules.tuple_transformer import (
@@ -245,6 +246,8 @@ class MusicTransformerOutput(_MusicTransformerConfig):
 
 
 class MusicTransformer(_MusicTransformer):
+    EMBEDDER_CLASS = MusicEmbedder
+
     def __init__(
         self,
         num_tokens: dict[str, int],

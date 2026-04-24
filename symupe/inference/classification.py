@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 import torch
 import torch.nn.functional as F
 from symusic import Score
-from tqdm.auto import tqdm
 
 from symupe.data.datasets import SequenceDataset
-from symupe.data.midi import preprocess_midi
 from symupe.data.tokenizers import SyMuPe, TokSequence
 from symupe.models import Model
-from .base import Classifier
+from .base import Classifier, _PerformanceInference, _SlidingWindowInference
 
 
 @dataclass
@@ -29,6 +27,8 @@ class MusicClassificationResult:
         all_logits: Raw logits for each sliding window.
         all_probabilities: Softmax probabilities for each sliding window.
         all_predictions: Predicted class indices for each sliding window.
+        sequences: List of windowed :class:`TokSequence` objects processed by the model.
+        window_indices: List of (start, end) token indices for each window.
     """
 
     midi: Score
@@ -39,12 +39,15 @@ class MusicClassificationResult:
     all_logits: torch.Tensor | None
     all_probabilities: torch.Tensor | None
     all_predictions: torch.Tensor | None
+    sequences: list[TokSequence]
+    window_indices: list[tuple[int, int]]
 
 
-class MusicClassifier(Classifier):
+class MusicClassifier(_PerformanceInference, _SlidingWindowInference, Classifier):
     """Inference wrapper for musical sequence classification tasks.
 
     Handles sliding window inference and result aggregation for long musical sequences.
+    This class is designed for tasks like MIDI quality assessment or style identification.
     """
 
     def __init__(
@@ -52,6 +55,7 @@ class MusicClassifier(Classifier):
         model: Model,
         tokenizer: SyMuPe,
         dataset: SequenceDataset | None = None,
+        used_token_types: list[str] | None = None,
         labels: dict[int, str] | None = None,
         device: str | torch.device | None = None,
         **kwargs,
@@ -61,20 +65,15 @@ class MusicClassifier(Classifier):
         Args:
             model: :class:`Model` instance used for generation.
             tokenizer: :class:`SyMuPe` tokenizer instance for encoding.
-            dataset: Optional dataset for metadata.
+            dataset: Optional dataset for sequence extraction.
+            used_token_types: List of token types used by classifier backbone.
             labels: Optional mapping from class indices to string labels.
             device: Target device for computation.
             **kwargs: Additional classifier parameters.
         """
-        super().__init__(
-            model=model,
-            tokenizer=tokenizer,
-            dataset=dataset,
-            device=device,
-            **kwargs,
-        )
+        used_token_types = used_token_types or list(model._config.backbone.num_tokens.keys())
 
-        self.used_token_types = list(self.model.backbone_config.num_tokens.keys())
+        super().__init__(model, tokenizer, dataset, used_token_types, device, **kwargs)
 
         self.labels = (
             labels
@@ -82,29 +81,19 @@ class MusicClassifier(Classifier):
             or {i: str(i) for i in range(model.num_classes)}
         )
 
-    def prepare_sequence(self, seq: TokSequence) -> TokSequence:
-        """Prepares performance sequence for classifier input.
-
-        Processes time positions, removes pedals, and normalizes values.
+    def _forward_batch(self, tokens: torch.Tensor, values: torch.Tensor, **kwargs) -> torch.Tensor:
+        """Internal method to perform batch inference on transformer backbone.
 
         Args:
-            seq: :class:`TokSequence` to process.
+            tokens: Batch of token IDs.
+            values: Batch of token values.
+            **kwargs: Additional arguments for the model's forward pass.
 
         Returns:
-            Processed :class:`TokSequence` ready for model backbone.
+            Tensor of logits moved to CPU.
         """
-        # process special tokens
-        seq = self.tokenizer.add_time_position_tokens(seq, segment_tokens=False)
-        seq = self.tokenizer.remove_pedal_tokens(seq)
-
-        # prepare values
-        seq = self.tokenizer.normalize_values(seq)
-        seq = self.tokenizer.clip_values(seq)
-
-        # compress sequence to token types the backbone expects
-        seq = self.tokenizer.compress(seq, token_types=self.used_token_types)
-
-        return seq
+        out = self.model(tokens=tokens, values=values, **kwargs)
+        return out.logits.cpu()
 
     @torch.inference_mode()
     def predict(
@@ -117,7 +106,8 @@ class MusicClassifier(Classifier):
     ) -> MusicClassificationResult:
         """Classifies musical sequence using sliding window approach.
 
-        Splits sequence into overlapping chunks and averages probabilities across windows.
+        Splits the sequence into overlapping chunks, performs inference on each chunk,
+        and aggregates the results using soft voting (averaging probabilities).
 
         Args:
             midi: Input MIDI path, :class:`symusic.Score` object, or :class:`TokSequence` object.
@@ -130,66 +120,20 @@ class MusicClassifier(Classifier):
             :class:`MusicClassificationResult` containing aggregated and per-window predictions.
         """
         # load MIDI and prepare token sequence
-        if isinstance(midi, (str, Path)):
-            midi = Score(str(midi))
+        if not isinstance(midi, TokSequence):
+            midi = self._load_midi(midi)
 
-        if isinstance(midi, Score):
-            midi = preprocess_midi(midi, to_single_track=True)
-
-            seq = self.tokenizer.encode_performance(midi, score_tokens=None)
-        else:
-            seq = midi
+        seq = self._tokenize_midi(midi)
 
         init_seq = copy.deepcopy(seq)
-        tokens, values = seq.tokens, seq.values
 
-        # slice into windows
-        total_len = len(seq)
-        if total_len <= max_seq_len:
-            # single window
-            seq = self.prepare_sequence(seq).torch()
-            batch_tokens = seq.ids.unsqueeze(0)
-            batch_values = seq.values.unsqueeze(0)
-        else:
-            # create sliding windows
-            batch_tokens, batch_values = [], []
-
-            start_indices = list(range(0, total_len - max_seq_len + 1, hop_size))
-            last_start = total_len - max_seq_len
-            if start_indices[-1] != last_start:  # add the last bit
-                start_indices.append(last_start)
-
-            for i in start_indices:
-                _seq = replace(
-                    seq,
-                    ids=tokens[i : i + max_seq_len],
-                    values=values[i : i + max_seq_len],
-                )
-                _seq = self.prepare_sequence(_seq).torch()
-                batch_tokens.append(_seq.ids)
-                batch_values.append(_seq.values)
-
-            batch_tokens = torch.stack(batch_tokens)
-            batch_values = torch.stack(batch_values)
-
-        # inference in mini-batches
-        pbar = None
-        if show_progress:
-            pbar = tqdm(total=len(batch_tokens))
-
-        all_logits = []
-        for i in range(0, len(batch_tokens), batch_size):
-            tokens = batch_tokens[i : i + batch_size].to(self.device)
-            values = batch_values[i : i + batch_size].to(self.device)
-
-            out = self.model(tokens=tokens, values=values)
-            all_logits.append(out.logits.cpu())
-
-            if pbar is not None:
-                pbar.update(len(tokens))
-
-        if pbar is not None:
-            pbar.close()
+        all_logits, sequences, window_indices = self._sliding_window_inference(
+            seq=seq,
+            max_seq_len=max_seq_len,
+            hop_size=hop_size,
+            batch_size=batch_size,
+            show_progress=show_progress,
+        )
 
         logits = torch.cat(all_logits)  # (num_windows, num_classes)
         probabilities = F.softmax(logits, dim=-1)
@@ -211,6 +155,8 @@ class MusicClassifier(Classifier):
             all_logits=logits,
             all_probabilities=probabilities,
             all_predictions=logits.argmax(dim=-1),
+            sequences=sequences,
+            window_indices=window_indices,
         )
 
 
@@ -231,9 +177,10 @@ def test():
     midi = Score("performance.mid")
 
     # Classify MIDI (tokenization is handled inside)
-    result = classifier.predict(midi=midi)
+    result = classifier(midi)
     # result is MusicClassificationResult(...) containing:
-    # - midi, seq, probabilities, prediction, label, all_logits, all_probabilities, all_predictions
+    # - midi, seq, probabilities, prediction, label, all_logits, all_probabilities, all_predictions,
+    #   sequences and window_indices
     print(result.label, result.probabilities)
 
 

@@ -8,6 +8,8 @@ from .base import Generator, Classifier
 class _AutoFactory:
     """Internal factory class for initializing inference wrappers."""
 
+    _WRAPPER_ATTR: str = ""
+
     @classmethod
     def from_model(
         cls,
@@ -27,7 +29,18 @@ class _AutoFactory:
         Returns:
             Initialized Generator or Classifier instance.
         """
-        ...
+        wrapper_cls = getattr(model, cls._WRAPPER_ATTR, None)
+
+        if wrapper_cls is None:
+            model_name = model.__class__.__name__
+            raise ValueError(f"Model {model_name} does not have a {cls._WRAPPER_ATTR} defined.")
+
+        return wrapper_cls(
+            model=model,
+            tokenizer=tokenizer,
+            device=device,
+            **kwargs,
+        )
 
     @classmethod
     def from_pretrained(
@@ -64,72 +77,16 @@ class _AutoFactory:
 class AutoGenerator(_AutoFactory):
     """Factory class to initialize sequence generators."""
 
-    @classmethod
-    def from_model(
-        cls,
-        model: Model,
-        tokenizer: MusicTokenizer,
-        device: str | torch.device | None = None,
-        **kwargs,
-    ) -> Generator:
-        """Creates task-specific generator based on model architecture.
-
-        Args:
-            model: :class:`Model` instance to wrap.
-            tokenizer: :class:`MusicTokenizer` instance for data processing.
-            device: Target device for inference.
-            **kwargs: Additional parameters for generator.
-
-        Returns:
-            Initialized Generator instance.
-        """
-        # get Generator class from the model
-        if model.GENERATOR_CLASS is None:
-            model_name = model.__class__.__name__
-            raise ValueError(f"Model of class {model_name} does not have a Generator class")
-
-        generator_cls = model.GENERATOR_CLASS
-
-        return generator_cls(
-            model=model,
-            tokenizer=tokenizer,
-            device=device,
-            **kwargs,
-        )
+    _WRAPPER_ATTR = "GENERATOR_CLASS"
 
 
 class AutoClassifier(_AutoFactory):
     """Factory class to initialize classifiers."""
 
-    @classmethod
-    def from_model(
-        cls,
-        model: Model,
-        tokenizer: MusicTokenizer,
-        device: str | torch.device | None = None,
-        **kwargs,
-    ) -> Classifier:
-        """Creates task-specific classifier based on model architecture.
+    _WRAPPER_ATTR = "CLASSIFIER_CLASS"
 
-        Args:
-            model: :class:`Model` instance to wrap.
-            tokenizer: :class:`MusicTokenizer` instance for data processing.
-            device: Target device for inference.
-            **kwargs: Additional parameters for classifier.
 
-        Returns:
-            Initialized Classifier instance.
-        """
-        # get Classifier class from the model
-        if model.CLASSIFIER_CLASS is None:
-            model_name = model.__class__.__name__
-            raise ValueError(f"Model of class {model_name} does not have a Classifier class")
+class AutoEmbedder(_AutoFactory):
+    """Factory class to initialize feature embedders."""
 
-        classifier_cls = model.CLASSIFIER_CLASS
-
-        return classifier_cls(
-            model=model,
-            tokenizer=tokenizer,
-            device=device,
-            **kwargs,
-        )
+    _WRAPPER_ATTR = "EMBEDDER_CLASS"

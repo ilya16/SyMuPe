@@ -7,7 +7,14 @@ __version__ = f"{MAJOR}.{MINOR}.{PATCH}"
 
 from .data.alignments import Alignment, RAScoP
 from .data.tokenizers import AutoTokenizer, SyMuPeTokenizer
-from .inference import AutoGenerator, PerformanceGenerator, AutoClassifier, MusicClassifier
+from .inference import (
+    AutoGenerator,
+    PerformanceGenerator,
+    AutoClassifier,
+    MusicClassifier,
+    AutoEmbedder,
+    MusicEmbedder,
+)
 from .models import AutoModel
 
 __all__ = [
@@ -17,6 +24,8 @@ __all__ = [
     "PerformanceGenerator",
     "AutoClassifier",
     "MusicClassifier",
+    "AutoEmbedder",
+    "MusicEmbedder",
     "AutoTokenizer",
     "SyMuPeTokenizer",
     "Alignment",

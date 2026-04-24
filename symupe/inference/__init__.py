@@ -1,6 +1,8 @@
-from .auto import AutoGenerator, AutoClassifier
-from .base import Generator, GeneratorData, Classifier
+from .auto import AutoGenerator, AutoClassifier, AutoEmbedder
+from .auto import AutoGenerator, AutoClassifier, AutoEmbedder
+from .base import Generator, GeneratorData, Classifier, Embedder
 from .classification import MusicClassificationResult, MusicClassifier
+from .embeddings import MusicEmbeddingResult, MusicEmbedder
 from .performance import (
     PerformanceGenerator,
     perform_score,
@@ -9,15 +11,23 @@ from .performance import (
 )
 
 __all__ = [
+    # Auto Classes
     "AutoGenerator",
     "AutoClassifier",
+    "AutoEmbedder",
+    # Generators
     "Generator",
     "GeneratorData",
-    "Classifier",
     "PerformanceGenerator",
+    "PerformanceRenderingResult",
     "perform_score",
     "save_performances",
-    "PerformanceRenderingResult",
+    # Classifiers
+    "Classifier",
     "MusicClassifier",
     "MusicClassificationResult",
+    # Embedders
+    "Embedder",
+    "MusicEmbedder",
+    "MusicEmbeddingResult",
 ]

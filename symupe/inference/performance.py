@@ -11,7 +11,6 @@ import torch
 from symusic import Score
 
 from symupe.data.datasets import SequenceDataset
-from symupe.data.midi import preprocess_midi
 from symupe.data.tokenizers import SyMuPe, TokSequence, SequenceType
 from symupe.models import Model
 from .base import Generator
@@ -61,7 +60,7 @@ class PerformanceGenerator(Generator, ABC):
         Args:
             model: :class:`Model` instance used for generation.
             tokenizer: :class:`SyMuPe` tokenizer instance for encoding.
-            dataset: Optional dataset for context.
+            dataset: Optional dataset for sequence extraction.
             used_token_types: List of token types used by generator.
             mask_token_dims: Indices of tokens to mask during generation.
             used_context_token_types: List of token types for context sequence.
@@ -69,13 +68,7 @@ class PerformanceGenerator(Generator, ABC):
             device: Target computation device.
             **kwargs: Additional parameters for base generator.
         """
-        super().__init__(
-            model=model,
-            tokenizer=tokenizer,
-            dataset=dataset,
-            device=device,
-            **kwargs,
-        )
+        super().__init__(model, tokenizer, dataset, device, **kwargs)
 
         cfg = model._config
 
@@ -98,6 +91,23 @@ class PerformanceGenerator(Generator, ABC):
         self.used_score_token_types = (
             used_score_token_types or list((cfg.score_num_tokens or {}).keys()) or None
         )
+
+    def _tokenize_midi(self, score: Score) -> TokSequence:
+        """Converts :class:`symusic.Score` object into a score-based token sequence.
+
+        Args:
+            score: Preprocessed :class:`symusic.Score` object.
+
+        Returns:
+            Raw :class:`TokSequence` in score encoding.
+        """
+        score_seq = self.tokenizer.encode_score(score)
+        score_seq = self.tokenizer.score_tokens_as_performance(score_seq)
+        return score_seq
+
+    def __call__(self, *args, **kwargs) -> list[PerformanceRenderingResult]:
+        """Alias for :meth:`perform_score`."""
+        return self.perform_score(*args, **kwargs)
 
     @abstractmethod
     def _prepare_generator_kwargs(self, **kwargs) -> dict[str, object]:
@@ -153,16 +163,10 @@ class PerformanceGenerator(Generator, ABC):
             torch.cuda.manual_seed(seed)
 
         # load MIDI and prepare token sequence
-        if isinstance(score, (str, Path)):
-            score = Score(score)
+        if not isinstance(score, TokSequence):
+            score = self._load_midi(score)
 
-        if isinstance(score, Score):
-            score = preprocess_midi(score, to_single_track=True)
-
-            score_seq = self.tokenizer.encode_score(score)
-            score_seq = self.tokenizer.score_tokens_as_performance(score_seq)
-        else:
-            score_seq = score
+        score_seq = self._tokenize_midi(score)
 
         # prepare internal data
         self.reset()
@@ -257,7 +261,11 @@ class PerformanceGenerator(Generator, ABC):
         """
         ...
 
-    def _postprocess_performance_sequence(self, gen_seq: TokSequence, score_seq: TokSequence):
+    def _postprocess_performance_sequence(
+        self,
+        gen_seq: TokSequence,
+        score_seq: TokSequence,
+    ) -> TokSequence:
         """Applies musical metadata and sustain logic to generated sequence.
 
         Copies `Bar`, `Tempo`, and `Time Signature` information from input score.

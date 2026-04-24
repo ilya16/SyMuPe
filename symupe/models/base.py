@@ -39,6 +39,7 @@ class Model(nn.Module, Constructor):
 
     GENERATOR_CLASS = None
     CLASSIFIER_CLASS = None
+    EMBEDDER_CLASS = None
 
     @abstractmethod
     def forward(self, *args, **kwargs):
