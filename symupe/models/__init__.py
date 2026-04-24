@@ -1,5 +1,5 @@
 from .auto import AutoModel, AutoEvaluator
-from .base import Model, Evaluator, Generator
+from .base import Model, Evaluator
 from .classifiers import SequenceClassifier, SequenceClassifierEvaluator
 from .music_transformer import (
     MusicTransformer,

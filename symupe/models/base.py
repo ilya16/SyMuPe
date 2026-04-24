@@ -16,56 +16,64 @@ from safetensors.torch import load_model, save_model
 from torch.utils.data import Dataset
 
 from symupe import __version__
-from symupe.data.datasets import SequenceDataset
-from symupe.data.tokenizers import SyMuPe, SyMuPeTransformer
 from symupe.modules.constructor import Constructor, ModuleConfig
 from symupe.utils import load_json, dump_json
 
 
 class Model(nn.Module, Constructor):
-    """
-    Base Model class for the SyMuPe framework models.
+    """Base Model class for SyMuPe framework models.
 
-    Integrates torch.nn.Module with a factory-based Constructor and Hugging Face-style serialization.
+    Integrates :class:`torch.nn.Module` with factory-based Constructor
+    and Hugging Face-style serialization.
 
-    This class provides unified methods for:
+    Provides unified methods for:
         - injection and cleanup of data configurations,
         - preparation of inputs,
-        - saving and loading model weights from training checkpoints (.pt) and model artifacts (safetensors).
+        - saving and loading model weights from training checkpoints (.pt)
+        and model artifacts (safetensors).
     """
 
     CONFIG_NAME = "config.json"
     SAFETENSORS_FILE_NAME = "model.safetensors"
     TOKENIZER_FILE_NAME = "tokenizer.json"
 
+    GENERATOR_CLASS = None
+    CLASSIFIER_CLASS = None
+    EMBEDDER_CLASS = None
+
     @abstractmethod
     def forward(self, *args, **kwargs):
-        """Forward pass logic for the model."""
+        """Performs forward pass logic for model."""
         ...
 
     @abstractmethod
     def prepare_inputs(
         self, inputs: object, ema_model: nn.Module | None = None
     ) -> dict[str, torch.Tensor]:
-        """
-        Format raw input data into a dictionary of tensors for the model.
+        """Formats raw input data into dictionary of tensors for model.
 
-        :param inputs: raw input data
-        :param ema_model: exponential moving average model to be used inside the model
-        :return: dictionary of tensors for the model
+        Args:
+            inputs: Raw input data.
+            ema_model: Exponential moving average model used inside model.
+
+        Returns:
+            Dictionary of tensors for model.
         """
         ...
 
     @staticmethod
     def allocate_inputs(
-        inputs_dict: dict[str, torch.Tensor], device: torch.device
+        inputs_dict: dict[str, torch.Tensor],
+        device: str | torch.device | None = None,
     ) -> dict[str, torch.Tensor]:
-        """
-        Move a dictionary of tensors to the specified device.
+        """Moves dictionary of tensors to the specified device.
 
-        :param inputs_dict: dictionary of tensors
-        :param device: torch.device
-        :return: dictionary of tensors
+        Args:
+            inputs_dict: Dictionary of tensors.
+            device: Target torch device.
+
+        Returns:
+            Dictionary of tensors on target device.
         """
         return {key: value.to(device, non_blocking=True) for key, value in inputs_dict.items()}
 
@@ -73,13 +81,14 @@ class Model(nn.Module, Constructor):
     def inject_data_config(
         config: DictConfig | ModuleConfig | None, dataset: Dataset | None
     ) -> DictConfig | ModuleConfig | None:
-        """
-        Update the model configuration with data-specific attributes.
+        """Updates model configuration with data-specific attributes.
 
-        Used to set vocabulary sizes or token indices derived from the dataset/tokenizer before model initialization.
+        Args:
+            config: Model configuration.
+            dataset: Dataset object providing metadata.
 
-        :param config: model configuration
-        :param dataset: dataset object
+        Returns:
+            Updated model configuration.
         """
         return config
 
@@ -87,11 +96,13 @@ class Model(nn.Module, Constructor):
     def cleanup_config(
         config: DictConfig | ModuleConfig | None,
     ) -> DictConfig | ModuleConfig | None:
-        """
-        Remove extra fields from the configuration.
+        """Removes extra fields from configuration.
 
-        :param config: model configuration
-        :return: updated model configuration
+        Args:
+            config: Model configuration.
+
+        Returns:
+            Cleaned model configuration.
         """
         return config
 
@@ -101,21 +112,23 @@ class Model(nn.Module, Constructor):
         ignore_layers: list[str] | None = None,
         ignore_mismatched_keys: bool = False,
     ) -> nn.Module:
-        """
-        Custom `state_dict` loader.
+        """Loads weights from state dictionary into model instance.
 
-        :param state_dict: model state dictionary
-        :param ignore_layers: list of layers to ignore
-        :param ignore_mismatched_keys: whether to ignore mismatched keys
-        :return: loaded model
+        Args:
+            state_dict: Model state dictionary.
+            ignore_layers: List of layers to exclude.
+            ignore_mismatched_keys: Whether to ignore keys with shape mismatches.
+
+        Returns:
+            Loaded model instance.
         """
         return load_state_dict(self, state_dict, ignore_layers, ignore_mismatched_keys)
 
     def freeze(self, exception_list: list[str] | None = None) -> None:
-        """
-        Freezes model parameters for fine-tuning.
+        """Freezes model parameters for fine-tuning.
 
-        :param exception_list: list of exceptions to ignore, prefixed with '!' to force freeze.
+        Args:
+            exception_list: List of layers to ignore, prefixed with '!' to force freeze.
         """
         not_frozen = []
         exception_list = exception_list or []
@@ -139,14 +152,16 @@ class Model(nn.Module, Constructor):
         load_weights: bool = True,
         strict: bool = True,
     ) -> Model:
-        """
-        Load a model from a monolithic training checkpoint (.pt).
+        """Initializes model from monolithic training checkpoint (.pt).
 
-        :param checkpoint_path: path to checkpoint file
-        :param from_ema: whether to load the model from an EMA checkpoint
-        :param load_weights: whether to load the weights from the checkpoint or only initialize the model
-        :param strict: whether to strictly enforce that the model keys match the keys in the checkpoint
-        :return: loaded model
+        Args:
+            checkpoint_path: Path to checkpoint file.
+            from_ema: Whether to load model from EMA checkpoint.
+            load_weights: Whether to load weights or only initialize architecture.
+            strict: Whether to strictly match checkpoint keys.
+
+        Returns:
+            Initialized model instance.
         """
         checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
 
@@ -177,15 +192,21 @@ class Model(nn.Module, Constructor):
 
     @classmethod
     def from_pretrained(
-        cls, pretrained_path: str, strict: bool = True, device: str = "cpu", **kwargs
+        cls,
+        pretrained_path: str,
+        strict: bool = True,
+        device: str | torch.device | None = None,
+        **kwargs,
     ) -> Model:
-        """
-        Load a model from the Hugging Face Hub or a local directory.
+        """Initializes model from Hugging Face Hub or local directory.
 
-        :param pretrained_path: path to pretrained model
-        :param strict: whether to strictly enforce that the model keys match the keys in the checkpoint
-        :param device: device to load the model
-        :return: loaded model
+        Args:
+            pretrained_path: Path or Hub repo ID for pretrained model.
+            strict: Whether to strictly match checkpoint keys.
+            device: Target device for model loading.
+
+        Returns:
+            Initialized model instance.
         """
         if os.path.isdir(pretrained_path):
             config_path = os.path.join(pretrained_path, cls.CONFIG_NAME)
@@ -215,16 +236,13 @@ class Model(nn.Module, Constructor):
         tokenizer: MusicTokenizer | None = None,
         model_version: str = "1.0",
     ) -> None:
-        """
-        Export the model and configuration in a Hugging Face compatible format.
+        """Exports model and configuration in Hugging Face compatible format.
 
-        This method resolves OmegaConf interpolations and injects library
-        metadata (versioning) into the saved "config.json".
-
-        :param save_directory: path to save the model and configuration
-        :param config: (optional) model configuration to overwrite `model._config`
-        :param tokenizer: (optional) tokenizer to be saved as "tokenizer.json"
-        :param model_version: (optional) model version to overwrite model version from the config
+        Args:
+            save_directory: Path to export directory.
+            config: Optional configuration to overwrite internal config.
+            tokenizer: Optional tokenizer to save alongside model.
+            model_version: Version string for saved model.
         """
         os.makedirs(save_directory, exist_ok=True)
 
@@ -267,17 +285,19 @@ class Model(nn.Module, Constructor):
         token: str | None = None,
         branch: str | None = None,
     ) -> str:
-        """
-        Upload model weights, config, and tokenizer to the Hugging Face Hub.
+        """Uploads model weights, config, and tokenizer to Hugging Face Hub.
 
-        :param repo_id: repo id to push model weights to
-        :param config: (optional) model configuration to overwrite `model._config`
-        :param tokenizer: (optional) tokenizer to be saved as "tokenizer.json"
-        :param commit_message: commit message to push model weights to
-        :param private: (optional) whether to push model weights to private repo
-        :param token: (optional) tokenizer to be saved as "tokenizer.json"
-        :param branch: (optional) branch to push model weights to
-        :return: the url of the commit of the model in the given repository
+        Args:
+            repo_id: Target repository ID.
+            config: Optional configuration to overwrite internal `model._config``.
+            tokenizer: Optional tokenizer to upload 'tokenizer.json'.
+            commit_message: Commit message to push model weights to.
+            private: Whether to push model weights to private repo.
+            token: Hugging Face authentication token.
+            branch: Target git branch.
+
+        Returns:
+            URL of uploaded repository commit.
         """
         api = HfApi(token=token)
         repo_id = api.create_repo(repo_id=repo_id, private=private, exist_ok=True).repo_id
@@ -300,14 +320,16 @@ def load_state_dict(
     ignore_layers: list[str] | None = None,
     ignore_mismatched_keys: bool = False,
 ) -> nn.Module:
-    """
-    Load model weights from a state dictionary.
+    """Loads model weights from state dictionary into model instance.
 
-    :param model: model to load
-    :param state_dict: model state dictionary
-    :param ignore_layers: list of layers to ignore
-    :param ignore_mismatched_keys: whether to ignore mismatched keys
-    :return: loaded model
+    Args:
+        model: Model instance to load weights into.
+        state_dict: Dictionary containing model weights.
+        ignore_layers: List of layer names to exclude from loading.
+        ignore_mismatched_keys: Whether to ignore keys with incompatible tensor shapes.
+
+    Returns:
+        Model instance with loaded weights.
     """
     ignore_layers = ignore_layers or []
 
@@ -352,38 +374,23 @@ class Evaluator(Constructor):
     """Base class for all model evaluators."""
 
     def __init__(self, model: Model, **kwargs):
+        """Initializes evaluator with model instance.
+
+        Args:
+            model: Model instance to evaluate.
+        """
         self.model = model
 
     @abstractmethod
     @torch.no_grad()
     def __call__(self, inputs: object, outputs: object, **kwargs) -> dict[str, torch.Tensor]:
-        """Compute metrics from inputs and model outputs."""
-        raise NotImplementedError
+        """Computes metrics from inputs and model outputs.
 
+        Args:
+            inputs: Raw input data.
+            outputs: Model forward pass outputs.
 
-class Generator(Constructor):
-    """Base class for all model evaluators."""
-
-    def __init__(
-        self,
-        model: Model,
-        tokenizer: SyMuPe,
-        dataset: SequenceDataset | None = None,
-        device: str | torch.device | None = None,
-        **kwargs,
-    ):
-        self.model = model
-        self.tokenizer = tokenizer
-        self.dataset = dataset
-        self.device = device
-
-        assert isinstance(self.tokenizer, SyMuPe)
-        self.token_transformer = SyMuPeTransformer(tokenizer=self.tokenizer)
-
-    @abstractmethod
-    def reset(self) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    def prepare_sequence(self, **kwargs):
+        Returns:
+            Dictionary of metric names and their :class:`torch.Tensor` values.
+        """
         raise NotImplementedError

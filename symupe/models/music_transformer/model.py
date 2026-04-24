@@ -24,6 +24,7 @@ from omegaconf import DictConfig
 from symupe.data.collators import SequenceInputs, Seq2SeqInputs
 from symupe.data.datasets import SequenceDataset
 from symupe.data.tokenizers import OctupleM, SyMuPe
+from symupe.inference.embeddings import MusicEmbedder
 from symupe.modules.classes import LanguageModelingMode, ModelWrapper
 from symupe.modules.constructor import ModuleConfig
 from symupe.modules.tuple_transformer import (
@@ -245,6 +246,8 @@ class MusicTransformerOutput(_MusicTransformerConfig):
 
 
 class MusicTransformer(_MusicTransformer):
+    EMBEDDER_CLASS = MusicEmbedder
+
     def __init__(
         self,
         num_tokens: dict[str, int],
@@ -357,7 +360,7 @@ class MusicTransformer(_MusicTransformer):
         temperature: float = 1.0,
         top_k: float | int = -1,
         top_p: float = 0.8,
-        disable_tqdm: bool = False,
+        show_progress: bool = True,
         **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor, None]:
         assert self.mode is not None
@@ -374,7 +377,7 @@ class MusicTransformer(_MusicTransformer):
             temperature=temperature,
             top_k=top_k,
             top_p=top_p,
-            disable_tqdm=disable_tqdm,
+            show_progress=show_progress,
             **kwargs,
         )
 
@@ -537,7 +540,7 @@ class CFMMusicTransformer(_MusicTransformer):
         num_resample: int = 1,
         resample_period: int = 5,
         resample_fn: Callable = resample,
-        disable_tqdm: bool = False,
+        show_progress: bool = True,
         return_intermediates: bool = False,
         **kwargs,
     ) -> (
@@ -577,7 +580,7 @@ class CFMMusicTransformer(_MusicTransformer):
             num_resample=num_resample,
             resample_period=resample_period,
             resample_fn=resample_fn,
-            disable_tqdm=disable_tqdm,
+            show_progress=show_progress,
             **kwargs,
         )
 
@@ -715,7 +718,7 @@ class DFMMusicTransformer(_MusicTransformer):
         context_tokens: torch.Tensor | None = None,
         context_values: torch.Tensor | None = None,
         context_scale: float = 1.0,
-        disable_tqdm: bool = False,
+        show_progress: bool = True,
         return_intermediates: bool = False,
         **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor] | tuple[torch.Tensor, torch.Tensor, DFMIntermediates]:
@@ -734,7 +737,7 @@ class DFMMusicTransformer(_MusicTransformer):
             context_tokens=context_tokens,
             context_values=context_values,
             context_scale=context_scale,
-            disable_tqdm=disable_tqdm,
+            show_progress=show_progress,
             **kwargs,
         )
 
@@ -925,7 +928,7 @@ class FMMusicTransformer(_MusicTransformer):
         context_tokens: torch.Tensor | None = None,
         context_values: torch.Tensor | None = None,
         context_scale: float = 1.0,
-        disable_tqdm: bool = False,
+        show_progress: bool = True,
         return_intermediates: bool = False,
         **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor] | tuple[torch.Tensor, torch.Tensor, FMIntermediates]:
@@ -946,7 +949,7 @@ class FMMusicTransformer(_MusicTransformer):
             context_tokens=context_tokens,
             context_values=context_values,
             context_scale=context_scale,
-            disable_tqdm=disable_tqdm,
+            show_progress=show_progress,
             **kwargs,
         )
 

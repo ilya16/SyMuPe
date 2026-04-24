@@ -341,7 +341,7 @@ class TupleTransformerCFMWrapper(ModelWrapper):
         resample_period: int = 5,
         resample_fn: Callable = resample,
         value_denorm_fn: Callable | None = None,
-        disable_tqdm: bool = False,
+        show_progress: bool = True,
         **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, CFMIntermediates]:
         tokenizer = tokenizer or self.tokenizer
@@ -426,7 +426,7 @@ class TupleTransformerCFMWrapper(ModelWrapper):
                 )
 
         points, vectors, losses, grads = [], [], [], []
-        pbar = time_steps[:-1] if disable_tqdm else tqdm(time_steps[:-1], leave=False)
+        pbar = tqdm(time_steps[:-1], leave=False) if show_progress else time_steps[:-1]
         for i, t in enumerate(pbar):
             dt = time_steps[i + 1] - time_steps[i]
 
@@ -759,7 +759,7 @@ class TupleTransformerDFMWrapper(ModelWrapper):
         context_tokens: torch.Tensor | None = None,
         context_values: torch.Tensor | None = None,
         context_scale: float = 1.0,
-        disable_tqdm: bool = False,
+        show_progress: bool = True,
         **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor, DFMIntermediates]:
         tokenizer = tokenizer or self.tokenizer
@@ -837,7 +837,7 @@ class TupleTransformerDFMWrapper(ModelWrapper):
                 )
 
         states, probs = [], []
-        pbar = time_steps[:-1] if disable_tqdm else tqdm(time_steps[:-1], leave=False)
+        pbar = tqdm(time_steps[:-1], leave=False) if show_progress else time_steps[:-1]
         for i, t in enumerate(pbar):
             dt = time_steps[i + 1] - time_steps[i]
 
@@ -1308,7 +1308,7 @@ class TupleTransformerFMWrapper(ModelWrapper):
         context_scale: float = 1.0,
         filter_key_ids: dict[str, list] | None = None,
         ignore_non_special: list[str] | None = None,
-        disable_tqdm: bool = False,
+        show_progress: bool = True,
         **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor, FMIntermediates]:
         tokenizer = tokenizer or self.tokenizer
@@ -1455,7 +1455,7 @@ class TupleTransformerFMWrapper(ModelWrapper):
                 )
 
         states, points, probs = [], [], []
-        pbar = time_steps[:-1] if disable_tqdm else tqdm(time_steps[:-1], leave=False)
+        pbar = tqdm(time_steps[:-1], leave=False) if show_progress else time_steps[:-1]
         for i, t in enumerate(pbar):
             dt = time_steps[i + 1] - time_steps[i]
 

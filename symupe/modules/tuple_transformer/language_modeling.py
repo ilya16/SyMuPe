@@ -209,7 +209,7 @@ class TupleTransformerMLMWrapper(TupleTransformerLMWrapper):
         filter_key_ids: dict[str, list] | None = None,
         ignore_non_special: list[str] | None = None,
         tokenizer: OctupleM = None,
-        disable_tqdm: bool = False,
+        show_progress: bool = True,
         **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         assert values is None or tokenizer is not None
@@ -321,7 +321,7 @@ class TupleTransformerMLMWrapper(TupleTransformerLMWrapper):
         else:
             unmask_ids = torch.where(torch.any(unmask, dim=2))[1]
 
-            pbar = unmask_ids if disable_tqdm else tqdm(unmask_ids, leave=False)
+            pbar = tqdm(unmask_ids, leave=False) if show_progress else unmask_ids
             for idx in pbar:
                 # get samples
                 type_mask = unmask[:, idx][0]
@@ -398,7 +398,7 @@ class TupleTransformerARWrapper(TupleTransformerLMWrapper):
         ignore_non_special: list[str] | None = None,
         tokenizer: OctupleM = None,
         fix_errors: bool = False,
-        disable_tqdm: bool = False,
+        show_progress: bool = True,
         record_attention: bool = False,
         **kwargs,
     ) -> (
@@ -438,7 +438,7 @@ class TupleTransformerARWrapper(TupleTransformerLMWrapper):
         pedal_on_id, pedal_off_id = tokenizer.pedal_ids
 
         pbar = range(t, seq_len + 1)
-        pbar = pbar if disable_tqdm else tqdm(pbar, leave=False)
+        pbar = tqdm(pbar, leave=False) if show_progress else pbar
         for idx in pbar:
             outputs = self(
                 # these are cut inside forward
@@ -552,14 +552,14 @@ class TupleTransformerARWrapper(TupleTransformerLMWrapper):
                 )
                 if is_eos_tokens.any(dim=-1):
                     out_tokens[:, -1, 1:] = out_tokens[:, -1, :1]
-                    if not disable_tqdm:
+                    if show_progress:
                         pbar.close()
                     break
             elif max_bar is not None:
                 is_max_bar_tokens = out_tokens[..., -1, 0] > max_bar
                 if is_max_bar_tokens.any(dim=-1):
                     out_tokens = out_tokens[:, :-1, :]
-                    if not disable_tqdm:
+                    if show_progress:
                         pbar.close()
                     break
 
@@ -656,7 +656,7 @@ class TupleTransformerMixedLMWrapper(TupleTransformerLMWrapper):
         tokenizer: OctupleM = None,
         cache: TupleTransformerCache | None = None,
         return_cache: bool = False,
-        disable_tqdm: bool = False,
+        show_progress: bool = True,
         **kwargs,
     ) -> (
         tuple[torch.Tensor, torch.Tensor] | tuple[torch.Tensor, torch.Tensor, TupleTransformerCache]
@@ -726,7 +726,7 @@ class TupleTransformerMixedLMWrapper(TupleTransformerLMWrapper):
         unmask = out_tokens == self.mask_token_id
         unmask_ids = torch.where(torch.any(unmask, dim=2))[1]
 
-        pbar = unmask_ids if disable_tqdm else tqdm(unmask_ids, leave=False)
+        pbar = tqdm(unmask_ids, leave=False) if show_progress else unmask_ids
         for idx in pbar:
             # get samples
             type_mask = unmask[:, idx][0]

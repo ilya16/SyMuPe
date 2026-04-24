@@ -13,6 +13,7 @@ from omegaconf import MISSING, DictConfig, OmegaConf
 
 from symupe.data.collators import SequenceInputs
 from symupe.data.datasets import SequenceDataset
+from symupe.inference.classification import MusicClassifier
 from symupe.models import Model, AutoModel
 from symupe.modules.constructor import Registry, ModuleConfig, VariableModuleConfig
 from symupe.modules.metrics import masked_batch_mean
@@ -278,12 +279,17 @@ class SequenceClassifierConfig(ModuleConfig):
     emb_norm: bool = False
     dropout: float = 0.0
     context_with_memory: bool = False
+    memory_norm: bool = True
     backbone_output_layer: int | None = None
     detach_inputs: bool | float = True
     label_smoothing: float = 0.0
 
+    labels: dict[int, str] | None = None
+
 
 class SequenceClassifier(Model):
+    CLASSIFIER_CLASS = MusicClassifier
+
     def __init__(
         self,
         num_classes: int,
@@ -300,9 +306,11 @@ class SequenceClassifier(Model):
         emb_dropout: float = 0.0,
         clf_dropout: float = 0.0,
         context_with_memory: bool = False,
+        memory_norm: bool = True,
         backbone_output_layer: int | None = None,
         detach_inputs: bool | float = True,
         label_smoothing: float = 0.0,
+        labels: dict[int, str] | None = None,
     ):
         super().__init__()
 
@@ -333,6 +341,7 @@ class SequenceClassifier(Model):
 
         self.backbone_output_layer = backbone_output_layer
         self.context_with_memory = context_with_memory
+        self.memory_norm = memory_norm
         self.detach_inputs = float(detach_inputs)
 
         self.dim = transformer.dim if transformer is not None else dim
@@ -366,6 +375,8 @@ class SequenceClassifier(Model):
 
         self.label_smoothing = label_smoothing
 
+        self.labels = {int(idx): label for idx, label in (labels or {}).items()}
+
     def forward(
         self,
         tokens: torch.Tensor,
@@ -392,21 +403,26 @@ class SequenceClassifier(Model):
             )
 
         embeddings = backbone_out.hidden_state
+        memory_tokens = backbone_out.memory_state
 
         if (
             self.backbone_output_layer
             and self.backbone_output_layer < len(self.backbone.transformer.layers) - 1
         ):
-            embeddings = self.backbone.transformer.layers[
+            attention_norm = self.backbone.transformer.layers[
                 self.backbone_output_layer + 1
-            ].attention_norm(embeddings)
+            ].attention_norm
+            embeddings = attention_norm(embeddings)
+
+            if self.memory_norm and memory_tokens is not None:
+                memory_tokens = attention_norm(memory_tokens)
 
         if self.context_with_memory:
             mask = torch.ones_like(embeddings[..., 0]).bool() if mask is None else mask
 
-            if backbone_out.memory_state is not None:
-                embeddings = torch.cat((backbone_out.memory_state, embeddings), dim=1)
-                mask = F.pad(mask, (backbone_out.memory_state.shape[1], 0), value=True)
+            if memory_tokens is not None:
+                embeddings = torch.cat((memory_tokens, embeddings), dim=1)
+                mask = F.pad(mask, (memory_tokens.shape[1], 0), value=True)
 
         embeddings = self.emb_norm(embeddings)
         embeddings = self.emb_dropout(embeddings)

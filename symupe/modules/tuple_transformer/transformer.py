@@ -476,6 +476,7 @@ class TupleTransformer(nn.Module, Constructor):
         return_cache: bool = False,
         output_keys: list | None = None,
         return_embeddings: bool = False,
+        normalized_embeddings: bool = False,
         return_attn: bool = False,
         output_layer: int | None = None,
         **kwargs,
@@ -680,8 +681,12 @@ class TupleTransformer(nn.Module, Constructor):
                 )
 
         output_layer = output_layer if output_layer is not None else self.transformer_output_layer
+        output_layer = output_layer if output_layer is not None else -1
+        output_layer = (
+            len(self.transformer.layers) + output_layer if output_layer < 0 else output_layer
+        )
         return_embeddings = return_embeddings or (
-            output_layer and output_layer < len(self.transformer.layers) - 1
+            output_layer is not None and output_layer < len(self.transformer.layers) - 1
         )
 
         output: TransformerOutput = self.transformer(
@@ -698,10 +703,13 @@ class TupleTransformer(nn.Module, Constructor):
         )
         out, memory_tokens, intermediates = output.out, output.memory_tokens, output.intermediates
         if (
-            self.transformer_output_layer is not None
-            and self.transformer_output_layer < len(self.transformer.layers) - 1
+            normalized_embeddings
+            and output_layer is not None
+            and output_layer < len(self.transformer.layers) - 1
         ):
-            out = self.transformer.layers[self.transformer_output_layer + 1].attention_norm(out)
+            attention_norm = self.transformer.layers[output_layer + 1].attention_norm
+            out = attention_norm(out)
+            memory_tokens = attention_norm(memory_tokens)
 
         mode_out = None
         if mode_embeddings is not None and self.mode_embedding == EmbeddingMode.PREFIX:

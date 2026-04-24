@@ -12,11 +12,18 @@ import torch.nn as nn
 from tqdm.auto import tqdm
 
 from symupe.data.datasets import SequenceDataset, SequenceTask
-from symupe.data.tokenizers import TokSequence, TokSequenceContext, EncodingType, SyMuPe
+from symupe.data.tokenizers import (
+    TokSequence,
+    TokSequenceContext,
+    EncodingType,
+    SequenceType,
+    SyMuPe,
+)
 from symupe.data.tokenizers.constants import SOS_TOKEN, EOS_TOKEN, MASK_TOKEN, SPECIAL_TOKENS_VALUE
+from symupe.inference.base import GeneratorData
+from symupe.inference.performance import PerformanceGenerator
 from symupe.modules.tuple_transformer.flow_matching import resample
 from .model import MusicTransformer, CFMMusicTransformer
-from ..base import Generator
 
 
 @dataclass
@@ -90,27 +97,30 @@ class NoteMetadata:
 
 
 @dataclass
-class SequenceData:
+class SequenceData(GeneratorData):
     seq: TokSequence | None = None
     init_seq: TokSequence | None = None
+    gen_seq: TokSequence | None = None
+
     cond_embeddings: torch.Tensor | None = None
     cond_seq: TokSequence | None = None
     score_seq: TokSequence | None = None
-    gen_seq: TokSequence | None = None
     seq_context: TokSequenceContext | None = None
     cached_note_times: list[float] | None = None
+
     task: SequenceTask | str | None = None
     context_len: int = 0
     onset_token_dims: list[int] | None = None
     has_sos_eos: bool = False
     reached_eos: bool = False
+
     note_meta: NoteMetadata | None = None
     ticks_data: dict | None = None
     beat_ids: np.ndarray | None = None
     tempos: np.ndarray | None = None
 
 
-class MusicTransformerGenerator(Generator):
+class MusicTransformerGenerator(PerformanceGenerator):
     def __init__(
         self,
         model: MusicTransformer | CFMMusicTransformer,
@@ -126,6 +136,10 @@ class MusicTransformerGenerator(Generator):
             model=model,
             tokenizer=tokenizer,
             dataset=dataset,
+            used_token_types=used_token_types,
+            mask_token_dims=mask_token_dims,
+            used_context_token_types=used_context_token_types,
+            used_score_token_types=used_score_token_types,
             device=device,
         )
 
@@ -137,11 +151,6 @@ class MusicTransformerGenerator(Generator):
         self.eos_token_id = self.tokenizer[0, EOS_TOKEN]
         self.mask_token_id = self.tokenizer[0, MASK_TOKEN]
         self.mask_token_value = SPECIAL_TOKENS_VALUE - self.mask_token_id
-
-        self.used_token_types = used_token_types
-        self.mask_token_dims = mask_token_dims or {}
-        self.used_context_token_types = used_context_token_types
-        self.used_score_token_types = used_score_token_types
 
     def reset(self):
         self.data = SequenceData()
@@ -298,6 +307,15 @@ class MusicTransformerGenerator(Generator):
 
         return self.data
 
+    def _prepare_generator_kwargs(self, **kwargs) -> dict[str, object]:
+        return {
+            "top_k": kwargs.get("top_k", kwargs.get("mlm_top_k", -1.0)),
+            "top_p": kwargs.get("top_p", kwargs.get("mlm_top_p", 0.95)),
+            "filter_key_ids": {
+                key: list(range(self.tokenizer.zero_token)) for key in self.used_token_types
+            },
+        }
+
     def _generate(
         self,
         input_tokens: torch.Tensor,
@@ -307,7 +325,7 @@ class MusicTransformerGenerator(Generator):
         context_values: torch.Tensor | None = None,
         score_tokens: torch.Tensor | None = None,
         score_values: torch.Tensor | None = None,
-        disable_tqdm: bool = True,
+        show_progress: bool = False,
         **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
         gen_tokens, gen_values, gen_pedals = self.model.generate(
@@ -319,7 +337,7 @@ class MusicTransformerGenerator(Generator):
             score_tokens=score_tokens,
             score_values=score_values,
             tokenizer=self.tokenizer,
-            disable_tqdm=disable_tqdm,
+            show_progress=show_progress,
             return_intermediates=False,
             **kwargs,
         )
@@ -341,7 +359,7 @@ class MusicTransformerGenerator(Generator):
         force_keep_cached_notes: bool = False,
         drop_known_seq: bool = False,
         sort_messages: bool = False,
-        disable_tqdm: bool = True,
+        show_progress: bool = False,
         **model_kwargs,
     ) -> tuple[TokSequence | None, list | np.ndarray, NoteMetadata]:
         init_seq, gen_seq = self.data.init_seq, self.data.gen_seq
@@ -523,7 +541,7 @@ class MusicTransformerGenerator(Generator):
                 context_tokens_dropout=1.0 if cond_seq_control is None else 0.0,
                 score_tokens=score_tokens,
                 score_values=score_values,
-                disable_tqdm=disable_tqdm,
+                show_progress=show_progress,
                 context_len=known_input_len,
                 type_ids=torch.ones_like(input_tokens[..., 0]) if interpolated else None,
                 **model_kwargs,
@@ -624,7 +642,7 @@ class MusicTransformerGenerator(Generator):
         cond_seq_control: dict[str, float] | None = None,
         interpolated: bool = False,
         group_onset_notes: bool = True,
-        disable_tqdm: bool = True,
+        show_progress: bool = False,
         **model_kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         init_seq, gen_seq = self.data.init_seq, self.data.gen_seq
@@ -668,7 +686,8 @@ class MusicTransformerGenerator(Generator):
         )
 
         # generate all notes till the end
-        if not disable_tqdm:
+        pbar = None
+        if show_progress:
             pbar = tqdm(total=len(init_seq))
             pbar.update(all_gen_tokens.shape[1])
         while not self.data.reached_eos:
@@ -782,7 +801,7 @@ class MusicTransformerGenerator(Generator):
                 score_tokens=score_tokens,
                 score_values=score_values,
                 context_tokens_dropout=1.0 if cond_seq_control is None else 0.0,
-                disable_tqdm=disable_tqdm,
+                show_progress=False,  # do not log steps inside the model wrapper
                 context_len=known_input_len,
                 type_ids=torch.ones_like(input_tokens[..., 0]) if interpolated else None,
                 **model_kwargs,
@@ -821,7 +840,7 @@ class MusicTransformerGenerator(Generator):
             current_note_idx += num_new_notes
             known_input_len += num_new_notes
 
-            if not disable_tqdm:
+            if pbar is not None:
                 pbar.update(num_new_notes)
 
         self.data.reached_eos = self.data.reached_eos and (
@@ -863,18 +882,13 @@ class MusicTransformerGenerator(Generator):
         self,
         postprocess: bool = True,
         encoding: EncodingType | str | None = None,
+        seq_type: SequenceType | str | None = None,
     ) -> TokSequence:
-        gen_seq = self.data.gen_seq[int(self.data.has_sos_eos) :].numpy()
-        gen_seq.type = "performance"
-
-        if postprocess:
-            gen_seq = self.tokenizer.denormalize_values(gen_seq)
-            gen_seq = self.tokenizer.decompress(copy.deepcopy(gen_seq))
-
-            if encoding is not None:
-                gen_seq = self.token_transformer(gen_seq, encoding)
-
-        return gen_seq
+        return super().generated_sequence(
+            postprocess=postprocess,
+            encoding=encoding,
+            seq_type=SequenceType.PERFORMANCE,
+        )
 
     def reset_position(
         self,
@@ -916,7 +930,18 @@ class MusicTransformerGenerator(Generator):
         return note_idx
 
 
+MusicTransformer.GENERATOR_CLASS = MusicTransformerGenerator
+
+
 class CFMMusicTransformerGenerator(MusicTransformerGenerator):
+    @staticmethod
+    def _prepare_generator_kwargs(**kwargs) -> dict[str, object]:
+        return {
+            "steps": kwargs.get("steps", kwargs.get("cfm_steps", 10)),
+            "top_p": kwargs.get("step_factor", kwargs.get("cfm_step_factor", 0.75)),
+            "method": kwargs.get("method", "euler"),
+        }
+
     def _generate(
         self,
         input_tokens: torch.Tensor,
@@ -934,7 +959,7 @@ class CFMMusicTransformerGenerator(MusicTransformerGenerator):
         num_resample: int = 1,
         resample_period: int = 5,
         resample_fn: Callable = resample,
-        disable_tqdm: bool = True,
+        show_progress: bool = False,
         **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
         gen_tokens, gen_values, gen_pedals = self.model.generate(
@@ -954,9 +979,12 @@ class CFMMusicTransformerGenerator(MusicTransformerGenerator):
             num_resample=num_resample,
             resample_period=resample_period,
             resample_fn=resample_fn,
-            disable_tqdm=disable_tqdm,
+            show_progress=show_progress,
             return_intermediates=False,
             **kwargs,
         )
 
         return gen_tokens, gen_values, gen_pedals
+
+
+CFMMusicTransformer.GENERATOR_CLASS = CFMMusicTransformerGenerator

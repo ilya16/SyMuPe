@@ -14,18 +14,18 @@ from symupe.data.tokenizers import (
     TokSequence,
     TokSequenceContext,
     SequenceType,
-    EncodingType,
     SortingType,
     ENCODING_SORTING,
     SyMuPe,
 )
 from symupe.data.tokenizers.constants import SOS_TOKEN, EOS_TOKEN, MASK_TOKEN, SPECIAL_TOKENS_VALUE
+from symupe.inference.base import GeneratorData
+from symupe.inference.performance import PerformanceGenerator
 from .model import Seq2SeqMusicTransformer
-from ..base import Generator
 
 
 @dataclass
-class Seq2SeqData:
+class Seq2SeqData(GeneratorData):
     source_seq: TokSequence | None = None
     target_seq: TokSequence | None = None
     init_seq: TokSequence | None = None
@@ -44,7 +44,7 @@ class Seq2SeqData:
     reached_eos: bool = False
 
 
-class Seq2SeqMusicTransformerGenerator(Generator):
+class Seq2SeqMusicTransformerGenerator(PerformanceGenerator):
     def __init__(
         self,
         model: Seq2SeqMusicTransformer,
@@ -60,6 +60,10 @@ class Seq2SeqMusicTransformerGenerator(Generator):
             model=model,
             tokenizer=tokenizer,
             dataset=dataset,
+            used_token_types=used_token_types,
+            mask_token_dims=mask_token_dims,
+            used_context_token_types=used_context_token_types,
+            used_score_token_types=used_score_token_types,
             device=device,
         )
 
@@ -71,11 +75,6 @@ class Seq2SeqMusicTransformerGenerator(Generator):
         self.eos_token_id = self.tokenizer[0, EOS_TOKEN]
         self.mask_token_id = self.tokenizer[0, MASK_TOKEN]
         self.mask_token_value = SPECIAL_TOKENS_VALUE - self.mask_token_id
-
-        self.used_token_types = used_token_types
-        self.mask_token_dims = mask_token_dims or {}
-        self.used_context_token_types = used_context_token_types
-        self.used_score_token_types = used_score_token_types
 
     def reset(self) -> None:
         self.data = Seq2SeqData()
@@ -207,6 +206,15 @@ class Seq2SeqMusicTransformerGenerator(Generator):
 
         return self.data
 
+    def _prepare_generator_kwargs(self, **kwargs) -> dict[str, object]:
+        return {
+            "top_k": kwargs.get("top_k", kwargs.get("mlm_top_k", -1.0)),
+            "top_p": kwargs.get("top_p", kwargs.get("mlm_top_p", 0.95)),
+            "filter_key_ids": {
+                key: list(range(self.tokenizer.zero_token)) for key in self.used_token_types
+            },
+        }
+
     def generate_batch(
         self,
         num_sequences: int = 1,
@@ -216,7 +224,7 @@ class Seq2SeqMusicTransformerGenerator(Generator):
         cond_seq_control: dict[str, float] | None = None,
         interpolated: bool = False,
         group_onset_notes: bool = True,
-        disable_tqdm: bool = True,
+        show_progress: bool = False,
         **model_kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         init_seq, gen_seq = self.data.init_seq, self.data.gen_seq
@@ -252,7 +260,8 @@ class Seq2SeqMusicTransformerGenerator(Generator):
         )
 
         # generate all notes till the end
-        if not disable_tqdm:
+        pbar = None
+        if show_progress:
             pbar = tqdm(total=len(init_seq))
             pbar.update(all_gen_tokens.shape[1])
         while not self.data.reached_eos:
@@ -353,7 +362,7 @@ class Seq2SeqMusicTransformerGenerator(Generator):
                 dec_score_tokens=score_tokens,
                 dec_score_values=score_values,
                 context_tokens_dropout=1.0 if cond_seq_control is None else 0.0,
-                disable_tqdm=disable_tqdm,
+                show_progress=False,  # do not log steps inside the model wrapper
                 context_len=known_input_len,
                 type_ids=torch.ones_like(input_tokens[..., 0]) if interpolated else None,
                 tokenizer=self.tokenizer,
@@ -382,7 +391,7 @@ class Seq2SeqMusicTransformerGenerator(Generator):
             current_note_idx += num_new_notes
             known_input_len += num_new_notes
 
-            if not disable_tqdm:
+            if pbar is not None:
                 pbar.update(num_new_notes)
 
         self.data.reached_eos = self.data.reached_eos and (
@@ -391,18 +400,5 @@ class Seq2SeqMusicTransformerGenerator(Generator):
 
         return all_gen_tokens, all_gen_values
 
-    def generated_sequence(
-        self,
-        postprocess: bool = True,
-        encoding: EncodingType | str | None = None,
-    ) -> TokSequence:
-        gen_seq = self.data.gen_seq[int(self.data.has_sos_eos) :].numpy()
 
-        if postprocess:
-            gen_seq = self.tokenizer.denormalize_values(gen_seq)
-            gen_seq = self.tokenizer.decompress(copy.deepcopy(gen_seq))
-
-            if encoding is not None:
-                gen_seq = self.token_transformer(gen_seq, encoding)
-
-        return gen_seq
+Seq2SeqMusicTransformer.GENERATOR_CLASS = Seq2SeqMusicTransformerGenerator
