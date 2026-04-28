@@ -10,6 +10,15 @@ from .timing import MIDITimeMapper
 
 
 def sort_notes(notes: NoteTickList, order: str = "time") -> tuple[NoteTickList, np.ndarray | None]:
+    """Sorts note list by time or pitch with secondary sorting on duration and velocity.
+
+    Args:
+        notes: :class:`symusic.core.NoteTickList` to sort.
+        order: Primary sort key ('time' or 'pitch').
+
+    Returns:
+        Tuple of (sorted_notes, sort_indices).
+    """
     if len(notes) == 0:
         return notes, None
 
@@ -42,13 +51,16 @@ def cut_overlapping_notes(
     min_shift: float | None = None,
     sort: bool = False,
 ) -> NoteTickList:
-    r"""Find and cut the first of the two overlapping notes, i.e. with the same pitch,
-    and the second note starting before the ending of the first note.
+    """Truncates notes that overlap with subsequent notes of same pitch.
 
-    :param notes: notes to analyse
-    :param duplicate_max_duration: make notes with the same start point have the same maximized duration
-    :param min_shift: minimal tick/time shift between two overlapping notes with the same pitch
-    :param sort: whether to sort notes before computation
+    Args:
+        notes: Note list to process.
+        duplicate_max_duration: If notes start same time, gives them same duration.
+        min_shift: Minimum required gap between overlapping notes.
+        sort: Whether to sort chronologically before processing.
+
+    Returns:
+        Processed :class:`symusic.core.NoteTickList`.
     """
     if sort:
         notes, sort_ids = sort_notes(notes, order="time")
@@ -97,10 +109,14 @@ def cut_overlapping_notes(
     return notes
 
 
-def remove_duplicated_notes(notes: NoteTickList):
-    r"""Find and remove exactly similar notes, i.e. with the same pitch, start and end.
+def remove_duplicated_notes(notes: NoteTickList) -> NoteTickList:
+    """Removes identical notes (same pitch, time, and duration).
 
-    :param notes: notes to analyse
+    Args:
+        notes: Note list to deduplicate.
+
+    Returns:
+        Deduplicated :class:`symusic.core.NoteTickList`.
     """
     i, prev_pitch_note = 0, {}
     while i < len(notes):
@@ -119,9 +135,13 @@ def remove_duplicated_notes(notes: NoteTickList):
 
 
 def remove_duplicated_midi_changes(midi: Score) -> Score:
-    r"""Find and remove exactly similar change events in MIDIs, i.e. with the same values or same start time.
+    """Deletes redundant tempo, time signature, and key signature changes.
 
-    :param midi: MIDI to analyse
+    Args:
+        midi: :class:`symusic.Score` to clean.
+
+    Returns:
+        Cleaned :class:`symusic.Score`.
     """
     # Process tempos
     if len(midi.tempos) > 0:
@@ -175,33 +195,36 @@ def remove_duplicated_midi_changes(midi: Score) -> Score:
     return midi
 
 
-def remove_short_notes(
-    notes: NoteTickList,
-    time_division: int,
-    max_beat_res: int = 48,
-    min_duration: float | int | None = None,
-):
-    r"""Find and remove short notes.
+def remove_short_notes(notes: NoteTickList, min_duration: float | int) -> NoteTickList:
+    """Deletes notes from list with duration below specified threshold.
 
-    :param notes: notes to analyse
-    :param time_division: MIDI time division / resolution, in ticks/beat (of the MIDI being parsed)
-    :param max_beat_res: maximum beat resolution for one sample
-    :param min_duration: minimum duration for a note
+    Args:
+        notes: :class:`symusic.core.NoteTickList` to filter.
+        min_duration: Minimum duration threshold in ticks or seconds.
+
+    Returns:
+        Filtered :class:`symusic.core.NoteTickList`.
     """
     if min_duration is not None:
         for i in range(len(notes) - 1, 0, -1):
             if notes[i].duration < min_duration:
                 del notes[i]
-    else:
-        ticks_per_sample = int(time_division / max_beat_res)
-        for i in range(len(notes) - 1, 0, -1):
-            if notes[i].duration < ticks_per_sample // 2:
-                del notes[i]
 
     return notes
 
 
-def filter_notes_by_pitch_range(notes: NoteTickList, pitch_range: tuple[int, int] = (21, 108)):
+def filter_notes_by_pitch_range(
+    notes: NoteTickList, pitch_range: tuple[int, int] = (21, 108)
+) -> NoteTickList:
+    """Removes notes with pitches falling outside inclusive MIDI boundary.
+
+    Args:
+        notes: Note list to filter.
+        pitch_range: Tuple of (min, max) MIDI pitch values.
+
+    Returns:
+        Filtered :class:`symusic.core.NoteTickList`.
+    """
     i = 0
     while i < len(notes):
         note = notes[i]
@@ -219,7 +242,19 @@ def filter_extra_midi_events(
     max_tick: int | float | None = None,
     sort: bool = False,
     use_sustain_boundaries: bool = False,
-):
+) -> Score:
+    """Removes control changes, pedals, and pitch bends outside active note boundaries.
+
+    Args:
+        midi: :class:`symusic.Score` to clean.
+        min_tick: Earliest allowed event time.
+        max_tick: Latest allowed event time.
+        sort: Whether to sort events chronologically before filtering.
+        use_sustain_boundaries: If ``True``, derives boundaries from active pedaling.
+
+    Returns:
+        Cleaned :class:`symusic.Score`.
+    """
     if use_sustain_boundaries:
         min_tick, max_tick = compute_global_sustain_control_boundaries(midi)
 
@@ -258,7 +293,21 @@ def shift_midi_events(
     note_indices: np.ndarray | None = None,
     inplace: bool = True,
     return_shifted_indices: bool = False,
-):
+) -> Score | tuple[Score, np.ndarray]:
+    """Applies global time offset to notes, pedals, and control changes.
+
+    Args:
+        midi: :class:`symusic.Score` to shift.
+        time_shift: Amount of time to add (in seconds or ticks based on score ttype).
+        offset: Time threshold; only events after this are shifted.
+        note_offset: Index threshold for note list.
+        note_indices: Optional specific indices to shift.
+        inplace: Whether to modify object directly.
+        return_shifted_indices: Whether to return dictionary of modified indices.
+
+    Returns:
+        Shifted :class:`symusic.Score` or tuple of (Score, shifted_indices).
+    """
     midi = midi if inplace else midi.copy()
 
     time_mapper = MIDITimeMapper(midi) if isinstance(midi.ttype, Tick) else None
@@ -344,6 +393,15 @@ def shift_midi_events(
 
 
 def clip_silence(midi: Score, max_silence: float = 5.0) -> Score:
+    """Removes excessive gaps between notes throughout performance.
+
+    Args:
+        midi: :class:`symusic.Score` to process.
+        max_silence: Maximum allowed gap in seconds.
+
+    Returns:
+        :class:`symusic.Score` with silence segments removed.
+    """
     for track in midi.tracks:
         note_soa = track.notes.numpy()
         note_on = note_soa["time"]
@@ -369,13 +427,33 @@ def clip_silence(midi: Score, max_silence: float = 5.0) -> Score:
     return midi
 
 
-def resample_midi(midi: Score, ticks_per_quarter: int, min_duration: int | None = 1):
+def resample_midi(midi: Score, ticks_per_quarter: int, min_duration: int | None = 1) -> Score:
+    """Changes MIDI resolution and rescales all event times accordingly.
+
+    Args:
+        midi: :class:`symusic.Score` to resample.
+        ticks_per_quarter: Target resolution (TPQ).
+        min_duration: Minimum duration to preserve for notes after scaling.
+
+    Returns:
+        Resampled :class:`symusic.Score`.
+    """
     if midi.ticks_per_quarter == ticks_per_quarter:
         return midi
     return midi.resample(ticks_per_quarter, min_dur=min_duration)
 
 
 def convert_note_markers(midi: Score) -> Score:
+    """Converts performance text markers into structured note metadata.
+
+    Calculates absolute durations for performance markers based on temporal mapping.
+
+    Args:
+        midi: :class:`symusic.Score` containing text markers.
+
+    Returns:
+        :class:`symusic.Score` with updated markers.
+    """
     ttype = "tick" if isinstance(midi.ttype, Tick) else "second"
     time_mapper = MIDITimeMapper(midi)
 
@@ -394,7 +472,15 @@ def convert_note_markers(midi: Score) -> Score:
     return midi
 
 
-def extract_track_pedals(track: Track):
+def extract_track_pedals(track: Track) -> tuple[list | np.ndarray, list | np.ndarray]:
+    """Parses sustain pedal (CC64) control changes into paired onset and offset times.
+
+    Args:
+        track: :class:`symusic.Track` to analyze.
+
+    Returns:
+        Tuple containing lists of (sustain_ons, sustain_offs).
+    """
     ctrl_soa = track.controls.numpy()
 
     is_sustain = ctrl_soa["number"] == 64
@@ -414,8 +500,20 @@ def extract_track_pedals(track: Track):
 
 
 def apply_sustain_control_changes(
-    midi: Score, inplace: bool = True, max_duration: int | float | None = None
-):
+    midi: Score,
+    inplace: bool = True,
+    max_duration: int | float | None = None,
+) -> Score:
+    """Extends note durations to match sustain pedal (CC64) release times.
+
+    Args:
+        midi: :class:`symusic.Score` to process.
+        inplace: Whether to modify object directly.
+        max_duration: Cap for extended durations.
+
+    Returns:
+        :class:`symusic.Score` with updated note durations.
+    """
     midi = midi if inplace else midi.copy()
 
     for track in midi.tracks:
@@ -446,7 +544,19 @@ def apply_sustain_control_changes(
     return midi
 
 
-def compute_global_sustain_control_boundaries(midi: Score):
+def compute_global_sustain_control_boundaries(
+    midi: Score,
+) -> tuple[int | float, int | float] | tuple[None, None]:
+    """Calculates earliest and latest active sustain pedal events across all tracks.
+
+    Used to define the effective temporal range of a performance.
+
+    Args:
+        midi: :class:`symusic.Score` to analyze.
+
+    Returns:
+        Tuple of (global_start, global_end) or (None, None) if no pedals exist.
+    """
     start, end = midi.end(), midi.start()
     has_pedals = False
 
@@ -488,6 +598,19 @@ def compute_global_sustain_control_boundaries(midi: Score):
 
 
 def clean_controls_in_interval(midi: Score, start: float, end: float, eps: float = 1e-3):
+    """Removes control changes and pedals within a specified temporal window.
+
+    Ensures control state continuity by shifting boundary events slightly outside the deleted range.
+
+    Args:
+        midi: :class:`symusic.Score` to clean.
+        start: Start of deletion window.
+        end: End of deletion window.
+        eps: Small epsilon for boundary shifting.
+
+    Returns:
+        Cleaned :class:`symusic.Score`.
+    """
     ttype = "tick" if isinstance(midi.ttype, Tick) else "second"
     midi = midi.to("second") if ttype == "tick" else midi
 
@@ -531,6 +654,17 @@ def clean_controls_in_interval(midi: Score, start: float, end: float, eps: float
 
 
 def fix_incorrect_durations(notes: NoteTickList, sort: bool = True):
+    """Adjusts note durations to prevent logical overlaps or invalid lengths.
+
+    Handles cases where notes of same pitch start simultaneously or overlap chronologically.
+
+    Args:
+        notes: Note list to repair.
+        sort: Whether to sort chronologically before processing.
+
+    Returns:
+        List of repaired :class:`symusic.Note` objects.
+    """
     if sort:
         notes, _ = sort_notes(notes, order="time")
 
@@ -565,4 +699,12 @@ UNPERFORMED_TRACK_NAME = "Unperformed Notes"
 
 
 def create_unperformed_notes_track(program: int = 0):
+    """Creates empty track dedicated to silent/unperformed note markers.
+
+    Args:
+        program: MIDI program for track.
+
+    Returns:
+        Empty :class:`symusic.Track` named 'Unperformed Notes'.
+    """
     return Track(program=program, name=UNPERFORMED_TRACK_NAME, is_drum=False)

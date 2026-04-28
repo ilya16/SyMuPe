@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import os
 import sys
+import tempfile
 from collections import defaultdict
+from pathlib import Path
 
 import numpy as np
 import partitura as pt
@@ -15,7 +18,17 @@ def cut_overlapping_partitura_score_notes(
     score: pt.score.Score,
     duplicate_max_duration: bool = True,
     min_shift: float | None = 1 / 32,  # in quarter notes
-):
+) -> pt.score.Score:
+    """Truncates overlapping notes of same pitch within each part of a Partitura score.
+
+    Args:
+        score: :class:`partitura.score.Score` object to process.
+        duplicate_max_duration: If notes start same time, gives them same maximized duration.
+        min_shift: Minimum required gap in quarter notes between overlapping notes.
+
+    Returns:
+        Modified :class:`partitura.score.Score` object.
+    """
     for part in score.parts:
         tpq = part.first_point.quarter
         min_tick_shift = max(1, round(tpq * min_shift)) if min_shift is not None else None
@@ -75,7 +88,15 @@ def cut_overlapping_partitura_score_notes(
     return score
 
 
-def remove_duplicated_partitura_score_notes(score: pt.score.Score):
+def remove_duplicated_partitura_score_notes(score: pt.score.Score) -> pt.score.Score:
+    """Deletes identical notes (same pitch, start, and duration) from Partitura score.
+
+    Args:
+        score: :class:`partitura.score.Score` object to deduplicate.
+
+    Returns:
+        Deduplicated :class:`partitura.score.Score` object.
+    """
     for part in score.parts:
         notes = part.notes_tied
         i, prev_pitch_note = 0, {}
@@ -98,7 +119,20 @@ def expand_partitura_score_grace_notes(
     score: pt.score.Score,
     default_duration_ratio=0.125,
     max_steal_ratio=0.75,
-):
+) -> pt.score.Score:
+    """Converts zero-duration grace notes into notes with physical temporal boundaries.
+
+    Steals time from main notes to accommodate acciaccaturas and appoggiaturas
+    based on symbolic duration and specified ratios.
+
+    Args:
+        score: :class:`partitura.score.Score` object to process.
+        default_duration_ratio: Base ratio of quarter note for acciaccaturas.
+        max_steal_ratio: Maximum fraction of main note duration that can be stolen.
+
+    Returns:
+        Modified :class:`partitura.score.Score` with expanded grace notes.
+    """
     for part in score.parts:
         tpq = part.first_point.quarter
 
@@ -179,7 +213,20 @@ def process_partitura_score_ornaments(
     score: pt.score.Score,
     min_notes_in_cluster: int = 3,
     max_pitch_difference: int = 2,
-):
+) -> pt.score.Score:
+    """Identifies clusters of hidden realization notes as ornaments (trills, mordents).
+
+    Links clusters to visible placeholder notes and transfers ornament metadata
+    before removing placeholders.
+
+    Args:
+        score: :class:`partitura.score.Score` object to process.
+        min_notes_in_cluster: Minimum notes required to form an ornament cluster.
+        max_pitch_difference: Maximum pitch interval between successive notes in cluster.
+
+    Returns:
+        Modified :class:`partitura.score.Score` with structured ornament data.
+    """
     for part in score.parts:
         all_notes = [n for n in part.notes_tied if not isinstance(n, pt.score.GraceNote)]
         hidden = sorted(
@@ -263,7 +310,29 @@ def preprocess_partitura_score(
     cut_overlapped_notes: bool = True,
     voice_is_staff: bool = True,
     recursion_depth: int = 10000,
-):
+) -> pt.score.Score:
+    """Orchestrates comprehensive cleaning pipeline for symbolic Partitura scores.
+
+    Handles repeat unfolding, grace note expansion, ornament realization, and overlap removal.
+
+    If `midi_path` is provided, the final MIDI is saved to disk.
+    If `None`, a temporary file is used and cleaned up after loading.
+
+    Args:
+        score: :class:`partitura.score.Score` object to preprocess.
+        unfold_repeats: Whether to unfold repeat signs and endings.
+        unfold_minimal: Whether to use minimal unfolding logic.
+        remove_grace_notes: Whether to delete all grace notes.
+        expand_grace_notes: Whether to give grace notes physical durations.
+        process_ornaments: Whether to group realization notes into ornaments.
+        clean_duplicates: Whether to remove identical notes.
+        cut_overlapped_notes: Whether to truncate overlapping notes.
+        voice_is_staff: If ``True``, maps MIDI staff index to note voice.
+        recursion_depth: Maximum depth for repeat unfolding.
+
+    Returns:
+        Cleaned and processed :class:`partitura.score.Score` object.
+    """
     if unfold_repeats and len(score.parts[0].repeats) > 0:
         sys.setrecursionlimit(recursion_depth)
 
@@ -306,7 +375,8 @@ def preprocess_partitura_score(
 
 def partitura_score_to_midi(
     score: str | pt.score.Score,
-    midi_path: str,
+    midi_path: str | Path | None = None,
+    *,
     unfold_repeats: bool = True,
     unfold_minimal: bool = False,
     remove_grace_notes: bool = False,
@@ -314,11 +384,35 @@ def partitura_score_to_midi(
     process_ornaments: bool = True,
     clean_duplicates: bool = True,
     cut_overlapped_notes: bool = True,
+    clean_short_notes: bool = True,
     downsample_ticks_per_quarter: int | None = None,
     ticks_per_quarter: int | None = 480,
     min_shift: float | None = 1 / 24,
     min_duration: float | None = 1 / 24,
 ) -> Score:
+    """Converts symbolic Partitura score to normalized :class:`symusic.Score` MIDI.
+
+    Applies Partitura-side preprocessing before saving to MIDI and performing final normalization.
+
+    Args:
+        score: File path or :class:`partitura.score.Score` object.
+        midi_path: Optional path to save final MIDI.
+        unfold_repeats: Whether to unfold symbolic repeats.
+        unfold_minimal: Whether to use minimal unfolding.
+        remove_grace_notes: Whether to delete grace notes.
+        expand_grace_notes: Whether to expand grace notes.
+        process_ornaments: Whether to process ornaments.
+        clean_duplicates: Whether to remove identical notes.
+        clean_short_notes: Whether to remove notes shorter than specified threshold.
+        cut_overlapped_notes: Whether to truncate overlaps.
+        downsample_ticks_per_quarter: Initial resolution for resampling.
+        ticks_per_quarter: Final MIDI resolution.
+        min_shift: Minimum shift between notes in quarter notes.
+        min_duration: Minimum duration for notes in quarter notes.
+
+    Returns:
+        Preprocessed and normalized :class:`symusic.Score` object.
+    """
     if not isinstance(score, pt.score.Score):
         score = pt.load_score(score)
 
@@ -333,32 +427,61 @@ def partitura_score_to_midi(
         cut_overlapped_notes=cut_overlapped_notes,
     )
 
-    pt.save_score_midi(
-        score, midi_path, part_voice_assign_mode=5, velocity=80, anacrusis_behavior="pad_bar"
-    )
-    midi = Score(midi_path)
+    is_temporary = midi_path is None
+    if is_temporary:
+        fd, actual_path = tempfile.mkstemp(suffix=".mid")
+        os.close(fd)
+    else:
+        actual_path = str(midi_path)
 
-    midi = preprocess_midi(
-        midi,
-        to_single_track=False,
-        clean_duplicates=True,
-        cut_overlapped_notes=True,
-        clean_short_notes=True,
-        min_tick_shift=(
-            int(ticks_per_quarter * min_shift) if ticks_per_quarter is not None else None
-        ),
-        min_tick_duration=(
-            int(ticks_per_quarter * min_duration) if ticks_per_quarter is not None else None
-        ),
-        downsample_ticks_per_quarter=downsample_ticks_per_quarter,
-        target_ticks_per_quarter=ticks_per_quarter,
-    )
+    try:
+        pt.save_score_midi(
+            score,
+            actual_path,
+            part_voice_assign_mode=5,
+            velocity=80,
+            anacrusis_behavior="pad_bar",
+        )
 
-    midi.dump_midi(midi_path)
+        midi = Score(actual_path)
+        midi = preprocess_midi(
+            midi,
+            to_single_track=False,
+            clean_duplicates=clean_duplicates,
+            cut_overlapped_notes=cut_overlapped_notes,
+            clean_short_notes=clean_short_notes,
+            min_tick_shift=(
+                int(ticks_per_quarter * min_shift) if ticks_per_quarter is not None else None
+            ),
+            min_tick_duration=(
+                int(ticks_per_quarter * min_duration) if ticks_per_quarter is not None else None
+            ),
+            downsample_ticks_per_quarter=downsample_ticks_per_quarter,
+            target_ticks_per_quarter=ticks_per_quarter,
+        )
+
+        if not is_temporary:
+            midi.dump_midi(actual_path)
+
+    finally:
+        if is_temporary and os.path.exists(actual_path):
+            os.remove(actual_path)
+
     return midi
 
 
-def load_performance_note_array(midi_path):
+def load_performance_note_array(midi_path: str | Path) -> np.ndarray:
+    """Extracts MIDI performance data into structured NumPy array.
+
+    Provides concurrent access to onset/duration in both seconds and ticks,
+    matching Partitura's field structure with extensions for track and channel.
+
+    Args:
+        midi_path: Path to MIDI performance file.
+
+    Returns:
+        Structured NumPy array containing note-level performance data.
+    """
     midi_t = Score(midi_path)
     midi_s = midi_t.to("second")
 

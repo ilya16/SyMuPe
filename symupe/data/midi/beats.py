@@ -13,6 +13,15 @@ BEATS_IN_BARS = {
 
 
 def get_ticks_per_bar(time_sig: TimeSignature, ticks_per_quarter: int = 480):
+    """Calculates total number of ticks in a single bar based on time signature.
+
+    Args:
+        time_sig: :class:`symusic.TimeSignature` object.
+        ticks_per_quarter: MIDI resolution (TPQ).
+
+    Returns:
+        Total ticks per bar.
+    """
     return ticks_per_quarter * 4 * time_sig.numerator // time_sig.denominator
 
 
@@ -22,6 +31,18 @@ def get_inter_beat_interval(
     ticks_per_bar: int | None = None,
     ticks_per_quarter: int = 480,
 ):
+    """Determines number of ticks between consecutive beats.
+
+    Accounts for compound meters (e.g., 6/8 treated as 2 beats).
+
+    Args:
+        time_sig: :class:`symusic.TimeSignature` object.
+        ticks_per_bar: Optional precalculated ticks per bar.
+        ticks_per_quarter: MIDI resolution.
+
+    Returns:
+        Interval between beats in ticks.
+    """
     if ticks_per_bar is None:
         ticks_per_bar = get_ticks_per_bar(time_sig, ticks_per_quarter=ticks_per_quarter)
 
@@ -38,6 +59,17 @@ def get_bar_beat_ticks(
     ticks_per_quarter: int | None = None,
     max_tick: int | None = None,
 ):
+    """Generates arrays of absolute tick positions for every bar and beat onset.
+
+    Args:
+        midi: Optional :class:`symusic.Score` to analyze.
+        time_sigs: List of time signatures (if score not provided).
+        ticks_per_quarter: MIDI resolution (if score not provided).
+        max_tick: End of sequence in ticks (if score not provided).
+
+    Returns:
+        Tuple containing (bar_ticks, beat_ticks).
+    """
     assert midi is not None or all(
         map(lambda x: x is not None, (time_sigs, ticks_per_quarter, max_tick))
     )
@@ -73,6 +105,17 @@ def get_performance_beats(
     monotonic_times: bool = False,
     ticks_per_quarter: int = 480,
 ):
+    """Maps symbolic score beat ticks to performance timestamps using linear interpolation.
+
+    Args:
+        score_beats: Array of symbolic beat positions in ticks.
+        position_pairs: Matched (score_tick, perf_time) anchor points.
+        monotonic_times: If ``True``, filters anchors to ensure non-decreasing time.
+        ticks_per_quarter: MIDI resolution.
+
+    Returns:
+        Tuple of (score_beats, perf_beats) in seconds.
+    """
     if monotonic_times:
         mono_position_pairs = [position_pairs[0]]
         cur_pair = prev_pair = position_pairs[0]

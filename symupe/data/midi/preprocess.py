@@ -24,6 +24,31 @@ def preprocess_midi(
     downsample_ticks_per_quarter: int | None = None,
     target_ticks_per_quarter: int | None = None,
 ):
+    """Applies cleaning and normalization pipeline to MIDI object.
+
+    Handles track merging, event sorting, deduplication, overlapping note removal,
+    pitch filtering, and resampling to target resolution.
+
+    Args:
+        midi: :class:`symusic.Score` object to process.
+        to_single_track: Whether to merge all tracks into one.
+        sort_events: Whether to sort notes chronologically.
+        clean_duplicates: Whether to remove identical notes and control changes.
+        cut_overlapped_notes: Whether to truncate overlapping notes of same pitch.
+        clean_short_notes: Whether to remove notes shorter than specified threshold.
+        filter_extra_events: Whether to remove control changes outside note boundaries.
+        pitch_range: Valid MIDI pitch range (inclusive).
+        min_tick_shift: Minimum shift in ticks.
+        min_tick_duration: Minimum duration in ticks.
+        min_time_shift: Minimum shift in seconds.
+        min_time_duration: Minimum duration in seconds.
+        max_silence: Maximum allowed silence between notes.
+        downsample_ticks_per_quarter: Resolution for initial downsampling.
+        target_ticks_per_quarter: Final target MIDI resolution.
+
+    Returns:
+        Cleaned and normalized :class:`symusic.Score` object.
+    """
     if len(midi.tracks) == 0:
         return midi
 
@@ -70,9 +95,10 @@ def preprocess_midi(
                 track.notes = midi_utl.remove_duplicated_notes(track.notes)
 
         if clean_short_notes:
-            track.notes = midi_utl.remove_short_notes(
-                track.notes, time_division=midi.ticks_per_quarter, min_duration=min_duration
+            assert min_duration is not None, (
+                f"`min_tick_duration` or `min_time_duration` should be provided"
             )
+            track.notes = midi_utl.remove_short_notes(track.notes, min_duration=min_duration)
 
         if pitch_range is not None:
             track.notes = midi_utl.filter_notes_by_pitch_range(track.notes, pitch_range=pitch_range)
