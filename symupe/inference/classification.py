@@ -167,7 +167,7 @@ def test():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Built the Generator by loading the model and tokenizer directly from the Hub
+    # Build Classifier by loading the model and tokenizer directly from the Hub
     classifier: MusicClassifier = AutoClassifier.from_pretrained(
         "SyMuPe/MIDI-Quality-Classifier", device=device
     )

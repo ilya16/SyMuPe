@@ -374,7 +374,7 @@ def preprocess_partitura_score(
 
 
 def partitura_score_to_midi(
-    score: str | pt.score.Score,
+    score: str | Path | pt.score.Score,
     midi_path: str | Path | None = None,
     *,
     unfold_repeats: bool = True,
