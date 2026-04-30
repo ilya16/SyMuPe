@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, replace, field
+from functools import partial
 
 import numpy as np
 from symusic import Score
@@ -24,7 +25,7 @@ from ..midi.timing import MIDITimeMapper
 
 
 @dataclass
-class TrackedRefinementStages:
+class RefinementStages:
     """Statistics for recall or precision at different pipeline stages."""
 
     aligner: float | None = None
@@ -38,8 +39,8 @@ class TrackedRefinementStages:
 class AlignmentMetrics:
     """Container for tracking Recall and Precision through the refinement process."""
 
-    recall: TrackedRefinementStages
-    precision: TrackedRefinementStages
+    recall: RefinementStages
+    precision: RefinementStages
 
 
 @dataclass
@@ -187,6 +188,10 @@ class RAScoP:
     ):
         """Initializes the refiner with score, performance, and initial alignment.
 
+        Note: alignment refinement works with single-track MIDI files.
+            If the original score and performance MIDI files had multiple tracks,
+            the all tracks will be merged into one before the refinement.
+
         Args:
             score_midi: Path to MIDI or :class:`symusic.Score` object representing the score.
             perf_midi: Path to MIDI or :class:`symusic.Score` object representing the performance.
@@ -197,6 +202,10 @@ class RAScoP:
         self.perf_midi = Score(perf_midi) if isinstance(perf_midi, str) else perf_midi
         self.alignment = Alignment.from_file(alignment) if isinstance(alignment, str) else alignment
 
+        prepare_midi = partial(preprocess_midi, to_single_track=True, clean_duplicates=True)
+        self.score_midi = prepare_midi(self.score_midi)
+        self.perf_midi = prepare_midi(self.perf_midi)
+
         self.config = config or RAScoPConfig()
         self.verbose = verbose
 
@@ -206,8 +215,8 @@ class RAScoP:
     def empty_metrics_dict() -> AlignmentMetrics:
         """Creates a fresh AlignmentMetrics container."""
         return AlignmentMetrics(
-            recall=TrackedRefinementStages(),
-            precision=TrackedRefinementStages(),
+            recall=RefinementStages(),
+            precision=RefinementStages(),
         )
 
     def compute_metrics(self) -> tuple[float, float]:
@@ -270,13 +279,15 @@ class RAScoP:
         print(log_str)
 
     @staticmethod
-    def _log_detail(label: str, data: str | list | np.ndarray) -> None:
+    def _log_detail(label: str | None, data: str | list | np.ndarray) -> None:
         """Internal logging helper for detailed stage data."""
-        if data:
-            print(f"           ↳ {label}: {data}")
+        if label is not None:
+            print(f"            ↳ {label}: {data}")
+        else:
+            print(f"            ↳ {data}")
 
     def __call__(self, **kwargs) -> tuple[Alignment, AlignmentMetrics, RefinementTimes]:
-        """Alias for refine_alignment."""
+        """Alias for :meth:`refine_alignment`."""
         return self.refine_alignment(**kwargs)
 
     def refine_alignment(
@@ -339,9 +350,14 @@ class RAScoP:
                 or self.alignment.num_full_pairs == 0
             ):
                 if verbose:
-                    print(
-                        f"  [HALT    ] Recall {recall:.3f} < threshold {cfg.min_recall}. Pipeline terminated."
-                        f"           ↳ Stages {', '.join(map(str, range(stage + 1, 5)))} cancelled."
+                    self._log(
+                        stage="HALT",
+                        msg=f"recall {recall:.3f} < threshold {cfg.min_recall}, pipeline terminated.",
+                        verbose=verbose,
+                    )
+                    self._log_detail(
+                        label=None,
+                        data=f"Stages {', '.join(map(str, range(stage + 1, 5)))} cancelled.",
                     )
                 self.perf_midi = self.perf_midi.to("tick")
                 metrics.recall.cleaner, metrics.precision.cleaner = recall, precision
@@ -473,7 +489,8 @@ class RAScoP:
             stage_start = time.perf_counter()
             if cfg.clean_onsets and cfg.score_holes:
                 hole_beat_ticks, hole_times = self.process_holes()
-                metrics.recall.hole_post, metrics.precision.hole_post = self.compute_metrics()
+                if run == 0:
+                    metrics.recall.hole_post, metrics.precision.hole_post = self.compute_metrics()
                 stage_time = time.perf_counter() - stage_start
                 stage_times.holes_post = (stage_times.holes_post or 0.0) + stage_time
                 self._log(
@@ -597,8 +614,8 @@ class RAScoP:
         self.perf_midi = self.perf_midi.to("tick")
 
         # sort after quantization
-        self.score_midi = preprocess_midi(self.score_midi, sort_events=True, clean_duplicates=False)
-        self.perf_midi = preprocess_midi(self.perf_midi, sort_events=True, clean_duplicates=False)
+        self.score_midi = preprocess_midi(self.score_midi, sort_events=True)
+        self.perf_midi = preprocess_midi(self.perf_midi, sort_events=True)
 
         if cfg.match_note_ids:
             self._update_note_ids()

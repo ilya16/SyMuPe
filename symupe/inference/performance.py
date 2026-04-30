@@ -433,7 +433,7 @@ def test():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Built the Generator by loading the model and tokenizer directly from the Hub
+    # Build Generator by loading the model and tokenizer directly from the Hub
     generator: PerformanceGenerator = AutoGenerator.from_pretrained(
         "SyMuPe/MLM-base", device=device
     )

@@ -79,6 +79,10 @@ class ParangonarAligner(Aligner):
         self.matcher = pa.DualDTWNoteMatcher()
         self.matcher.onset_matcher.dtw = DynamicTimeWarpingSingleLoop()
 
+    def __call__(self, score_midi: str | Path, perf_midi: str | Path, **kwargs):
+        """Alias for :meth:`align`."""
+        return self.align(score_midi, perf_midi, **kwargs)
+
     def align(
         self,
         score_midi: str | Path,
@@ -89,7 +93,7 @@ class ParangonarAligner(Aligner):
         save_alignment: bool = False,
         timeout: float | None = 1000.0,
         memory_limit: int | None = None,
-    ):
+    ) -> tuple[Alignment | None, dict[str, dict[str, str | Path]], list[str]]:
         start_time = time.perf_counter()
 
         soft, hard = resource.getrlimit(resource.RLIMIT_AS)
@@ -184,12 +188,14 @@ class ParangonarAligner(Aligner):
             )
         score_short_name = os.path.basename(score_name)
 
+        perf_name = perf_name.replace("_processed", "")
         align_name = f"{perf_name}_{score_short_name}"
 
         # process and save alignment
         try:
             score_midi = preprocess_midi(
                 Score(score_midi),
+                to_single_track=True,
                 cut_overlapped_notes=True,
                 clean_duplicates=True,
             ).to("second")

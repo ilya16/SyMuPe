@@ -262,8 +262,8 @@ class Seq2SeqMusicTransformerGenerator(PerformanceGenerator):
         # generate all notes till the end
         pbar = None
         if show_progress:
-            pbar = tqdm(total=len(init_seq))
-            pbar.update(all_gen_tokens.shape[1])
+            pbar = tqdm(total=len(self.data.source_seq))
+            pbar.update(all_gen_tokens.shape[1] - int(self.data.has_sos_eos))
         while not self.data.reached_eos:
             # add notes to predict
             cut_idx = current_note_idx + max_new_notes
@@ -295,6 +295,8 @@ class Seq2SeqMusicTransformerGenerator(PerformanceGenerator):
             has_eos = new_seq.ids[-1, 0] == self.eos_token_id
             if has_eos and (num_new_notes == 1 or not group_onset_notes):
                 self.data.reached_eos = True
+                if pbar is not None:
+                    pbar.update(num_new_notes)
                 break
 
             input_tokens = torch.cat(
@@ -393,6 +395,9 @@ class Seq2SeqMusicTransformerGenerator(PerformanceGenerator):
 
             if pbar is not None:
                 pbar.update(num_new_notes)
+
+        if pbar is not None:
+            pbar.close()
 
         self.data.reached_eos = self.data.reached_eos and (
             len(self.data.gen_seq[0]) - int(self.data.has_sos_eos) == len(self.data.source_seq)

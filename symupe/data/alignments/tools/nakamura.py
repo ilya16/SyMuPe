@@ -128,7 +128,7 @@ class AlignmentTool(Aligner):
         self.check_err_match = check_err_match
         self.min_recall = min_recall
 
-    def _check_and_build_programs(self):
+    def _check_and_build_programs(self) -> None:
         # check all required computation programs
         self.programs_dir = os.path.join(self.tool_path, "Programs")
         assert os.path.exists(self.programs_dir), "No programs directory found, run `compile.sh`"
@@ -141,13 +141,17 @@ class AlignmentTool(Aligner):
             )
             self.programs[program] = program_path
 
-    def _build_file_directories(self):
+    def _build_file_directories(self) -> None:
         # build file directories under `alignments_dir`
         self.file_dirs = {}
         for name in FILE_DIRECTORIES:
             dirname = os.path.join(self.alignments_dir, name)
             os.makedirs(dirname, exist_ok=True)
             self.file_dirs[name] = dirname
+
+    def __call__(self, score_midi: str | Path, perf_midi: str | Path, **kwargs):
+        """Alias for :meth:`align`."""
+        return self.align(score_midi, perf_midi, **kwargs)
 
     def align(
         self,
@@ -158,7 +162,7 @@ class AlignmentTool(Aligner):
         timeout: float | None = 1000.0,
         memory_limit: int | None = 8_000_000_000,
         retries: int = 0,
-    ):
+    ) -> tuple[Alignment | None, dict[str, dict[str, str | Path]], list[str]]:
         start_time = time.perf_counter()
 
         paths = {
@@ -214,7 +218,7 @@ class AlignmentTool(Aligner):
         self,
         midi_path: str | Path,
         force_recompute: bool = False,
-    ):
+    ) -> tuple[Path | None, str]:
         program = self.programs["midi2pianoroll"]
         midi_path = Path(midi_path)
 
@@ -241,7 +245,11 @@ class AlignmentTool(Aligner):
 
         return spr_path, ""
 
-    def spr_to_fmt3x(self, spr_path: str | Path, force_recompute: bool = False):
+    def spr_to_fmt3x(
+        self,
+        spr_path: str | Path,
+        force_recompute: bool = False,
+    ) -> tuple[Path | None, str]:
         program = self.programs["SprToFmt3x"]
         spr_path = Path(spr_path)
 
@@ -270,7 +278,11 @@ class AlignmentTool(Aligner):
 
         return fmt3x_path, ""
 
-    def fmt3x_to_hmm(self, fmt3x_path: str | Path, force_recompute: bool = False):
+    def fmt3x_to_hmm(
+        self,
+        fmt3x_path: str | Path,
+        force_recompute: bool = False,
+    ) -> tuple[Path | None, str]:
         program = self.programs["Fmt3xToHmm"]
         fmt3x_path = Path(fmt3x_path)
 
@@ -310,7 +322,7 @@ class AlignmentTool(Aligner):
         timeout: float | None = 1000.0,
         memory_limit: int | None = 8_000_000_000,
         retries: int = 0,
-    ):
+    ) -> tuple[tuple[Path | None, Path | None], str]:
         start_time = time.perf_counter()
 
         score_spr, score_fmt3x, score_hmm, perf_spr = map(
@@ -320,9 +332,9 @@ class AlignmentTool(Aligner):
         if any([not path.exists() for path in (score_spr, score_fmt3x, score_hmm, perf_spr)]):
             # essential files are missing, abort alignment tool
             return (
-                None,
-                None,
-            ), "Error@compute_alignment: at least one of spr/fmt3x/hmm files missing"
+                (None, None),
+                "Error@compute_alignment: at least one of spr/fmt3x/hmm files missing",
+            )
 
         # prepare alignment name, directory and paths
         score, perf = map(

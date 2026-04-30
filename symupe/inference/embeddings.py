@@ -188,14 +188,14 @@ def test():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Built the Generator by loading the model and tokenizer directly from the Hub
+    # Build Embedder by loading the model and tokenizer directly from the Hub
     embedder: MusicEmbedder = AutoEmbedder.from_pretrained("SyMuPe/Aria-MIDI-MLM", device=device)
     # model, tokenizer = embedder.model, embedder.tokenizer
 
     # Load MIDI
     midi = Score("performance.mid")
 
-    # Classify MIDI (tokenization is handled inside)
+    # Compute embeddings (tokenization is handled inside)
     result = embedder(midi, max_seq_len=512, hop_size=256, layer=-1)
     # result is MusicEmbeddingResult(...) containing:
     # - midi, seq, embeddings, memory_tokens, token_embeddings, hidden_states, sequences and window_indices
